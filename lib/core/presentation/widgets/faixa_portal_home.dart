@@ -39,6 +39,7 @@ class FaixaPortalHome extends StatelessWidget {
     required this.actions,
     this.onRefresh,
     this.onLogout,
+    this.bottomContent,
   });
 
   final String userName;
@@ -49,6 +50,7 @@ class FaixaPortalHome extends StatelessWidget {
   final List<PortalHomeAction> actions;
   final VoidCallback? onRefresh;
   final VoidCallback? onLogout;
+  final Widget? bottomContent;
 
   @override
   Widget build(BuildContext context) {
@@ -213,6 +215,10 @@ class FaixaPortalHome extends StatelessWidget {
               );
             },
           ),
+          if (bottomContent != null) ...[
+            const SizedBox(height: AppSpacing.lg),
+            bottomContent!,
+          ],
         ],
       ),
     );

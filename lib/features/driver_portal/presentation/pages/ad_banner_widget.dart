@@ -16,6 +16,7 @@ class AdBanner {
     this.imageUrl,
     this.link,
     required this.order,
+    this.updatedAt,
   });
 
   final int id;
@@ -23,6 +24,16 @@ class AdBanner {
   final String? imageUrl;
   final String? link;
   final int order;
+  final DateTime? updatedAt;
+
+  String? get resolvedImageUrl {
+    final raw = imageUrl;
+    if (raw == null || raw.isEmpty) return null;
+    final version = updatedAt?.millisecondsSinceEpoch;
+    if (version == null) return raw;
+    final separator = raw.contains('?') ? '&' : '?';
+    return '$raw${separator}v=$version';
+  }
 
   factory AdBanner.fromJson(Map<String, dynamic> json) {
     return AdBanner(
@@ -31,6 +42,7 @@ class AdBanner {
       imageUrl: json['image_url']?.toString(),
       link: json['link']?.toString(),
       order: (json['order'] as num?)?.toInt() ?? 0,
+      updatedAt: DateTime.tryParse(json['updated_at']?.toString() ?? ''),
     );
   }
 }
@@ -102,9 +114,10 @@ class AdBannerWidget extends ConsumerStatefulWidget {
 }
 
 class _AdBannerWidgetState extends ConsumerState<AdBannerWidget>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final PageController _pageController;
   Timer? _autoPlayTimer;
+  Timer? _refreshTimer;
   int _currentPage = 0;
   final Set<int> _impressionsSent = <int>{};
   final Dio _trackingDio = Dio(BaseOptions(baseUrl: BackendConfig.apiBaseUrl));
@@ -114,6 +127,7 @@ class _AdBannerWidgetState extends ConsumerState<AdBannerWidget>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _pageController = PageController(viewportFraction: 0.92);
     _fadeController = AnimationController(
       vsync: this,
@@ -124,14 +138,29 @@ class _AdBannerWidgetState extends ConsumerState<AdBannerWidget>
       curve: Curves.easeIn,
     );
     _fadeController.forward();
+    Future.microtask(() => ref.invalidate(adBannersProvider));
+    _refreshTimer = Timer.periodic(const Duration(seconds: 45), (_) {
+      if (mounted) {
+        ref.invalidate(adBannersProvider);
+      }
+    });
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _autoPlayTimer?.cancel();
+    _refreshTimer?.cancel();
     _pageController.dispose();
     _fadeController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      ref.invalidate(adBannersProvider);
+    }
   }
 
   void _startAutoPlay(int count) {
@@ -149,11 +178,19 @@ class _AdBannerWidgetState extends ConsumerState<AdBannerWidget>
   }
 
   Future<void> _openLink(String link) async {
-    final uri = Uri.tryParse(link);
+    final uri = _normalizeUri(link);
     if (uri == null) return;
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
+
+    final openedExternally = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    );
+    if (openedExternally) return;
+
+    final openedDefault = await launchUrl(uri, mode: LaunchMode.platformDefault);
+    if (openedDefault) return;
+
+    await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
   }
 
   Future<void> _trackImpression(AdBanner ad) async {
@@ -256,6 +293,18 @@ class _AdBannerWidgetState extends ConsumerState<AdBannerWidget>
   }
 }
 
+Uri? _normalizeUri(String raw) {
+  final trimmed = raw.trim();
+  if (trimmed.isEmpty) return null;
+
+  final parsed = Uri.tryParse(trimmed);
+  if (parsed != null && parsed.hasScheme) {
+    return parsed;
+  }
+
+  return Uri.tryParse('https://$trimmed');
+}
+
 // ─── Ad Card ─────────────────────────────────────────────────────────────────
 
 class _AdCard extends StatelessWidget {
@@ -277,7 +326,7 @@ class _AdCard extends StatelessWidget {
             children: [
               // Banner image
               Image.network(
-                ad.imageUrl!,
+                ad.resolvedImageUrl ?? ad.imageUrl!,
                 fit: BoxFit.cover,
                 loadingBuilder: (context, child, loadingProgress) {
                   if (loadingProgress == null) return child;

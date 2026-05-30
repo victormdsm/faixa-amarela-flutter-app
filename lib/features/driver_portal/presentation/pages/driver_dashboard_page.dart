@@ -8,6 +8,7 @@ import '../../../../core/presentation/widgets/faixa_portal_home.dart';
 import '../../../auth/presentation/state/app_session_controller.dart';
 import '../../../tracking/presentation/providers/tracking_providers.dart';
 import '../providers/driver_portal_providers.dart';
+import 'ad_banner_widget.dart';
 
 class DriverDashboardPage extends ConsumerWidget {
   const DriverDashboardPage({super.key});
@@ -29,6 +30,7 @@ class DriverDashboardPage extends ConsumerWidget {
       ref.invalidate(driverClientsProvider);
       ref.invalidate(driverRoutesProvider);
       ref.invalidate(driverProfileProvider);
+      ref.invalidate(adBannersProvider);
     }
 
     final clientCount = clientsAsync.when(
@@ -126,6 +128,7 @@ class DriverDashboardPage extends ConsumerWidget {
           onTap: () => ref.read(appSessionControllerProvider.notifier).clear(),
         ),
       ],
+      bottomContent: const AdBannerWidget(height: 104),
     );
   }
 

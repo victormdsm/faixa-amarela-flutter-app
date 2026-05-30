@@ -6,6 +6,7 @@ import '../../../../app/router/app_router.dart';
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/presentation/widgets/faixa_portal_home.dart';
 import '../../../auth/presentation/state/app_session_controller.dart';
+import '../../../driver_portal/presentation/pages/ad_banner_widget.dart';
 import '../providers/parent_portal_providers.dart';
 
 class ParentDashboardPage extends ConsumerWidget {
@@ -22,6 +23,7 @@ class ParentDashboardPage extends ConsumerWidget {
       ref.invalidate(parentChildrenProvider);
       ref.invalidate(parentRoutesProvider);
       ref.invalidate(parentBoardingsProvider);
+      ref.invalidate(adBannersProvider);
     }
 
     final childCount = childrenAsync.when(
@@ -112,6 +114,7 @@ class ParentDashboardPage extends ConsumerWidget {
           onTap: () => ref.read(appSessionControllerProvider.notifier).clear(),
         ),
       ],
+      bottomContent: const AdBannerWidget(height: 104),
     );
   }
 

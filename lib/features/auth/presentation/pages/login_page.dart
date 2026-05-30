@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/router/app_router.dart';
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/presentation/widgets/app_feedback.dart';
+import '../../../driver_portal/presentation/pages/ad_banner_widget.dart';
 import '../../domain/entities/user_role.dart';
 import '../state/app_session_controller.dart';
 import '../state/login_controller.dart';
@@ -238,6 +239,11 @@ class LoginPage extends ConsumerWidget {
                       ],
                     ),
                   ),
+                ),
+                const SizedBox(height: 12),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 2),
+                  child: AdBannerWidget(height: 104),
                 ),
               ],
             ),

@@ -9,11 +9,19 @@ fi
 # Android SDK
 export ANDROID_HOME="/opt/homebrew/Caskroom/android-platform-tools/37.0.0"
 
-API_BASE_URL="${1:-https://c8b1-2804-2610-6752-3e00-4d11-702d-6b00-cf10.ngrok-free.app/api}"
-PUSHER_APP_KEY="${2:-app-key}"
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
+
+if [ -f "$SCRIPT_DIR/.env.build" ]; then
+  echo "==> loading .env.build"
+  set -a
+  # shellcheck disable=SC1091
+  . "$SCRIPT_DIR/.env.build"
+  set +a
+fi
+
+API_BASE_URL="${API_BASE_URL:-https://c8b1-2804-2610-6752-3e00-4d11-702d-6b00-cf10.ngrok-free.app/api}"
+PUSHER_APP_KEY="${PUSHER_APP_KEY:-app-key}"
 
 echo "==> flutter pub get"
 flutter pub get

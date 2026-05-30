@@ -53,6 +53,7 @@ class DriverHomePage extends ConsumerWidget {
               onPressed: () {
                 ref.invalidate(driverClientsProvider);
                 ref.invalidate(driverRoutesProvider);
+                ref.invalidate(adBannersProvider);
               },
               icon: const Icon(Icons.refresh_rounded),
             ),
@@ -121,6 +122,13 @@ class DriverHomePage extends ConsumerWidget {
               ),
             ),
           ],
+        ),
+        bottomNavigationBar: const SafeArea(
+          top: false,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(12, 0, 12, 8),
+            child: AdBannerWidget(height: 96),
+          ),
         ),
       ),
     );

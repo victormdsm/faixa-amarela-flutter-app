@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/presentation/widgets/searchable_select_field.dart';
 import '../../../../core/utils/whatsapp_launcher.dart';
+import '../../../driver_portal/presentation/pages/ad_banner_widget.dart';
 import '../../domain/entities/public_transport_driver.dart';
 import '../../domain/entities/service_period.dart';
 import '../providers/transport_search_providers.dart';
@@ -45,15 +46,21 @@ class SearchTransportPage extends ConsumerWidget {
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: _FilterCard(
-                filters: filters,
-                schools: schools,
-                neighborhoods: neighborhoods,
-                driversAsync: driversAsync,
-                filteredCount: drivers.length,
-                onSchoolSelected: controller.setSchool,
-                onNeighborhoodSelected: controller.setNeighborhood,
-                onPeriodChanged: controller.setPeriod,
+              child: Column(
+                children: [
+                  _FilterCard(
+                    filters: filters,
+                    schools: schools,
+                    neighborhoods: neighborhoods,
+                    driversAsync: driversAsync,
+                    filteredCount: drivers.length,
+                    onSchoolSelected: controller.setSchool,
+                    onNeighborhoodSelected: controller.setNeighborhood,
+                    onPeriodChanged: controller.setPeriod,
+                  ),
+                  const SizedBox(height: 12),
+                  const AdBannerWidget(height: 104),
+                ],
               ),
             ),
           ),
