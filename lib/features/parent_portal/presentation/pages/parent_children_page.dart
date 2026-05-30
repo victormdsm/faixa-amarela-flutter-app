@@ -51,7 +51,10 @@ class ParentChildrenPage extends ConsumerWidget {
           }
           return ListView.separated(
             padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg, AppSpacing.md, AppSpacing.lg, 100,
+              AppSpacing.lg,
+              AppSpacing.md,
+              AppSpacing.lg,
+              100,
             ),
             itemCount: page.items.length,
             separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
@@ -122,15 +125,16 @@ class _ChildCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final name = (item['name'] ?? 'Sem nome').toString();
     final school = (item['school'] as Map?)?['name']?.toString();
-    final relative = ((item['relative'] as Map?)?['name'] ??
-            (item['relative'] as Map?)?['relative'])
-        ?.toString();
-    final shift = ((item['shift'] as Map?)?['shift_name'] ??
-            (item['shift'] as Map?)?['name'])
-        ?.toString();
+    final relative =
+        ((item['relative'] as Map?)?['name'] ??
+                (item['relative'] as Map?)?['relative'])
+            ?.toString();
+    final shift =
+        ((item['shift'] as Map?)?['shift_name'] ??
+                (item['shift'] as Map?)?['name'])
+            ?.toString();
     final isInadimplent = item['is_inadimplent'] == true;
-    final avatarUrl =
-        (item['avatar_url'] ?? item['avatar'])?.toString();
+    final avatarUrl = (item['avatar_url'] ?? item['avatar'])?.toString();
     final theme = Theme.of(context);
 
     return Container(
@@ -159,10 +163,7 @@ class _ChildCard extends ConsumerWidget {
                     ),
                     if (school != null || shift != null)
                       Text(
-                        [
-                          ?school,
-                          ?shift,
-                        ].join(' · '),
+                        [?school, ?shift].join(' · '),
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: AppColors.slate,
                         ),
@@ -190,9 +191,20 @@ class _ChildCard extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.md),
-          Row(
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
             children: [
-              Expanded(
+              SizedBox(
+                width: 132,
+                child: OutlinedButton.icon(
+                  onPressed: () => _openAddresses(context, ref, item),
+                  icon: const Icon(Icons.home_work_outlined, size: 18),
+                  label: const Text('Enderecos'),
+                ),
+              ),
+              SizedBox(
+                width: 108,
                 child: OutlinedButton.icon(
                   onPressed: () {
                     _editChild(context, ref, item);
@@ -201,8 +213,8 @@ class _ChildCard extends ConsumerWidget {
                   label: const Text('Editar'),
                 ),
               ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
+              SizedBox(
+                width: 112,
                 child: OutlinedButton.icon(
                   onPressed: () => _confirmDelete(context, ref),
                   icon: const Icon(Icons.delete_outline_rounded, size: 18),
@@ -285,10 +297,25 @@ class _ChildCard extends ConsumerWidget {
       );
     } on ApiException catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
     }
+  }
+
+  Future<void> _openAddresses(
+    BuildContext context,
+    WidgetRef ref,
+    Map<String, dynamic> dependent,
+  ) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (_) => _DependentAddressesSheet(dependent: dependent),
+    );
+    ref.invalidate(parentChildrenProvider);
   }
 }
 
@@ -422,8 +449,10 @@ class _DependentFormDialogState extends ConsumerState<_DependentFormDialog> {
                       children: [
                         OutlinedButton.icon(
                           onPressed: _saving ? null : _pickImage,
-                          icon: const Icon(Icons.photo_library_outlined,
-                              size: 18),
+                          icon: const Icon(
+                            Icons.photo_library_outlined,
+                            size: 18,
+                          ),
                           label: const Text('Foto'),
                         ),
                         if (_avatarPath != null)
@@ -447,22 +476,21 @@ class _DependentFormDialogState extends ConsumerState<_DependentFormDialog> {
               DropdownButtonFormField<String>(
                 initialValue: _sex,
                 isExpanded: true,
-                decoration:
-                    const InputDecoration(labelText: 'Sexo (opcional)'),
+                decoration: const InputDecoration(labelText: 'Sexo (opcional)'),
                 items: const [
                   DropdownMenuItem(value: 'M', child: Text('Masculino')),
                   DropdownMenuItem(value: 'F', child: Text('Feminino')),
                   DropdownMenuItem(value: 'O', child: Text('Outro')),
                 ],
-                onChanged:
-                    _saving ? null : (v) => setState(() => _sex = v),
+                onChanged: _saving ? null : (v) => setState(() => _sex = v),
               ),
               const SizedBox(height: AppSpacing.md),
               TextField(
                 controller: _ageCtrl,
                 keyboardType: TextInputType.number,
-                decoration:
-                    const InputDecoration(labelText: 'Idade (opcional)'),
+                decoration: const InputDecoration(
+                  labelText: 'Idade (opcional)',
+                ),
               ),
               const SizedBox(height: AppSpacing.md),
               _catDropdown(
@@ -487,8 +515,10 @@ class _DependentFormDialogState extends ConsumerState<_DependentFormDialog> {
               ),
               if (_error != null) ...[
                 const SizedBox(height: AppSpacing.sm),
-                Text(_error!,
-                    style: TextStyle(color: AppColors.danger, fontSize: 13)),
+                Text(
+                  _error!,
+                  style: TextStyle(color: AppColors.danger, fontSize: 13),
+                ),
               ],
             ],
           ),
@@ -496,8 +526,7 @@ class _DependentFormDialogState extends ConsumerState<_DependentFormDialog> {
       ),
       actions: [
         TextButton(
-          onPressed:
-              _saving ? null : () => Navigator.of(context).pop(false),
+          onPressed: _saving ? null : () => Navigator.of(context).pop(false),
           child: const Text('Cancelar'),
         ),
         FilledButton(
@@ -519,10 +548,12 @@ class _DependentFormDialogState extends ConsumerState<_DependentFormDialog> {
       isExpanded: true,
       decoration: InputDecoration(labelText: label),
       items: items
-          .map((i) => DropdownMenuItem(
-                value: i,
-                child: Text(i.name, overflow: TextOverflow.ellipsis),
-              ))
+          .map(
+            (i) => DropdownMenuItem(
+              value: i,
+              child: Text(i.name, overflow: TextOverflow.ellipsis),
+            ),
+          )
           .toList(growable: false),
       onChanged: _saving ? null : onChanged,
     );
@@ -535,17 +566,20 @@ class _DependentFormDialogState extends ConsumerState<_DependentFormDialog> {
   ) {
     final c = widget.current;
     if (_relative == null && c != null) {
-      final id = ((c['relative'] as Map?)?['id'] as num?)?.toInt() ??
+      final id =
+          ((c['relative'] as Map?)?['id'] as num?)?.toInt() ??
           (c['relative_id'] as num?)?.toInt();
       if (id != null) _relative = _find(rels, id);
     }
     if (_school == null && c != null) {
-      final id = ((c['school'] as Map?)?['id'] as num?)?.toInt() ??
+      final id =
+          ((c['school'] as Map?)?['id'] as num?)?.toInt() ??
           (c['school_id'] as num?)?.toInt();
       if (id != null) _school = _find(schools, id);
     }
     if (_shift == null && c != null) {
-      final id = ((c['shift'] as Map?)?['id'] as num?)?.toInt() ??
+      final id =
+          ((c['shift'] as Map?)?['id'] as num?)?.toInt() ??
           (c['shift_id'] as num?)?.toInt();
       if (id != null) _shift = _find(shifts, id);
     }
@@ -589,15 +623,17 @@ class _DependentFormDialogState extends ConsumerState<_DependentFormDialog> {
       _error = null;
     });
     try {
-      await widget.onSubmit(_DependentFormDraft(
-        name: name,
-        relativeId: _relative!.id,
-        schoolId: _school!.id,
-        shiftId: _shift!.id,
-        sex: _sex,
-        age: age,
-        avatarImagePath: _avatarPath,
-      ));
+      await widget.onSubmit(
+        _DependentFormDraft(
+          name: name,
+          relativeId: _relative!.id,
+          schoolId: _school!.id,
+          shiftId: _shift!.id,
+          sex: _sex,
+          age: age,
+          avatarImagePath: _avatarPath,
+        ),
+      );
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } on ApiException catch (e) {
@@ -612,4 +648,443 @@ class _DependentFormDialogState extends ConsumerState<_DependentFormDialog> {
       });
     }
   }
+}
+
+class _DependentAddressesSheet extends ConsumerStatefulWidget {
+  const _DependentAddressesSheet({required this.dependent});
+
+  final Map<String, dynamic> dependent;
+
+  @override
+  ConsumerState<_DependentAddressesSheet> createState() =>
+      _DependentAddressesSheetState();
+}
+
+class _DependentAddressesSheetState
+    extends ConsumerState<_DependentAddressesSheet> {
+  bool _saving = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = (widget.dependent['name'] ?? 'Dependente').toString();
+    final addresses = ((widget.dependent['addresses'] as List?) ?? const [])
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList(growable: false);
+
+    return SizedBox(
+      height: (MediaQuery.sizeOf(context).height * 0.82).clamp(440.0, 760.0),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Enderecos de $name',
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Cadastre um ou mais enderecos para o motorista escolher ao planejar a rota.',
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppColors.slate),
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: addresses.isEmpty
+                  ? const AppEmptyState(
+                      message: 'Nenhum endereco cadastrado.',
+                      icon: Icons.home_outlined,
+                    )
+                  : ListView.separated(
+                      itemCount: addresses.length,
+                      separatorBuilder: (_, _) =>
+                          const SizedBox(height: AppSpacing.sm),
+                      itemBuilder: (context, index) {
+                        final item = addresses[index];
+                        final district = (item['district'] as Map?)?['name']
+                            ?.toString();
+                        final city = (item['city'] as Map?)?['name']
+                            ?.toString();
+                        final type = (item['type'] ?? 'home').toString();
+                        final isDefault = item['is_default'] == true;
+                        final label = [
+                          (item['street'] ?? '').toString(),
+                          (item['number'] ?? '').toString(),
+                        ].where((e) => e.trim().isNotEmpty).join(', ');
+                        final extra = [
+                          ?district,
+                          ?city,
+                        ].where((e) => e.trim().isNotEmpty).join(' · ');
+                        return Container(
+                          padding: const EdgeInsets.all(AppSpacing.md),
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      label.isEmpty ? 'Endereco' : label,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleSmall
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                    ),
+                                  ),
+                                  if (isDefault)
+                                    const AppInfoPill(
+                                      icon: Icons.check_circle_outline_rounded,
+                                      text: 'Padrao',
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${_addressTypeLabel(type)}${extra.isEmpty ? '' : ' · $extra'}',
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(color: AppColors.slate),
+                              ),
+                              if ((item['reference'] ?? '')
+                                  .toString()
+                                  .trim()
+                                  .isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 4),
+                                  child: Text(
+                                    'Ref: ${(item['reference'] ?? '').toString()}',
+                                    style: Theme.of(context).textTheme.bodySmall
+                                        ?.copyWith(color: AppColors.slate),
+                                  ),
+                                ),
+                              const SizedBox(height: 8),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton.icon(
+                                  onPressed: _saving
+                                      ? null
+                                      : () => _openAddressForm(current: item),
+                                  icon: const Icon(
+                                    Icons.edit_outlined,
+                                    size: 18,
+                                  ),
+                                  label: const Text('Editar'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+            ),
+            const SizedBox(height: 8),
+            FilledButton.icon(
+              onPressed: _saving ? null : () => _openAddressForm(),
+              icon: const Icon(Icons.add_location_alt_outlined),
+              label: const Text('Adicionar endereco'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openAddressForm({Map<String, dynamic>? current}) async {
+    final draft = await showDialog<_DependentAddressDraft>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _DependentAddressDialog(current: current),
+    );
+    if (draft == null || !mounted) return;
+    final session = ref.read(appSessionControllerProvider).session;
+    if (session == null) return;
+    final dependentId = (widget.dependent['id'] as num?)?.toInt() ?? 0;
+    if (dependentId <= 0) return;
+
+    setState(() => _saving = true);
+    try {
+      final repo = ref.read(parentPortalRepositoryProvider);
+      if (current == null) {
+        await repo.createDependentAddress(
+          session.authorizationHeader,
+          dependentId: dependentId,
+          zipcode: draft.zipcode,
+          street: draft.street,
+          number: draft.number,
+          reference: draft.reference,
+          districtId: draft.districtId,
+          cityId: draft.cityId,
+          type: draft.type,
+          isDefault: draft.isDefault,
+          latitude: draft.latitude,
+          longitude: draft.longitude,
+        );
+      } else {
+        final addressId = (current['id'] as num?)?.toInt() ?? 0;
+        if (addressId <= 0) return;
+        await repo.updateDependentAddress(
+          session.authorizationHeader,
+          dependentId: dependentId,
+          addressId: addressId,
+          zipcode: draft.zipcode,
+          street: draft.street,
+          number: draft.number,
+          reference: draft.reference,
+          districtId: draft.districtId,
+          cityId: draft.cityId,
+          type: draft.type,
+          isDefault: draft.isDefault,
+          latitude: draft.latitude,
+          longitude: draft.longitude,
+        );
+      }
+      ref.invalidate(parentChildrenProvider);
+      if (!mounted) return;
+      Navigator.of(context).pop();
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
+  }
+}
+
+class _DependentAddressDraft {
+  const _DependentAddressDraft({
+    required this.zipcode,
+    required this.street,
+    required this.number,
+    required this.type,
+    required this.isDefault,
+    this.reference,
+    this.districtId,
+    this.cityId,
+    this.latitude,
+    this.longitude,
+  });
+
+  final String zipcode;
+  final String street;
+  final String number;
+  final String? reference;
+  final int? districtId;
+  final int? cityId;
+  final String type;
+  final bool isDefault;
+  final String? latitude;
+  final String? longitude;
+}
+
+class _DependentAddressDialog extends ConsumerStatefulWidget {
+  const _DependentAddressDialog({this.current});
+
+  final Map<String, dynamic>? current;
+
+  @override
+  ConsumerState<_DependentAddressDialog> createState() =>
+      _DependentAddressDialogState();
+}
+
+class _DependentAddressDialogState
+    extends ConsumerState<_DependentAddressDialog> {
+  late final TextEditingController _zipcodeCtrl;
+  late final TextEditingController _streetCtrl;
+  late final TextEditingController _numberCtrl;
+  late final TextEditingController _referenceCtrl;
+  late final TextEditingController _latCtrl;
+  late final TextEditingController _lngCtrl;
+  CatalogOption? _district;
+  String _type = 'home';
+  bool _isDefault = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    final c = widget.current;
+    _zipcodeCtrl = TextEditingController(
+      text: (c?['zipcode'] ?? '').toString(),
+    );
+    _streetCtrl = TextEditingController(text: (c?['street'] ?? '').toString());
+    _numberCtrl = TextEditingController(text: (c?['number'] ?? '').toString());
+    _referenceCtrl = TextEditingController(
+      text: (c?['reference'] ?? '').toString(),
+    );
+    _latCtrl = TextEditingController(text: (c?['latitude'] ?? '').toString());
+    _lngCtrl = TextEditingController(text: (c?['longitude'] ?? '').toString());
+    final rawType = (c?['type'] ?? 'home').toString().trim();
+    _type = ['home', 'school', 'other'].contains(rawType) ? rawType : 'home';
+    _isDefault = c?['is_default'] == true;
+  }
+
+  @override
+  void dispose() {
+    _zipcodeCtrl.dispose();
+    _streetCtrl.dispose();
+    _numberCtrl.dispose();
+    _referenceCtrl.dispose();
+    _latCtrl.dispose();
+    _lngCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final districts = ref.watch(districtsCatalogProvider).value ?? const [];
+    if (_district == null && widget.current != null) {
+      final districtId =
+          ((widget.current!['district'] as Map?)?['id'] as num?)?.toInt() ??
+          (widget.current!['district_id'] as num?)?.toInt();
+      if (districtId != null) {
+        for (final item in districts) {
+          if (item.id == districtId) {
+            _district = item;
+            break;
+          }
+        }
+      }
+    }
+
+    return AlertDialog(
+      title: Text(widget.current == null ? 'Novo endereco' : 'Editar endereco'),
+      content: SizedBox(
+        width: 420,
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextField(
+                controller: _zipcodeCtrl,
+                decoration: const InputDecoration(labelText: 'CEP'),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              TextField(
+                controller: _streetCtrl,
+                decoration: const InputDecoration(labelText: 'Rua'),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              TextField(
+                controller: _numberCtrl,
+                decoration: const InputDecoration(labelText: 'Numero'),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              TextField(
+                controller: _referenceCtrl,
+                decoration: const InputDecoration(labelText: 'Referencia'),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              DropdownButtonFormField<CatalogOption>(
+                initialValue: _district,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Bairro'),
+                items: districts
+                    .map(
+                      (d) => DropdownMenuItem<CatalogOption>(
+                        value: d,
+                        child: Text(d.name, overflow: TextOverflow.ellipsis),
+                      ),
+                    )
+                    .toList(growable: false),
+                onChanged: (v) => setState(() => _district = v),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              DropdownButtonFormField<String>(
+                initialValue: _type,
+                decoration: const InputDecoration(labelText: 'Tipo'),
+                items: const [
+                  DropdownMenuItem(value: 'home', child: Text('Casa')),
+                  DropdownMenuItem(value: 'school', child: Text('Escola')),
+                  DropdownMenuItem(value: 'other', child: Text('Outro')),
+                ],
+                onChanged: (v) => setState(() => _type = v ?? 'home'),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _latCtrl,
+                      decoration: const InputDecoration(labelText: 'Latitude'),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: TextField(
+                      controller: _lngCtrl,
+                      decoration: const InputDecoration(labelText: 'Longitude'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                value: _isDefault,
+                onChanged: (v) => setState(() => _isDefault = v),
+                title: const Text('Definir como endereco padrao'),
+              ),
+              if (_error != null)
+                Text(_error!, style: const TextStyle(color: AppColors.danger)),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(onPressed: _submit, child: const Text('Salvar')),
+      ],
+    );
+  }
+
+  void _submit() {
+    final zipcode = _zipcodeCtrl.text.trim();
+    final street = _streetCtrl.text.trim();
+    final number = _numberCtrl.text.trim();
+    if (zipcode.isEmpty || street.isEmpty || number.isEmpty) {
+      setState(() => _error = 'CEP, rua e numero sao obrigatorios.');
+      return;
+    }
+    Navigator.of(context).pop(
+      _DependentAddressDraft(
+        zipcode: zipcode,
+        street: street,
+        number: number,
+        reference: _referenceCtrl.text.trim().isEmpty
+            ? null
+            : _referenceCtrl.text.trim(),
+        districtId: _district?.id,
+        cityId: null,
+        type: _type,
+        isDefault: _isDefault,
+        latitude: _latCtrl.text.trim().isEmpty ? null : _latCtrl.text.trim(),
+        longitude: _lngCtrl.text.trim().isEmpty ? null : _lngCtrl.text.trim(),
+      ),
+    );
+  }
+}
+
+String _addressTypeLabel(String type) {
+  return switch (type.trim().toLowerCase()) {
+    'home' => 'Casa',
+    'school' => 'Escola',
+    _ => 'Outro',
+  };
 }

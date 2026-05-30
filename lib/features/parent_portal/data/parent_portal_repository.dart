@@ -48,8 +48,9 @@ class ParentPortalRepository {
               options: Options(headers: {'Authorization': authHeader}),
               data: FormData.fromMap({
                 ...payload,
-                'avatar_image':
-                    await MultipartFile.fromFile(avatarImagePath.trim()),
+                'avatar_image': await MultipartFile.fromFile(
+                  avatarImagePath.trim(),
+                ),
               }),
             )
           : await _dio.post<Map<String, dynamic>>(
@@ -117,6 +118,81 @@ class ParentPortalRepository {
         '/parents/dependents/$dependentId',
         options: Options(headers: {'Authorization': authHeader}),
       );
+    } catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
+  Future<Map<String, dynamic>> createDependentAddress(
+    String authHeader, {
+    required int dependentId,
+    required String zipcode,
+    required String street,
+    required String number,
+    String? reference,
+    int? districtId,
+    int? cityId,
+    String type = 'home',
+    bool isDefault = false,
+    String? latitude,
+    String? longitude,
+  }) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/parents/dependents/$dependentId/addresses',
+        options: Options(headers: {'Authorization': authHeader}),
+        data: {
+          'zipcode': zipcode,
+          'street': street,
+          'number': number,
+          ...?_stringEntry('reference', reference),
+          ...?_numEntry('district_id', districtId),
+          ...?_numEntry('city_id', cityId),
+          ...?_stringEntry('latitude', latitude),
+          ...?_stringEntry('longitude', longitude),
+          'type': type,
+          'is_default': isDefault,
+        },
+      );
+      return response.data ?? const <String, dynamic>{};
+    } catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
+  Future<Map<String, dynamic>> updateDependentAddress(
+    String authHeader, {
+    required int dependentId,
+    required int addressId,
+    required String zipcode,
+    required String street,
+    required String number,
+    String? reference,
+    int? districtId,
+    int? cityId,
+    String type = 'home',
+    bool isDefault = false,
+    String? latitude,
+    String? longitude,
+  }) async {
+    try {
+      final response = await _dio.put<Map<String, dynamic>>(
+        '/parents/dependents/$dependentId/addresses/$addressId',
+        options: Options(headers: {'Authorization': authHeader}),
+        data: {
+          'zipcode': zipcode,
+          'street': street,
+          'number': number,
+          ...?_stringEntry('reference', reference),
+          ...?_numEntry('district_id', districtId),
+          ...?_numEntry('city_id', cityId),
+          ...?_stringEntry('latitude', latitude),
+          ...?_stringEntry('longitude', longitude),
+          'type': type,
+          'is_default': isDefault,
+        },
+      );
+      return response.data ?? const <String, dynamic>{};
     } catch (error) {
       throw ApiException.fromDio(error);
     }
