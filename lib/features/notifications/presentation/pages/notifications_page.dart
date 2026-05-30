@@ -196,6 +196,8 @@ class _NotificationTile extends StatelessWidget {
 
   IconData _iconFor(String type) {
     return switch (type) {
+      'boarded' => Icons.directions_bus_rounded,
+      'disembarked' => Icons.home_rounded,
       'arrived' => Icons.location_on_rounded,
       'delayed' => Icons.schedule_rounded,
       'breakdown' || 'flat_tire' || 'accident' => Icons.warning_rounded,
