@@ -139,6 +139,8 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
       warning: permissionWarning,
       clearGeofence: true,
       clearRoutePreview: true,
+      offRoute: false,
+      routeRecalculating: false,
     );
     _lastRouteRecalcAt = null;
     _isRouteRecalcInFlight = false;
@@ -209,6 +211,8 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
       clearRoutePreview: true,
       clearError: silent,
       clearWarning: false,
+      offRoute: false,
+      routeRecalculating: false,
     );
   }
 
@@ -518,10 +522,16 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
     if (!distanceMeters.isFinite ||
         distanceMeters <= _deviationDistanceThresholdMeters) {
       _offRouteSince = null;
+      if (state.offRoute || state.routeRecalculating) {
+        state = state.copyWith(offRoute: false, routeRecalculating: false);
+      }
       return;
     }
 
     _offRouteSince ??= now;
+    if (!state.offRoute) {
+      state = state.copyWith(offRoute: true);
+    }
 
     if (now.difference(_offRouteSince!) <
         Duration(seconds: _deviationSustainSeconds)) {
@@ -536,6 +546,7 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
 
     _lastDeviationRecalcAt = now;
     _offRouteSince = null;
+    state = state.copyWith(offRoute: true, routeRecalculating: true);
     await _performRoutePreviewRefresh(position, force: true);
   }
 
@@ -662,11 +673,14 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
           previous: state.routePlannedStops,
           incomingRemaining: stops,
         ),
+        offRoute: false,
+        routeRecalculating: false,
         clearWarning: true,
       );
     } catch (e) {
       final message = _extractRouteRecalcErrorMessage(e);
       state = state.copyWith(
+        routeRecalculating: false,
         warning: message == null
             ? state.warning
             : 'Rota nao foi atualizada agora: $message',

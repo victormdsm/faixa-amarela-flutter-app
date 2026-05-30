@@ -40,6 +40,8 @@ class DriverTrackingState {
     this.routePolyline = const [],
     this.routeRemainingStops = const [],
     this.routePlannedStops = const [],
+    this.offRoute = false,
+    this.routeRecalculating = false,
     this.warning,
     this.error,
   });
@@ -71,6 +73,8 @@ class DriverTrackingState {
   final List<DriverTrackingLatLng> routePolyline;
   final List<DriverTrackingStopPoint> routeRemainingStops;
   final List<DriverTrackingStopPoint> routePlannedStops;
+  final bool offRoute;
+  final bool routeRecalculating;
   final String? warning;
   final String? error;
 
@@ -104,6 +108,8 @@ class DriverTrackingState {
     List<DriverTrackingLatLng>? routePolyline,
     List<DriverTrackingStopPoint>? routeRemainingStops,
     List<DriverTrackingStopPoint>? routePlannedStops,
+    bool? offRoute,
+    bool? routeRecalculating,
     String? warning,
     String? error,
     bool clearRoute = false,
@@ -162,6 +168,10 @@ class DriverTrackingState {
       routePlannedStops: clearRoute || clearRoutePreview
           ? const []
           : (routePlannedStops ?? this.routePlannedStops),
+      offRoute: clearRoute ? false : (offRoute ?? this.offRoute),
+      routeRecalculating: clearRoute
+          ? false
+          : (routeRecalculating ?? this.routeRecalculating),
       warning: clearWarning ? null : (warning ?? this.warning),
       error: clearError ? null : (error ?? this.error),
     );

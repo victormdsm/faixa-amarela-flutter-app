@@ -2261,6 +2261,10 @@ class _DriverRouteWorkspacePanelState
             context,
           ).textTheme.bodySmall?.copyWith(color: AppColors.slate),
         ),
+        if (tracking.routeActive) ...[
+          const SizedBox(height: 6),
+          _buildRouteHealthChip(context, tracking),
+        ],
         if (tracking.routeActive &&
             (tracking.routeEtaSeconds != null ||
                 tracking.routeDistanceMeters != null ||
@@ -2392,6 +2396,61 @@ class _DriverRouteWorkspacePanelState
               : Icons.check_circle_outline_rounded,
         ),
       ],
+    );
+  }
+
+  Widget _buildRouteHealthChip(
+    BuildContext context,
+    DriverTrackingState tracking,
+  ) {
+    final (label, icon, bgColor, fgColor) = switch ((
+      tracking.routeRecalculating,
+      tracking.offRoute,
+    )) {
+      (true, _) => (
+        'Recalculando...',
+        Icons.autorenew_rounded,
+        const Color(0xFFFFF1BE),
+        const Color(0xFF7A4B00),
+      ),
+      (false, true) => (
+        'Fora da rota',
+        Icons.warning_amber_rounded,
+        const Color(0xFFFFE2DB),
+        const Color(0xFFA13C1A),
+      ),
+      _ => (
+        'Na rota',
+        Icons.check_circle_rounded,
+        const Color(0xFFDFF6EA),
+        const Color(0xFF0D6B43),
+      ),
+    };
+
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: fgColor.withValues(alpha: 0.18)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: fgColor),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: fgColor,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
