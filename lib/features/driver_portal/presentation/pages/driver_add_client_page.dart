@@ -40,6 +40,7 @@ class _DriverAddClientPageState extends ConsumerState<DriverAddClientPage> {
   String? _cepInfo;
   String? _parentLookupInfo;
   String? _inadimplencyWarning;
+  bool _cpfLookupCompleted = false;
 
   @override
   void dispose() {
@@ -96,7 +97,18 @@ class _DriverAddClientPageState extends ConsumerState<DriverAddClientPage> {
                       keyboardType: TextInputType.emailAddress,
                     ),
                     const SizedBox(height: 12),
-                    _buildTextField(_cpfController, 'CPF'),
+                    _buildTextField(
+                      _cpfController,
+                      'CPF',
+                      onChanged: (_) {
+                        setState(() {
+                          _cpfLookupCompleted = false;
+                          _linkedParentId = null;
+                          _lookupDependents = const [];
+                          _selectedDependent = null;
+                        });
+                      },
+                    ),
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 8,
@@ -146,7 +158,20 @@ class _DriverAddClientPageState extends ConsumerState<DriverAddClientPage> {
                             .toList(growable: false),
                         onChanged: _submitting
                             ? null
-                            : (value) => setState(() => _selectedDependent = value),
+                            : (value) {
+                                if (value == null) {
+                                  setState(() => _selectedDependent = null);
+                                  return;
+                                }
+                                if (value.blockedByOtherDriver) {
+                                  setState(() {
+                                    _error =
+                                        'Dependente bloqueado para este motorista. Solicite transferencia.';
+                                  });
+                                  return;
+                                }
+                                setState(() => _selectedDependent = value);
+                              },
                       ),
                     ],
                     if (_inadimplencyWarning != null) ...[
@@ -387,6 +412,7 @@ class _DriverAddClientPageState extends ConsumerState<DriverAddClientPage> {
     }
 
     setState(() {
+      _cpfLookupCompleted = false;
       _lookingUpParentCpf = true;
       _parentLookupInfo = null;
       _inadimplencyWarning = null;
@@ -401,7 +427,8 @@ class _DriverAddClientPageState extends ConsumerState<DriverAddClientPage> {
       if (!found) {
         setState(() {
           _parentLookupInfo =
-              (result['message'] ?? 'Nenhum responsavel encontrado para este CPF.')
+              (result['message'] ??
+                      'Nenhum responsavel encontrado para este CPF.')
                   .toString();
         });
         return;
@@ -416,10 +443,11 @@ class _DriverAddClientPageState extends ConsumerState<DriverAddClientPage> {
       if (email.isNotEmpty) _emailController.text = email;
       if (cellPhone.isNotEmpty) _cellPhoneController.text = cellPhone;
 
-      final linkedDependentIds = (((result['linked_dependent_ids'] as List?) ?? const [])
-              .whereType<num>()
-              .map((e) => e.toInt()))
-          .toSet();
+      final linkedDependentIds =
+          (((result['linked_dependent_ids'] as List?) ?? const [])
+                  .whereType<num>()
+                  .map((e) => e.toInt()))
+              .toSet();
       final dependentOptions = dependents
           .whereType<Map>()
           .map((raw) => Map<String, dynamic>.from(raw))
@@ -434,13 +462,14 @@ class _DriverAddClientPageState extends ConsumerState<DriverAddClientPage> {
                 if ((raw['shift_name'] ?? '').toString().isNotEmpty)
                   'Turno: ${raw['shift_name']}',
                 if (raw['is_inadimplent'] == true) 'INADIMPLENTE',
-                if (linkedDependentIds.contains((raw['id'] as num?)?.toInt() ?? 0))
+                if (linkedDependentIds.contains(
+                  (raw['id'] as num?)?.toInt() ?? 0,
+                ))
                   'ja vinculado a este motorista',
                 if (raw['linked_to_other_driver'] == true)
                   (() {
                     final rawNames =
-                        (raw['linked_other_driver_names'] as List?) ??
-                        const [];
+                        (raw['linked_other_driver_names'] as List?) ?? const [];
                     final names = rawNames
                         .map((name) => name.toString().trim())
                         .where((name) => name.isNotEmpty)
@@ -465,6 +494,7 @@ class _DriverAddClientPageState extends ConsumerState<DriverAddClientPage> {
           .where((item) => !item.blockedByOtherDriver)
           .toList(growable: false);
       setState(() {
+        _cpfLookupCompleted = true;
         _linkedParentId = (parent['id'] as num?)?.toInt();
         _lookupDependents = dependentOptions;
         _selectedDependent = firstAvailableDependent.isNotEmpty
@@ -476,7 +506,9 @@ class _DriverAddClientPageState extends ConsumerState<DriverAddClientPage> {
         if (dependentOptions.isEmpty) {
           _parentLookupInfo =
               'Responsavel encontrado, mas sem dependentes cadastrados. O responsavel deve cadastrar o dependente no app.';
-        } else if (dependentOptions.every((item) => item.blockedByOtherDriver)) {
+        } else if (dependentOptions.every(
+          (item) => item.blockedByOtherDriver,
+        )) {
           _parentLookupInfo =
               'Responsavel encontrado, mas todos os dependentes ativos ja estao vinculados a outro motorista.';
         }
@@ -579,8 +611,16 @@ class _DriverAddClientPageState extends ConsumerState<DriverAddClientPage> {
       });
       return;
     }
+    if (!_cpfLookupCompleted) {
+      setState(
+        () => _error = 'Primeiro toque em "Buscar responsavel pelo CPF".',
+      );
+      return;
+    }
     if (_selectedDependent == null) {
-      setState(() => _error = 'Selecione o dependente que sera vinculado a esta van.');
+      setState(
+        () => _error = 'Selecione o dependente que sera vinculado a esta van.',
+      );
       return;
     }
     if (_selectedDependent!.blockedByOtherDriver) {
@@ -589,6 +629,28 @@ class _DriverAddClientPageState extends ConsumerState<DriverAddClientPage> {
             'Este dependente ja esta vinculado a outro motorista. Selecione outro dependente.';
       });
       return;
+    }
+    if (_inadimplencyWarning != null) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Confirmar vinculo inadimplente'),
+          content: Text(
+            '$_inadimplencyWarning\n\nDeseja continuar mesmo assim?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Continuar'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
     }
 
     setState(() {

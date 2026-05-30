@@ -300,7 +300,7 @@ class _DriverClientsPageState extends ConsumerState<DriverClientsPage> {
     if (session == null) return;
 
     try {
-      await ref
+      final response = await ref
           .read(driverPortalRepositoryProvider)
           .updateClientInadimplency(
             session.authorizationHeader,
@@ -314,9 +314,9 @@ class _DriverClientsPageState extends ConsumerState<DriverClientsPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            draft.amount > 0
-                ? 'Debito atualizado com sucesso.'
-                : 'Debito removido com sucesso.',
+            (response['message'] ?? '').toString().trim().isNotEmpty
+                ? (response['message'] as String)
+                : 'Solicitacao de debito enviada para aprovacao.',
           ),
         ),
       );
@@ -355,6 +355,8 @@ class _ClientCard extends StatelessWidget {
     final clientId = (client['id'] as num?)?.toInt() ?? 0;
     final parentName = (parent['name'] ?? 'Cliente #$clientId').toString();
     final inadimplencyAlert = client['inadimplency_alert'] == true;
+    final inadimplencyRequestStatus =
+        (client['inadimplency_request_status'] ?? '').toString().toLowerCase();
     final inadimplencyAmount = (client['inadimplency_amount'] as num?)
         ?.toDouble();
     final cpf = (parent['cpf'] ?? '').toString();
@@ -459,6 +461,15 @@ class _ClientCard extends StatelessWidget {
                     : 'Responsavel com debitos.',
                 icon: Icons.warning_amber_rounded,
                 color: AppColors.yellowDark,
+              ),
+            ],
+            if (inadimplencyRequestStatus == 'pending') ...[
+              const SizedBox(height: AppSpacing.sm),
+              const AppInfoBanner(
+                message:
+                    'Solicitacao de inadimplencia pendente de aprovacao do admin.',
+                icon: Icons.hourglass_top_rounded,
+                color: AppColors.ink,
               ),
             ],
 

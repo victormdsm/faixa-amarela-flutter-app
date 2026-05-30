@@ -228,7 +228,7 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
 
     final polyline = _extractPolylinePoints(geometry);
     final mapUrl = (state.lastLatitude != null && state.lastLongitude != null)
-        ? _buildGoogleDirectionsUrl(
+        ? _buildExternalDirectionsUrl(
             originLat: state.lastLatitude!,
             originLng: state.lastLongitude!,
             stops: parsedStops
@@ -653,7 +653,7 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
 
       final polyline = _extractPolylinePoints(data['geometry']);
 
-      final mapUrl = _buildGoogleDirectionsUrl(
+      final mapUrl = _buildExternalDirectionsUrl(
         originLat: position.latitude,
         originLng: position.longitude,
         stops: stops
@@ -1066,35 +1066,28 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
     return text;
   }
 
-  String? _buildGoogleDirectionsUrl({
+  /// Link externo de rota baseado em OpenStreetMap/OSRM (sem Google Maps).
+  /// O preview in-app usa a geometria ORS via [state.routePolyline] no MapLibre;
+  /// este link serve apenas como "abrir no mapa externo".
+  String? _buildExternalDirectionsUrl({
     required double originLat,
     required double originLng,
     required List<({String? name, double? lat, double? lng})> stops,
   }) {
-    if (stops.isEmpty) return null;
-    final first = stops.first;
-    if (first.lat == null || first.lng == null) return null;
+    final valid = stops
+        .where((s) => s.lat != null && s.lng != null)
+        .toList(growable: false);
+    if (valid.isEmpty) return null;
 
-    final params = <String, String>{
-      'api': '1',
-      'travelmode': 'driving',
-      'origin': '$originLat,$originLng',
-      'destination': '${first.lat},${first.lng}',
-    };
-
-    if (stops.length > 1) {
-      final waypoints = stops
-          .skip(1)
-          .take(5)
-          .where((s) => s.lat != null && s.lng != null)
-          .map((s) => '${s.lat},${s.lng}')
-          .join('|');
-      if (waypoints.isNotEmpty) {
-        params['waypoints'] = waypoints;
-      }
+    final waypoints = <String>['$originLat,$originLng'];
+    for (final s in valid.take(6)) {
+      waypoints.add('${s.lat},${s.lng}');
     }
 
-    return Uri.https('www.google.com', '/maps/dir/', params).toString();
+    return Uri.https('www.openstreetmap.org', '/directions', <String, String>{
+      'engine': 'fossgis_osrm_car',
+      'route': waypoints.join(';'),
+    }).toString();
   }
 
   List<DriverTrackingLatLng> _extractPolylinePoints(dynamic geometry) {

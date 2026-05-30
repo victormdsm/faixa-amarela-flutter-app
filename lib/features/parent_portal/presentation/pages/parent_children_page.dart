@@ -74,6 +74,7 @@ class ParentChildrenPage extends ConsumerWidget {
     final session = ref.read(appSessionControllerProvider).session;
     if (session == null) return;
 
+    Map<String, dynamic>? createdDependent;
     final result = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
@@ -82,7 +83,7 @@ class ParentChildrenPage extends ConsumerWidget {
         onSubmit: (draft) async {
           final repo = ref.read(parentPortalRepositoryProvider);
           if (current == null) {
-            await repo.createDependent(
+            createdDependent = await repo.createDependent(
               session.authorizationHeader,
               name: draft.name,
               relativeId: draft.relativeId,
@@ -109,7 +110,22 @@ class ParentChildrenPage extends ConsumerWidget {
         },
       ),
     );
-    if (result == true) ref.invalidate(parentChildrenProvider);
+    if (result == true) {
+      ref.invalidate(parentChildrenProvider);
+      if (current == null && createdDependent != null && context.mounted) {
+        await showModalBottomSheet<void>(
+          context: context,
+          isScrollControlled: true,
+          isDismissible: false,
+          enableDrag: false,
+          showDragHandle: true,
+          builder: (_) => _DependentAddressesSheet(
+            dependent: createdDependent!,
+            forceAtLeastOneAddress: true,
+          ),
+        );
+      }
+    }
   }
 }
 
@@ -651,9 +667,13 @@ class _DependentFormDialogState extends ConsumerState<_DependentFormDialog> {
 }
 
 class _DependentAddressesSheet extends ConsumerStatefulWidget {
-  const _DependentAddressesSheet({required this.dependent});
+  const _DependentAddressesSheet({
+    required this.dependent,
+    this.forceAtLeastOneAddress = false,
+  });
 
   final Map<String, dynamic> dependent;
+  final bool forceAtLeastOneAddress;
 
   @override
   ConsumerState<_DependentAddressesSheet> createState() =>
@@ -792,6 +812,24 @@ class _DependentAddressesSheetState
               onPressed: _saving ? null : () => _openAddressForm(),
               icon: const Icon(Icons.add_location_alt_outlined),
               label: const Text('Adicionar endereco'),
+            ),
+            if (widget.forceAtLeastOneAddress && addresses.isEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Obrigatorio cadastrar um endereco padrao. Ele sera usado no planejamento da rota.',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: Colors.red),
+              ),
+            ],
+            const SizedBox(height: 8),
+            OutlinedButton(
+              onPressed: widget.forceAtLeastOneAddress && addresses.isEmpty
+                  ? null
+                  : () => Navigator.of(context).pop(),
+              child: Text(
+                widget.forceAtLeastOneAddress ? 'Concluir cadastro' : 'Fechar',
+              ),
             ),
           ],
         ),

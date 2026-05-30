@@ -255,7 +255,9 @@ class _DriverAddChildPageState extends ConsumerState<DriverAddChildPage> {
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Icon(Icons.child_care_rounded),
-                      label: Text(_submitting ? 'Salvando...' : 'Salvar dependente'),
+                      label: Text(
+                        _submitting ? 'Salvando...' : 'Salvar dependente',
+                      ),
                     ),
                   ],
                 ),
@@ -433,6 +435,9 @@ class _DriverAddChildPageState extends ConsumerState<DriverAddChildPage> {
         return 'Selecione o tipo do endereco ${i + 1}.';
       }
     }
+    if (_addresses.every((a) => !a.isDefault)) {
+      return 'Marque um endereco padrao para o planejamento de rota.';
+    }
 
     return null;
   }
@@ -473,7 +478,25 @@ class _DriverAddChildPageState extends ConsumerState<DriverAddChildPage> {
       }
       final auth = session.authorizationHeader;
       final parsedAge = int.tryParse(_ageController.text.trim());
-      final child = await ref
+      final explicitDefaultIndex = _addresses.indexWhere((a) => a.isDefault);
+      final defaultIndex = explicitDefaultIndex >= 0 ? explicitDefaultIndex : 0;
+      final addressesPayload = <Map<String, dynamic>>[];
+      for (var i = 0; i < _addresses.length; i++) {
+        final address = _addresses[i];
+        addressesPayload.add({
+          'zipcode': address.zipcodeController.text.trim(),
+          'street': address.streetController.text.trim(),
+          'number': address.numberController.text.trim(),
+          'reference': address.referenceController.text.trim().isEmpty
+              ? null
+              : address.referenceController.text.trim(),
+          'district_id': address.district?.id,
+          'type': address.type,
+          'is_default': i == defaultIndex,
+        });
+      }
+
+      await ref
           .read(driverPortalRepositoryProvider)
           .createChild(
             auth,
@@ -485,33 +508,8 @@ class _DriverAddChildPageState extends ConsumerState<DriverAddChildPage> {
             avatarImagePath: _avatarLocalPath,
             schoolId: _school?.id,
             shiftId: _shift?.id,
+            addresses: addressesPayload,
           );
-
-      final childId = (child['id'] as num?)?.toInt();
-      if (childId == null || childId <= 0) {
-        throw ApiException(
-          message: 'Filho criado, mas o ID nao foi retornado.',
-        );
-      }
-
-      final explicitDefaultIndex = _addresses.indexWhere((a) => a.isDefault);
-      final defaultIndex = explicitDefaultIndex >= 0 ? explicitDefaultIndex : 0;
-      for (var i = 0; i < _addresses.length; i++) {
-        final address = _addresses[i];
-        await ref
-            .read(driverPortalRepositoryProvider)
-            .createChildAddress(
-              auth,
-              childId: childId,
-              zipcode: address.zipcodeController.text.trim(),
-              street: address.streetController.text.trim(),
-              number: address.numberController.text.trim(),
-              reference: address.referenceController.text.trim(),
-              districtId: address.district?.id,
-              type: address.type,
-              isDefault: i == defaultIndex,
-            );
-      }
 
       ref.invalidate(driverClientsProvider);
       ref.invalidate(driverClientChildrenProvider(widget.args.clientId));
@@ -525,7 +523,8 @@ class _DriverAddChildPageState extends ConsumerState<DriverAddChildPage> {
     } catch (_) {
       setState(() {
         _submitting = false;
-        _error = 'Falha ao cadastrar dependente.';
+        _error =
+            'Falha ao cadastrar dependente. Revise os campos e tente novamente.';
       });
     }
   }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
@@ -6,6 +8,7 @@ import 'package:maplibre_gl/maplibre_gl.dart';
 
 import '../../../../app/router/app_router.dart';
 import '../../../../app/theme/app_theme.dart';
+import '../../../../core/error/app_error_reporter.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../auth/presentation/state/app_session_controller.dart';
 import '../../../tracking/presentation/state/driver_tracking_controller.dart';
@@ -55,8 +58,10 @@ class DriverHomePage extends ConsumerWidget {
             ),
             IconButton(
               tooltip: 'Sair',
-              onPressed: () =>
-                  ref.read(appSessionControllerProvider.notifier).clear(),
+              onPressed: () {
+                ref.read(appSessionControllerProvider.notifier).clear();
+                context.go(AppRoutes.login);
+              },
               icon: const Icon(Icons.logout_rounded),
             ),
           ],
@@ -264,6 +269,10 @@ class _DriverClientsTabState extends ConsumerState<_DriverClientsTab> {
                             const <String, dynamic>{});
                         final inadimplencyAlert =
                             client['inadimplency_alert'] == true;
+                        final inadimplencyRequestStatus =
+                            (client['inadimplency_request_status'] ?? '')
+                                .toString()
+                                .toLowerCase();
                         final inadimplencyAmount =
                             (client['inadimplency_amount'] as num?)?.toDouble();
                         final cpf = (parent['cpf'] ?? '').toString();
@@ -413,6 +422,37 @@ class _DriverClientsTabState extends ConsumerState<_DriverClientsTab> {
                                                     inadimplencyAmount > 0
                                                 ? 'Debito em aberto: R\$ ${inadimplencyAmount.toStringAsFixed(2)}'
                                                 : 'Responsavel/dependente com debitos.',
+                                            style: Theme.of(
+                                              context,
+                                            ).textTheme.bodySmall,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                                if (inadimplencyRequestStatus == 'pending') ...[
+                                  const SizedBox(height: 10),
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFEAF2FF),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: const Color(0xFF8FB4FF),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.hourglass_top_rounded,
+                                          size: 18,
+                                          color: AppColors.ink,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            'Solicitacao de inadimplencia pendente de aprovacao do admin.',
                                             style: Theme.of(
                                               context,
                                             ).textTheme.bodySmall,
@@ -659,7 +699,7 @@ class _DriverClientsTabState extends ConsumerState<_DriverClientsTab> {
     }
 
     try {
-      await ref
+      final response = await ref
           .read(driverPortalRepositoryProvider)
           .updateClientInadimplency(
             session.authorizationHeader,
@@ -677,9 +717,9 @@ class _DriverClientsTabState extends ConsumerState<_DriverClientsTab> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            draft.amount > 0
-                ? 'Debito atualizado com sucesso.'
-                : 'Debito removido com sucesso.',
+            (response['message'] ?? '').toString().trim().isNotEmpty
+                ? (response['message'] as String)
+                : 'Solicitacao de debito enviada para aprovacao.',
           ),
         ),
       );
@@ -1365,7 +1405,9 @@ class _DriverRoutesTab extends ConsumerWidget {
             return Padding(
               padding: const EdgeInsets.all(24),
               child: Text(
-                snapshot.error.toString(),
+                AppErrorReporter.messageFor(
+                  snapshot.error ?? Exception('Falha ao carregar planner.'),
+                ),
                 textAlign: TextAlign.center,
               ),
             );
@@ -1376,12 +1418,31 @@ class _DriverRoutesTab extends ConsumerWidget {
             onStart: (payload) async {
               double? originLat;
               double? originLng;
+              final serviceEnabled =
+                  await Geolocator.isLocationServiceEnabled();
+              if (!serviceEnabled) {
+                throw ApiException(
+                  message:
+                      'Ative o GPS para iniciar rota. O app precisa da localizacao para rastrear e recalcular o trajeto.',
+                );
+              }
+              var permission = await Geolocator.checkPermission();
+              if (permission == LocationPermission.denied) {
+                permission = await Geolocator.requestPermission();
+              }
+              if (permission == LocationPermission.denied ||
+                  permission == LocationPermission.deniedForever) {
+                throw ApiException(
+                  message:
+                      'Permissao de localizacao negada. Libere em Configuracoes para iniciar a rota.',
+                );
+              }
               try {
                 final position = await Geolocator.getCurrentPosition();
                 originLat = position.latitude;
                 originLng = position.longitude;
               } catch (_) {
-                // Se não conseguir fix imediato, o tracking recalcula logo após iniciar.
+                // fallback: tracking atualiza assim que fixar o primeiro ponto
               }
 
               final response = await repo.startAdhocRoute(
@@ -3034,6 +3095,8 @@ class _DriverRouteWorkspacePanelState
       onSuccessLocal(trackingController);
       await trackingController.refreshRoutePreviewNow();
       widget.onRoutesChanged();
+      if (!mounted) return;
+      await _maybeAutoFinishRouteAfterLastStop();
       if (!context.mounted) return;
       ScaffoldMessenger.of(
         context,
@@ -3047,6 +3110,68 @@ class _DriverRouteWorkspacePanelState
       if (context.mounted) {
         setState(() => _submittingStopAction = false);
       }
+    }
+  }
+
+  Future<void> _maybeAutoFinishRouteAfterLastStop() async {
+    final latest = ref.read(driverTrackingControllerProvider);
+    if (!latest.routeActive || latest.routeRemainingStops.isNotEmpty) return;
+    final routeId = latest.routeId;
+    if (routeId == null || routeId <= 0) return;
+
+    var keepOpen = true;
+    var countdown = 20;
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        Timer? timer;
+        return StatefulBuilder(
+          builder: (context, setState) {
+            timer ??= Timer.periodic(const Duration(seconds: 1), (t) async {
+              if (!dialogContext.mounted) {
+                t.cancel();
+                return;
+              }
+              if (countdown <= 1) {
+                t.cancel();
+                keepOpen = false;
+                Navigator.of(dialogContext).pop();
+                return;
+              }
+              setState(() => countdown -= 1);
+            });
+            return AlertDialog(
+              title: const Text('Rota concluida'),
+              content: Text(
+                'Nao ha mais paradas pendentes. Finalizar automaticamente em ${countdown}s.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    timer?.cancel();
+                    Navigator.of(dialogContext).pop();
+                  },
+                  child: const Text('Manter aberta'),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    timer?.cancel();
+                    keepOpen = false;
+                    Navigator.of(dialogContext).pop();
+                  },
+                  child: const Text('Finalizar agora'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (!keepOpen && mounted) {
+      await _finishActiveRoute(context);
     }
   }
 }
@@ -3464,6 +3589,7 @@ class _AdhocRoutePlannerSheetState extends State<_AdhocRoutePlannerSheet> {
                     }
 
                     final selections = <Map<String, int>>[];
+                    final missingAddressNames = <String>[];
                     for (final student in filteredStudents) {
                       final childId =
                           (student['child_id'] as num?)?.toInt() ?? 0;
@@ -3475,9 +3601,14 @@ class _AdhocRoutePlannerSheetState extends State<_AdhocRoutePlannerSheet> {
                           clientId <= 0 ||
                           addressId == null ||
                           addressId <= 0) {
+                        final name =
+                            (student['child_name'] ?? 'Aluno #$childId')
+                                .toString();
+                        missingAddressNames.add(name);
                         setState(
-                          () => _error =
-                              'Selecione o endereco dos alunos marcados.',
+                          () => _error = missingAddressNames.isEmpty
+                              ? 'Selecione o endereco dos alunos marcados.'
+                              : 'Sem endereco selecionado para: ${missingAddressNames.join(', ')}. Cadastre/ajuste em Clientes > Dependentes.',
                         );
                         return;
                       }

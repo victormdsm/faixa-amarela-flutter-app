@@ -13,6 +13,23 @@ class ApiException implements Exception {
       final statusCode = error.response?.statusCode;
       String message = 'Falha de comunicacao com o servidor.';
 
+      switch (error.type) {
+        case DioExceptionType.connectionTimeout:
+        case DioExceptionType.sendTimeout:
+        case DioExceptionType.receiveTimeout:
+          message = 'Tempo de resposta esgotado. Tente novamente.';
+          break;
+        case DioExceptionType.connectionError:
+          message =
+              'Sem conexao com a internet ou servidor indisponivel no momento.';
+          break;
+        case DioExceptionType.cancel:
+          message = 'Requisicao cancelada.';
+          break;
+        default:
+          break;
+      }
+
       if (statusCode == 413) {
         return ApiException(
           message:
@@ -20,6 +37,18 @@ class ApiException implements Exception {
           statusCode: statusCode,
           data: responseData,
         );
+      }
+
+      if (statusCode == 401) {
+        message = 'Sessao expirada. Faca login novamente.';
+      } else if (statusCode == 403) {
+        message = 'Voce nao tem permissao para esta acao.';
+      } else if (statusCode == 404) {
+        message = 'Recurso nao encontrado.';
+      } else if (statusCode == 422) {
+        message = 'Dados invalidos. Revise os campos e tente novamente.';
+      } else if (statusCode != null && statusCode >= 500) {
+        message = 'Servidor indisponivel. Tente novamente em instantes.';
       }
 
       if (responseData is Map) {

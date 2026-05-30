@@ -106,6 +106,8 @@ class _AdBannerWidgetState extends ConsumerState<AdBannerWidget>
   late final PageController _pageController;
   Timer? _autoPlayTimer;
   int _currentPage = 0;
+  final Set<int> _impressionsSent = <int>{};
+  final Dio _trackingDio = Dio(BaseOptions(baseUrl: BackendConfig.apiBaseUrl));
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
 
@@ -154,6 +156,28 @@ class _AdBannerWidgetState extends ConsumerState<AdBannerWidget>
     }
   }
 
+  Future<void> _trackImpression(AdBanner ad) async {
+    if (_impressionsSent.contains(ad.id)) return;
+    _impressionsSent.add(ad.id);
+    try {
+      await _trackingDio.post<Map<String, dynamic>>(
+        '/publicities/${ad.id}/impression',
+      );
+    } catch (_) {
+      // Non-critical metric endpoint.
+    }
+  }
+
+  Future<void> _trackClick(AdBanner ad) async {
+    try {
+      await _trackingDio.post<Map<String, dynamic>>(
+        '/publicities/${ad.id}/click',
+      );
+    } catch (_) {
+      // Non-critical metric endpoint.
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final bannersAsync = ref.watch(adBannersProvider);
@@ -166,7 +190,12 @@ class _AdBannerWidgetState extends ConsumerState<AdBannerWidget>
 
         // Start/restart auto-play when data arrives
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _startAutoPlay(banners.length);
+          if (mounted) {
+            _startAutoPlay(banners.length);
+            if (banners.isNotEmpty) {
+              _trackImpression(banners[_currentPage % banners.length]);
+            }
+          }
         });
 
         return FadeTransition(
@@ -179,14 +208,19 @@ class _AdBannerWidgetState extends ConsumerState<AdBannerWidget>
                 child: PageView.builder(
                   controller: _pageController,
                   itemCount: banners.length,
-                  onPageChanged: (index) =>
-                      setState(() => _currentPage = index),
+                  onPageChanged: (index) {
+                    setState(() => _currentPage = index);
+                    _trackImpression(banners[index]);
+                  },
                   itemBuilder: (context, index) {
                     final ad = banners[index];
                     return _AdCard(
                       ad: ad,
                       onTap: ad.link != null && ad.link!.isNotEmpty
-                          ? () => _openLink(ad.link!)
+                          ? () async {
+                              await _trackClick(ad);
+                              await _openLink(ad.link!);
+                            }
                           : null,
                     );
                   },

@@ -4,6 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 
 import '../../../../app/theme/app_theme.dart';
+import '../../../../core/error/app_error_reporter.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/presentation/widgets/app_shared_widgets.dart';
 import '../../../auth/presentation/state/app_session_controller.dart';
@@ -36,9 +37,7 @@ class DriverRoutesPage extends ConsumerWidget {
       body: Stack(
         children: [
           // ── Map fills entire body ─────────────────────────────
-          Positioned.fill(
-            child: _SafeMapBuilder(tracking: tracking),
-          ),
+          Positioned.fill(child: _SafeMapBuilder(tracking: tracking)),
 
           // ── Top overlay: connection + speed + finish ──────────
           Positioned(
@@ -94,9 +93,9 @@ class DriverRoutesPage extends ConsumerWidget {
       );
     } on ApiException catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
     }
   }
 }
@@ -121,8 +120,7 @@ class _MapTopOverlay extends StatelessWidget {
           _SpeedChip(speedKmh: tracking.lastSpeedKmh!),
           const SizedBox(width: 8),
         ],
-        if (tracking.routeActive)
-          _FinishBtn(onTap: onFinish),
+        if (tracking.routeActive) _FinishBtn(onTap: onFinish),
       ],
     );
   }
@@ -137,7 +135,9 @@ class _ConnectionPill extends StatelessWidget {
     if (tracking.foregroundStreaming && tracking.socketConnected) {
       return (const Color(0xFF22C55E), 'Ao vivo');
     }
-    if (tracking.foregroundStreaming) return (const Color(0xFFF59E0B), 'GPS ativo');
+    if (tracking.foregroundStreaming) {
+      return (const Color(0xFFF59E0B), 'GPS ativo');
+    }
     return (const Color(0xFFF59E0B), 'Fallback');
   }
 
@@ -206,7 +206,11 @@ class _FinishBtn extends StatelessWidget {
           color: AppColors.danger.withValues(alpha: 0.93),
           borderRadius: BorderRadius.circular(AppRadius.full),
           boxShadow: const [
-            BoxShadow(color: Color(0x22000000), blurRadius: 10, offset: Offset(0, 3)),
+            BoxShadow(
+              color: Color(0x22000000),
+              blurRadius: 10,
+              offset: Offset(0, 3),
+            ),
           ],
         ),
         child: Row(
@@ -240,7 +244,11 @@ class _MapPill extends StatelessWidget {
         color: Colors.white.withValues(alpha: 0.95),
         borderRadius: BorderRadius.circular(AppRadius.full),
         boxShadow: const [
-          BoxShadow(color: Color(0x1A000000), blurRadius: 10, offset: Offset(0, 3)),
+          BoxShadow(
+            color: Color(0x1A000000),
+            blurRadius: 10,
+            offset: Offset(0, 3),
+          ),
         ],
       ),
       child: child,
@@ -311,7 +319,7 @@ class _BottomSheetState extends State<_BottomSheet> {
         final maxHeight = constraints.maxHeight;
         return DraggableScrollableSheet(
           controller: _sheetController,
-          initialChildSize: tracking.routeActive ? 0.30 : 0.20,
+          initialChildSize: tracking.routeActive ? 0.32 : 0.45,
           minChildSize: _minSize,
           maxChildSize: _maxSize,
           snap: true,
@@ -344,85 +352,121 @@ class _BottomSheetState extends State<_BottomSheet> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Padding(
-                              padding: const EdgeInsets.only(top: 10, bottom: 4),
+                              padding: const EdgeInsets.only(
+                                top: 10,
+                                bottom: 4,
+                              ),
                               child: Container(
                                 width: 40,
                                 height: 4,
                                 decoration: BoxDecoration(
                                   color: AppColors.border,
-                                  borderRadius:
-                                      BorderRadius.circular(AppRadius.full),
+                                  borderRadius: BorderRadius.circular(
+                                    AppRadius.full,
+                                  ),
                                 ),
                               ),
                             ),
                             // Sheet header
                             Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 6, 12, 8),
-                    child: Row(
-                      children: [
-                        Text(
-                          tracking.routeActive ? 'Alunos na rota' : 'Rotas salvas',
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.ink,
-                          ),
-                        ),
-                        if (tracking.routeActive && students.isNotEmpty) ...[
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.yellowLight,
-                              borderRadius: BorderRadius.circular(AppRadius.full),
-                            ),
-                            child: Text(
-                              '${students.length}',
-                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.yellowDark,
+                              padding: const EdgeInsets.fromLTRB(16, 6, 12, 8),
+                              child: Row(
+                                children: [
+                                  Text(
+                                    tracking.routeActive
+                                        ? 'Alunos na rota'
+                                        : 'Rotas salvas',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleSmall
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.w800,
+                                          color: AppColors.ink,
+                                        ),
+                                  ),
+                                  if (tracking.routeActive &&
+                                      students.isNotEmpty) ...[
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 3,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.yellowLight,
+                                        borderRadius: BorderRadius.circular(
+                                          AppRadius.full,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        '${students.length}',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .labelSmall
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w800,
+                                              color: AppColors.yellowDark,
+                                            ),
+                                      ),
+                                    ),
+                                  ],
+                                  const Spacer(),
+                                  if (tracking.routeActive) ...[
+                                    if (tracking.routeDistanceMeters !=
+                                        null) ...[
+                                      Icon(
+                                        Icons.straighten_rounded,
+                                        size: 13,
+                                        color: AppColors.slate,
+                                      ),
+                                      const SizedBox(width: 3),
+                                      Text(
+                                        _formatDistance(
+                                          tracking.routeDistanceMeters!,
+                                        ),
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .labelSmall
+                                            ?.copyWith(
+                                              color: AppColors.slate,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                    ],
+                                    if (tracking.routeEtaSeconds != null) ...[
+                                      Icon(
+                                        Icons.schedule_rounded,
+                                        size: 13,
+                                        color: AppColors.slate,
+                                      ),
+                                      const SizedBox(width: 3),
+                                      Text(
+                                        _formatEta(tracking.routeEtaSeconds!),
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .labelSmall
+                                            ?.copyWith(
+                                              color: AppColors.slate,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                      ),
+                                    ],
+                                  ] else ...[
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.refresh_rounded,
+                                        size: 18,
+                                      ),
+                                      onPressed: () =>
+                                          ref.invalidate(driverRoutesProvider),
+                                      visualDensity: VisualDensity.compact,
+                                      color: AppColors.slate,
+                                    ),
+                                  ],
+                                ],
                               ),
                             ),
-                          ),
-                        ],
-                        const Spacer(),
-                        if (tracking.routeActive) ...[
-                          if (tracking.routeDistanceMeters != null) ...[
-                            Icon(Icons.straighten_rounded, size: 13, color: AppColors.slate),
-                            const SizedBox(width: 3),
-                            Text(
-                              _formatDistance(tracking.routeDistanceMeters!),
-                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                color: AppColors.slate,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                          ],
-                          if (tracking.routeEtaSeconds != null) ...[
-                            Icon(Icons.schedule_rounded, size: 13, color: AppColors.slate),
-                            const SizedBox(width: 3),
-                            Text(
-                              _formatEta(tracking.routeEtaSeconds!),
-                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                color: AppColors.slate,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ] else ...[
-                          IconButton(
-                            icon: const Icon(Icons.refresh_rounded, size: 18),
-                            onPressed: () => ref.invalidate(driverRoutesProvider),
-                            visualDensity: VisualDensity.compact,
-                            color: AppColors.slate,
-                          ),
-                        ],
-                              ],
-                            ),
-                          ),
                           ],
                         ),
                       ),
@@ -435,15 +479,15 @@ class _BottomSheetState extends State<_BottomSheet> {
                                 scrollController: scrollController,
                               )
                             : _SavedRoutesContent(
-                            routesAsync: routesAsync,
-                            scrollController: scrollController,
-                          ),
-                  ),
-                ],
-              );
-            },
-          ),
-        );
+                                routesAsync: routesAsync,
+                                scrollController: scrollController,
+                              ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            );
           },
         );
       },
@@ -504,7 +548,8 @@ class _ActiveContentState extends ConsumerState<_ActiveContent> {
             student: s,
             submitting: _submitting,
             routeActive: widget.tracking.routeActive,
-            onBoard: s.clientId != null &&
+            onBoard:
+                s.clientId != null &&
                     (s.status == _StopStatus.onTheWay ||
                         s.status == _StopStatus.pending)
                 ? () => _markBoarded(s.clientId!)
@@ -573,9 +618,7 @@ class _ActiveContentState extends ConsumerState<_ActiveContent> {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.danger,
-            ),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
             child: const Text('Remover'),
           ),
         ],
@@ -590,25 +633,31 @@ class _ActiveContentState extends ConsumerState<_ActiveContent> {
 
     setState(() => _submitting = true);
     try {
-      await ref.read(driverPortalRepositoryProvider).removeStudentFromRoute(
+      await ref
+          .read(driverPortalRepositoryProvider)
+          .removeStudentFromRoute(
             session.authorizationHeader,
             routeId,
             clientId: clientId,
             lat: widget.tracking.lastLatitude,
             lng: widget.tracking.lastLongitude,
           );
-      ref.read(driverTrackingControllerProvider.notifier).removeClientLocal(clientId);
+      ref
+          .read(driverTrackingControllerProvider.notifier)
+          .removeClientLocal(clientId);
       await ref
           .read(driverTrackingControllerProvider.notifier)
           .refreshRoutePreviewNow();
       ref.invalidate(driverRoutesProvider);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$name removido(a) da rota.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('$name removido(a) da rota.')));
     } on ApiException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -620,7 +669,8 @@ class _ActiveContentState extends ConsumerState<_ActiveContent> {
       DriverPortalRepository,
       String,
       int,
-    ) apiCall,
+    )
+    apiCall,
     required void Function(DriverTrackingController) onLocal,
     required String msg,
   }) async {
@@ -645,7 +695,9 @@ class _ActiveContentState extends ConsumerState<_ActiveContent> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     } on ApiException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -846,9 +898,9 @@ class _SafeMapBuilderState extends State<_SafeMapBuilder> {
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
               child: Text(
                 '$error',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: AppColors.muted,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.labelSmall?.copyWith(color: AppColors.muted),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
@@ -991,12 +1043,16 @@ class _MapLibreRouteMapState extends State<_MapLibreRouteMap> {
         ? LatLng(t.lastLatitude!, t.lastLongitude!)
         : null;
     final poly = t.routePolyline.map((p) => LatLng(p.lat, p.lng)).toList();
-    final stops = t.routeRemainingStops.map((s) => LatLng(s.lat, s.lng)).toList();
+    final stops = t.routeRemainingStops
+        .map((s) => LatLng(s.lat, s.lng))
+        .toList();
     final all = [?current, ...poly, ...stops];
     final center = _avgLatLng(all) ?? current ?? _defaultCenter;
     final zoom = poly.length >= 2 ? 13.4 : 16.2;
     c.animateCamera(
-      CameraUpdate.newCameraPosition(CameraPosition(target: center, zoom: zoom)),
+      CameraUpdate.newCameraPosition(
+        CameraPosition(target: center, zoom: zoom),
+      ),
     );
   }
 
@@ -1085,7 +1141,11 @@ class _MapLibreRouteMapState extends State<_MapLibreRouteMap> {
 }
 
 class _MapBtn extends StatelessWidget {
-  const _MapBtn({required this.icon, required this.onPressed, this.active = false});
+  const _MapBtn({
+    required this.icon,
+    required this.onPressed,
+    this.active = false,
+  });
   final IconData icon;
   final VoidCallback? onPressed;
   final bool active;
@@ -1209,9 +1269,7 @@ class _StudentTileState extends State<_StudentTile> {
                           ),
                           child: Text(
                             '${student.sequence}',
-                            style: Theme.of(context)
-                                .textTheme
-                                .labelSmall
+                            style: Theme.of(context).textTheme.labelSmall
                                 ?.copyWith(fontWeight: FontWeight.w800),
                           ),
                         ),
@@ -1220,9 +1278,7 @@ class _StudentTileState extends State<_StudentTile> {
                       Expanded(
                         child: Text(
                           student.name,
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleSmall
+                          style: Theme.of(context).textTheme.titleSmall
                               ?.copyWith(fontWeight: FontWeight.w700),
                         ),
                       ),
@@ -1234,14 +1290,17 @@ class _StudentTileState extends State<_StudentTile> {
                         decoration: BoxDecoration(
                           color: color.withValues(alpha: 0.10),
                           borderRadius: BorderRadius.circular(AppRadius.full),
-                          border: Border.all(color: color.withValues(alpha: 0.3)),
+                          border: Border.all(
+                            color: color.withValues(alpha: 0.3),
+                          ),
                         ),
                         child: Text(
                           label,
-                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: color,
-                            fontWeight: FontWeight.w700,
-                          ),
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                color: color,
+                                fontWeight: FontWeight.w700,
+                              ),
                         ),
                       ),
                       const SizedBox(width: 4),
@@ -1254,7 +1313,8 @@ class _StudentTileState extends State<_StudentTile> {
                       ),
                     ],
                   ),
-                  if (student.pickupLabel != null || student.dropoffLabel != null) ...[
+                  if (student.pickupLabel != null ||
+                      student.dropoffLabel != null) ...[
                     const SizedBox(height: AppSpacing.sm),
                     Text(
                       [
@@ -1263,10 +1323,9 @@ class _StudentTileState extends State<_StudentTile> {
                         if (student.dropoffLabel != null)
                           'Destino: ${student.dropoffLabel}',
                       ].join(' · '),
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodySmall
-                          ?.copyWith(color: AppColors.slate),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: AppColors.slate),
                     ),
                   ],
                   const SizedBox(height: AppSpacing.sm),
@@ -1275,15 +1334,15 @@ class _StudentTileState extends State<_StudentTile> {
                     runSpacing: AppSpacing.sm,
                     children: [
                       FilledButton.tonal(
-                        onPressed:
-                            widget.submitting || !widget.routeActive ? null : widget.onBoard,
+                        onPressed: widget.submitting || !widget.routeActive
+                            ? null
+                            : widget.onBoard,
                         child: const Text('Embarcou'),
                       ),
                       OutlinedButton(
-                        onPressed:
-                            widget.submitting || !widget.routeActive
-                                ? null
-                                : widget.onDisembark,
+                        onPressed: widget.submitting || !widget.routeActive
+                            ? null
+                            : widget.onDisembark,
                         child: const Text('Desembarcou'),
                       ),
                     ],
@@ -1340,7 +1399,10 @@ class _StudentTileState extends State<_StudentTile> {
                         label: const Text('Remover da rota'),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.danger,
-                          side: const BorderSide(color: AppColors.danger, width: 1),
+                          side: const BorderSide(
+                            color: AppColors.danger,
+                            width: 1,
+                          ),
                         ),
                       ),
                     ),
@@ -1467,7 +1529,11 @@ class _GeneralAlertSectionState extends ConsumerState<_GeneralAlertSection> {
         children: [
           Row(
             children: [
-              const Icon(Icons.campaign_rounded, size: 20, color: Color(0xFFF57C00)),
+              const Icon(
+                Icons.campaign_rounded,
+                size: 20,
+                color: Color(0xFFF57C00),
+              ),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Text(
@@ -1515,7 +1581,9 @@ class _GeneralAlertSectionState extends ConsumerState<_GeneralAlertSection> {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFD32F2F)),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFD32F2F),
+            ),
             child: const Text('Enviar alerta'),
           ),
         ],
@@ -1529,11 +1597,9 @@ class _GeneralAlertSectionState extends ConsumerState<_GeneralAlertSection> {
 
     setState(() => _sending = true);
     try {
-      final result = await ref.read(driverPortalRepositoryProvider).alertAllParents(
-            session.authorizationHeader,
-            routeId,
-            type: type,
-          );
+      final result = await ref
+          .read(driverPortalRepositoryProvider)
+          .alertAllParents(session.authorizationHeader, routeId, type: type);
       if (!mounted) return;
       final count = result['notified_count'] ?? 0;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1541,7 +1607,9 @@ class _GeneralAlertSectionState extends ConsumerState<_GeneralAlertSection> {
       );
     } on ApiException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -1632,10 +1700,9 @@ class _SavedRouteCard extends ConsumerWidget {
               Expanded(
                 child: Text(
                   name,
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleSmall
-                      ?.copyWith(fontWeight: FontWeight.w700),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
                 ),
               ),
               if (isThisRoute) const _StatusPill(label: 'Ativa', active: true),
@@ -1644,10 +1711,9 @@ class _SavedRouteCard extends ConsumerWidget {
           const SizedBox(height: 4),
           Text(
             'Status: $status · Embarques: $boardingsCount',
-            style: Theme.of(context)
-                .textTheme
-                .bodySmall
-                ?.copyWith(color: AppColors.slate),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.slate),
           ),
           const SizedBox(height: AppSpacing.md),
           Wrap(
@@ -1655,15 +1721,16 @@ class _SavedRouteCard extends ConsumerWidget {
             runSpacing: AppSpacing.sm,
             children: [
               FilledButton.tonal(
-                onPressed:
-                    routeId <= 0 ? null : () => _handleAction(context, ref, true),
+                onPressed: routeId <= 0
+                    ? null
+                    : () => _handleAction(context, ref, true),
                 child: const Text('Iniciar'),
               ),
               OutlinedButton(
                 onPressed:
                     routeId <= 0 || (!isThisRoute && status != 'in_progress')
-                        ? null
-                        : () => _handleAction(context, ref, false),
+                    ? null
+                    : () => _handleAction(context, ref, false),
                 child: const Text('Finalizar'),
               ),
             ],
@@ -1688,10 +1755,18 @@ class _SavedRouteCard extends ConsumerWidget {
       final ctrl = ref.read(driverTrackingControllerProvider.notifier);
 
       if (start) {
-        final response = await repo.startRoute(auth, routeId, vanId: session.user.id);
+        final response = await repo.startRoute(
+          auth,
+          routeId,
+          vanId: session.user.id,
+        );
         if (!context.mounted) return;
-        await _startTrackingFromResponse(context, ref, response,
-            fallbackRouteId: routeId);
+        await _startTrackingFromResponse(
+          context,
+          ref,
+          response,
+          fallbackRouteId: routeId,
+        );
         if (!context.mounted) return;
       } else {
         await repo.finishRoute(auth, routeId);
@@ -1704,8 +1779,9 @@ class _SavedRouteCard extends ConsumerWidget {
       );
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.toString())));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
     }
   }
 }
@@ -1752,7 +1828,12 @@ Future<void> _openAdhocPlanner(
         if (snapshot.hasError) {
           return Padding(
             padding: const EdgeInsets.all(24),
-            child: Text(snapshot.error.toString(), textAlign: TextAlign.center),
+            child: Text(
+              AppErrorReporter.messageFor(
+                snapshot.error ?? Exception('Falha ao carregar dados da rota.'),
+              ),
+              textAlign: TextAlign.center,
+            ),
           );
         }
         final bundle = snapshot.data ?? const [];
@@ -1830,7 +1911,7 @@ class _AdhocPlannerContent extends StatefulWidget {
   final List<Map<String, dynamic>> presets;
   final int? initialPresetId;
   final Future<Map<String, dynamic>> Function(String name, _PlannerPayload)?
-      onSavePreset;
+  onSavePreset;
   final Future<void> Function(int presetId)? onDeletePreset;
 
   @override
@@ -1960,9 +2041,9 @@ class _AdhocPlannerContentState extends State<_AdhocPlannerContent> {
           _selectedPresetId = (created['id'] as num?)?.toInt();
         }
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Preset salvo.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Preset salvo.')));
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -2025,23 +2106,24 @@ class _AdhocPlannerContentState extends State<_AdhocPlannerContent> {
       _opId = ops.isNotEmpty ? _idStr(ops.first) : null;
     }
 
-    final filtered = students
-        .where((s) {
-          if (_opId == null) return true;
-          final ids = ((s['operation_window_ids'] as List?) ?? [])
-              .map((e) => e.toString())
-              .toSet();
-          return ids.contains(_opId);
-        })
-        .toList(growable: false)
-      ..sort((a, b) {
-        final c = (a['shift_name'] ?? '').toString();
-        final d = (b['shift_name'] ?? '').toString();
-        if (c != d) return c.compareTo(d);
-        return (a['child_name'] ?? '')
-            .toString()
-            .compareTo((b['child_name'] ?? '').toString());
-      });
+    final filtered =
+        students
+            .where((s) {
+              if (_opId == null) return true;
+              final ids = ((s['operation_window_ids'] as List?) ?? [])
+                  .map((e) => e.toString())
+                  .toSet();
+              return ids.contains(_opId);
+            })
+            .toList(growable: false)
+          ..sort((a, b) {
+            final c = (a['shift_name'] ?? '').toString();
+            final d = (b['shift_name'] ?? '').toString();
+            if (c != d) return c.compareTo(d);
+            return (a['child_name'] ?? '').toString().compareTo(
+              (b['child_name'] ?? '').toString(),
+            );
+          });
 
     for (final s in filtered) {
       final cid = _numId(s['child_id']);
@@ -2071,18 +2153,16 @@ class _AdhocPlannerContentState extends State<_AdhocPlannerContent> {
         children: [
           Text(
             'Planejar rota',
-            style: Theme.of(context)
-                .textTheme
-                .titleLarge
-                ?.copyWith(fontWeight: FontWeight.w700),
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
             'Escolha o momento, confirme os alunos e endereco.',
-            style: Theme.of(context)
-                .textTheme
-                .bodySmall
-                ?.copyWith(color: AppColors.slate),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.slate),
           ),
           if (_presets.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.lg),
@@ -2111,7 +2191,9 @@ class _AdhocPlannerContentState extends State<_AdhocPlannerContent> {
           TextField(
             controller: _nameCtrl,
             enabled: !_busy,
-            decoration: const InputDecoration(labelText: 'Nome da rota (opcional)'),
+            decoration: const InputDecoration(
+              labelText: 'Nome da rota (opcional)',
+            ),
           ),
           const SizedBox(height: AppSpacing.md),
           Flexible(
@@ -2120,13 +2202,17 @@ class _AdhocPlannerContentState extends State<_AdhocPlannerContent> {
                 : ListView.separated(
                     shrinkWrap: true,
                     itemCount: filtered.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
+                    separatorBuilder: (_, _) =>
+                        const SizedBox(height: AppSpacing.sm),
                     itemBuilder: (context, i) => _buildStudentItem(filtered[i]),
                   ),
           ),
           if (_error != null) ...[
             const SizedBox(height: AppSpacing.sm),
-            Text(_error!, style: TextStyle(color: AppColors.danger, fontSize: 13)),
+            Text(
+              _error!,
+              style: TextStyle(color: AppColors.danger, fontSize: 13),
+            ),
           ],
           const SizedBox(height: AppSpacing.md),
           if (widget.onSavePreset != null) ...[
@@ -2174,17 +2260,19 @@ class _AdhocPlannerContentState extends State<_AdhocPlannerContent> {
                 value: _selectedPresetId,
                 isExpanded: true,
                 hint: const Text('Carregar preset salvo'),
-                items: _presets.map((p) {
-                  final id = (p['id'] as num?)?.toInt();
-                  return DropdownMenuItem<int?>(
-                    value: id,
-                    child: Text(
-                      (p['name'] ?? 'Preset #$id').toString(),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  );
-                }).toList(growable: false),
+                items: _presets
+                    .map((p) {
+                      final id = (p['id'] as num?)?.toInt();
+                      return DropdownMenuItem<int?>(
+                        value: id,
+                        child: Text(
+                          (p['name'] ?? 'Preset #$id').toString(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      );
+                    })
+                    .toList(growable: false),
                 onChanged: _busy
                     ? null
                     : (id) {
@@ -2228,10 +2316,9 @@ class _AdhocPlannerContentState extends State<_AdhocPlannerContent> {
             contentPadding: EdgeInsets.zero,
             title: Text(
               (s['child_name'] ?? 'Aluno #$cid').toString(),
-              style: Theme.of(context)
-                  .textTheme
-                  .titleSmall
-                  ?.copyWith(fontWeight: FontWeight.w600),
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
             ),
             subtitle: Text(
               [
@@ -2249,8 +2336,9 @@ class _AdhocPlannerContentState extends State<_AdhocPlannerContent> {
             DropdownButtonFormField<int>(
               initialValue: _addressOf[cid],
               isExpanded: true,
-              decoration:
-                  const InputDecoration(labelText: 'Endereco de embarque'),
+              decoration: const InputDecoration(
+                labelText: 'Endereco de embarque',
+              ),
               items: addrs
                   .map((a) {
                     final id = _numId(a['id']);
@@ -2286,7 +2374,8 @@ class _AdhocPlannerContentState extends State<_AdhocPlannerContent> {
   ) async {
     if (tripModeId == null || tripModeId.isEmpty) {
       setState(
-        () => _error = 'Nao foi possivel determinar a operacao tecnica da rota.',
+        () =>
+            _error = 'Nao foi possivel determinar a operacao tecnica da rota.',
       );
       return;
     }
@@ -2301,7 +2390,9 @@ class _AdhocPlannerContentState extends State<_AdhocPlannerContent> {
         _PlannerPayload(
           operationId: _opId,
           tripModeId: tripModeId,
-          routeName: _nameCtrl.text.trim().isEmpty ? null : _nameCtrl.text.trim(),
+          routeName: _nameCtrl.text.trim().isEmpty
+              ? null
+              : _nameCtrl.text.trim(),
           selections: selections,
         ),
       );
@@ -2336,8 +2427,7 @@ Future<void> _startTrackingFromResponse(
       (response['route'] as Map?)?.cast<String, dynamic>() ?? const {};
   final manifest =
       (response['route_manifest'] as Map?)?.cast<String, dynamic>() ?? const {};
-  final routeId =
-      (routeMap['id'] as num?)?.toInt() ?? fallbackRouteId ?? 0;
+  final routeId = (routeMap['id'] as num?)?.toInt() ?? fallbackRouteId ?? 0;
   final manifestId = manifest['id']?.toString();
   final vanId = (manifest['van_id'] as num?)?.toInt();
 
@@ -2366,8 +2456,7 @@ Future<void> _startTrackingFromResponse(
 
   final preview =
       (response['route_preview'] as Map?)?.cast<String, dynamic>() ?? const {};
-  final meta =
-      (manifest['meta'] as Map?)?.cast<String, dynamic>() ?? const {};
+  final meta = (manifest['meta'] as Map?)?.cast<String, dynamic>() ?? const {};
   final stops = ((meta['optimized_stops'] as List?) ?? [])
       .whereType<Map>()
       .map((e) => Map<String, dynamic>.from(e))
@@ -2409,17 +2498,15 @@ List<_StudentCard> _studentRouteCards(DriverTrackingState tracking) {
         .where((s) => (s.type ?? '').startsWith('dropoff'))
         .cast<DriverTrackingStopPoint?>()
         .firstWhere((_) => true, orElse: () => null);
-    final anyDelivered =
-        stops.any((s) => s.status.toLowerCase() == 'delivered');
-    final anyPicked =
-        stops.any((s) => s.status.toLowerCase() == 'picked_up');
+    final anyDelivered = stops.any(
+      (s) => s.status.toLowerCase() == 'delivered',
+    );
+    final anyPicked = stops.any((s) => s.status.toLowerCase() == 'picked_up');
     final status = anyDelivered
         ? _StopStatus.droppedOff
         : anyPicked
-            ? _StopStatus.boarded
-            : (entry.key == nextKey
-                ? _StopStatus.onTheWay
-                : _StopStatus.pending);
+        ? _StopStatus.boarded
+        : (entry.key == nextKey ? _StopStatus.onTheWay : _StopStatus.pending);
     result.add(
       _StudentCard(
         clientId: stops.first.clientId,
@@ -2485,11 +2572,10 @@ String? _resolveTripMode(String? opId, List<Map<String, dynamic>> modes) {
   return preferred;
 }
 
-List<Map<String, dynamic>> _listOf(dynamic v) =>
-    ((v as List?) ?? const [])
-        .whereType<Map>()
-        .map((e) => Map<String, dynamic>.from(e))
-        .toList(growable: false);
+List<Map<String, dynamic>> _listOf(dynamic v) => ((v as List?) ?? const [])
+    .whereType<Map>()
+    .map((e) => Map<String, dynamic>.from(e))
+    .toList(growable: false);
 
 String _idStr(Map<String, dynamic> m) => (m['id'] ?? '').toString();
 

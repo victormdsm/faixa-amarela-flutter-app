@@ -52,6 +52,8 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
   String? _email;
   String? _cpf;
   Map<String, dynamic>? _coverageChangeRequest;
+  List<Map<String, dynamic>> _coverageChangeRequestsRecent =
+      const <Map<String, dynamic>>[];
   final Set<int> _selectedSchoolIds = <int>{};
   final Map<int, Set<int>> _districtShiftMap = <int, Set<int>>{};
 
@@ -174,7 +176,9 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                         TextButton.icon(
                           onPressed: _isSaving
                               ? null
-                              : () => setState(() => _avatarImageLocalPath = null),
+                              : () => setState(
+                                  () => _avatarImageLocalPath = null,
+                                ),
                           icon: const Icon(Icons.undo_rounded),
                           label: const Text('Desfazer foto de perfil'),
                         ),
@@ -302,7 +306,9 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                         TextButton.icon(
                           onPressed: _isSaving
                               ? null
-                              : () => setState(() => _vehicleImageLocalPath = null),
+                              : () => setState(
+                                  () => _vehicleImageLocalPath = null,
+                                ),
                           icon: const Icon(Icons.undo_rounded),
                           label: const Text('Desfazer foto do veiculo'),
                         ),
@@ -372,6 +378,12 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                         schoolsCount: _selectedSchoolIds.length,
                         districtsCount: _districtShiftMap.length,
                       ),
+                      if (_coverageChangeRequestsRecent.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        _CoverageRecentRequestsCard(
+                          items: _coverageChangeRequestsRecent,
+                        ),
+                      ],
                       const SizedBox(height: 16),
                       _CoveragePickerRow(
                         icon: Icons.school_rounded,
@@ -392,7 +404,8 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                               )
                             : null,
                       ),
-                      if (schoolsAsync.hasValue && _selectedSchoolIds.isNotEmpty) ...[
+                      if (schoolsAsync.hasValue &&
+                          _selectedSchoolIds.isNotEmpty) ...[
                         const SizedBox(height: 10),
                         _CoverageChips(
                           options: schoolsAsync.value!,
@@ -426,7 +439,8 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                               )
                             : null,
                       ),
-                      if (districtsAsync.hasValue && _districtShiftMap.isNotEmpty) ...[
+                      if (districtsAsync.hasValue &&
+                          _districtShiftMap.isNotEmpty) ...[
                         const SizedBox(height: 12),
                         _DistrictShiftEditor(
                           districtOptions: districtsAsync.value!,
@@ -474,6 +488,9 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
     if (_coverageChangeRequest != null && _coverageChangeRequest!.isEmpty) {
       _coverageChangeRequest = null;
     }
+    _coverageChangeRequestsRecent = _listOfMaps(
+      data['coverage_change_requests_recent'],
+    );
 
     final vehicle = _map(data['vehicle']);
     _vehicleBrandController.text = (vehicle['brand'] ?? '').toString();
@@ -1017,7 +1034,10 @@ class _ProfileImagePreview extends StatelessWidget {
                     ? NetworkImage(imageUrl!)
                     : null,
                 child: (!hasLocal && !hasRemote)
-                    ? const Icon(Icons.person_outline_rounded, color: AppColors.ink)
+                    ? const Icon(
+                        Icons.person_outline_rounded,
+                        color: AppColors.ink,
+                      )
                     : null,
               ),
               Positioned(
@@ -1047,15 +1067,15 @@ class _ProfileImagePreview extends StatelessWidget {
               children: [
                 Text(
                   'Foto de perfil',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
                 ),
                 Text(
                   onTap != null ? 'Toque para alterar' : '',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.slate,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: AppColors.slate),
                 ),
               ],
             ),
@@ -1108,24 +1128,54 @@ class _CoverageStatusBanner extends StatelessWidget {
     final theme = Theme.of(context);
 
     if (pendingRequest != null) {
+      final status = (pendingRequest!['status'] ?? '')
+          .toString()
+          .toLowerCase()
+          .trim();
       final schoolsReq = pendingRequest!['requested_schools_count'] ?? 0;
       final districtsReq = pendingRequest!['requested_districts_count'] ?? 0;
+      final reviewNote = (pendingRequest!['review_note'] ?? '')
+          .toString()
+          .trim();
       final photoLabels = <String>[
         if (pendingRequest!['has_avatar_change'] == true) 'foto do motorista',
-        if (pendingRequest!['has_vehicle_image_change'] == true) 'foto do veiculo',
+        if (pendingRequest!['has_vehicle_image_change'] == true)
+          'foto do veiculo',
       ];
       final coverageLabel = '$schoolsReq escola(s) e $districtsReq bairro(s)';
       final pendingLabel = photoLabels.isEmpty
           ? coverageLabel
           : '$coverageLabel, ${photoLabels.join(' e ')}';
-      return _CoverageBannerContent(
-        theme: theme,
-        color: AppColors.yellowDark,
-        icon: Icons.hourglass_top_rounded,
-        title: 'Aguardando aprovacao',
-        subtitle: '$pendingLabel aguardando revisao do administrador.',
-        showPulse: true,
-      );
+      if (status == 'pending') {
+        return _CoverageBannerContent(
+          theme: theme,
+          color: AppColors.yellowDark,
+          icon: Icons.hourglass_top_rounded,
+          title: 'Aguardando aprovacao',
+          subtitle: '$pendingLabel aguardando revisao do administrador.',
+          showPulse: true,
+        );
+      }
+      if (status == 'rejected') {
+        return _CoverageBannerContent(
+          theme: theme,
+          color: AppColors.danger,
+          icon: Icons.cancel_outlined,
+          title: 'Solicitacao reprovada',
+          subtitle: reviewNote.isNotEmpty
+              ? 'Motivo do admin: $reviewNote'
+              : 'Sua ultima solicitacao foi reprovada pelo admin.',
+        );
+      }
+      if (status == 'approved') {
+        return _CoverageBannerContent(
+          theme: theme,
+          color: AppColors.success,
+          icon: Icons.verified_rounded,
+          title: 'Ultima solicitacao aprovada',
+          subtitle: 'As alteracoes revisadas foram aprovadas pelo admin.',
+        );
+      }
     }
 
     if (schoolsCount > 0 || districtsCount > 0) {
@@ -1146,6 +1196,59 @@ class _CoverageStatusBanner extends StatelessWidget {
       title: 'Nao configurado',
       subtitle:
           'Adicione escolas e bairros para aparecer nas buscas de responsaveis.',
+    );
+  }
+}
+
+class _CoverageRecentRequestsCard extends StatelessWidget {
+  const _CoverageRecentRequestsCard({required this.items});
+
+  final List<Map<String, dynamic>> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8F5EA),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE8DFC4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Solicitacoes recentes',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ...items.map((item) {
+            final status = (item['status'] ?? '').toString().toLowerCase();
+            final note = (item['review_note'] ?? '').toString().trim();
+            final updatedAt = (item['updated_at'] ?? '').toString();
+            final statusLabel = switch (status) {
+              'pending' => 'Pendente',
+              'approved' => 'Aprovada',
+              'rejected' => 'Reprovada',
+              _ => 'Registrada',
+            };
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Text(
+                note.isNotEmpty
+                    ? '• $statusLabel ($updatedAt) - $note'
+                    : '• $statusLabel ($updatedAt)',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: AppColors.slate,
+                ),
+              ),
+            );
+          }),
+        ],
+      ),
     );
   }
 }
@@ -1465,7 +1568,8 @@ class _DistrictShiftEditor extends StatelessWidget {
         ...sortedEntries.map((entry) {
           final district = districtById[entry.key];
           final selectedShiftIds = entry.value;
-          final allSelected = shiftOptions.isNotEmpty &&
+          final allSelected =
+              shiftOptions.isNotEmpty &&
               shiftOptions.every((s) => selectedShiftIds.contains(s.id));
 
           return Container(
@@ -1545,56 +1649,61 @@ class _DistrictShiftEditor extends StatelessWidget {
                   child: Wrap(
                     spacing: 8,
                     runSpacing: 8,
-                    children: shiftOptions.map((shift) {
-                      final isSelected = selectedShiftIds.contains(shift.id);
-                      return GestureDetector(
-                        onTap: enabled
-                            ? () => onToggleShift(entry.key, shift.id)
-                            : null,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 160),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 7,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? AppColors.yellow
-                                : AppColors.surfaceSoft,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: isSelected
-                                  ? AppColors.yellowDark
-                                  : AppColors.border,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (isSelected) ...[
-                                const Icon(
-                                  Icons.check_rounded,
-                                  size: 13,
-                                  color: AppColors.ink,
-                                ),
-                                const SizedBox(width: 4),
-                              ],
-                              Text(
-                                shift.name,
-                                style: theme.textTheme.labelMedium?.copyWith(
+                    children: shiftOptions
+                        .map((shift) {
+                          final isSelected = selectedShiftIds.contains(
+                            shift.id,
+                          );
+                          return GestureDetector(
+                            onTap: enabled
+                                ? () => onToggleShift(entry.key, shift.id)
+                                : null,
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 160),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 7,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? AppColors.yellow
+                                    : AppColors.surfaceSoft,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
                                   color: isSelected
-                                      ? AppColors.ink
-                                      : AppColors.slate,
-                                  fontWeight: isSelected
-                                      ? FontWeight.w800
-                                      : FontWeight.w600,
+                                      ? AppColors.yellowDark
+                                      : AppColors.border,
                                 ),
                               ),
-                            ],
-                          ),
-                        ),
-                      );
-                    }).toList(growable: false),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (isSelected) ...[
+                                    const Icon(
+                                      Icons.check_rounded,
+                                      size: 13,
+                                      color: AppColors.ink,
+                                    ),
+                                    const SizedBox(width: 4),
+                                  ],
+                                  Text(
+                                    shift.name,
+                                    style: theme.textTheme.labelMedium
+                                        ?.copyWith(
+                                          color: isSelected
+                                              ? AppColors.ink
+                                              : AppColors.slate,
+                                          fontWeight: isSelected
+                                              ? FontWeight.w800
+                                              : FontWeight.w600,
+                                        ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        })
+                        .toList(growable: false),
                   ),
                 ),
               ],
@@ -1645,7 +1754,9 @@ class _ErrorPane extends StatelessWidget {
             Text(
               message,
               textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall?.copyWith(color: AppColors.slate),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.slate,
+              ),
             ),
           ],
         ),

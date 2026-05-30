@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
+import '../core/error/app_error_reporter.dart';
 import '../core/notifications/push_notifications.dart';
 import '../features/notifications/presentation/providers/notification_providers.dart';
 import '../features/tracking/presentation/providers/tracking_providers.dart';
@@ -29,16 +30,44 @@ class _FaixaAmarelaAppState extends ConsumerState<FaixaAmarelaApp> {
     );
     WidgetsBinding.instance.addObserver(_lifecycleObserver);
     FirebaseMessaging.onMessage.listen((message) {
-      // FCM does not show notifications while in foreground — display it.
-      PushNotifications.showForeground(message);
-      _refreshNotifications();
-    });
-    FirebaseMessaging.onMessageOpenedApp.listen((_) => _refreshNotifications());
-    Future<void>.microtask(() async {
-      final initialMessage = await FirebaseMessaging.instance
-          .getInitialMessage();
-      if (initialMessage != null) {
+      try {
+        PushNotifications.showForeground(message);
         _refreshNotifications();
+      } catch (error, stack) {
+        AppErrorReporter.report(
+          error,
+          stack,
+          source: 'fcm_foreground',
+          showSnack: true,
+        );
+      }
+    });
+    FirebaseMessaging.onMessageOpenedApp.listen((_) {
+      try {
+        _refreshNotifications();
+      } catch (error, stack) {
+        AppErrorReporter.report(
+          error,
+          stack,
+          source: 'fcm_opened_app',
+          showSnack: false,
+        );
+      }
+    });
+    Future<void>.microtask(() async {
+      try {
+        final initialMessage = await FirebaseMessaging.instance
+            .getInitialMessage();
+        if (initialMessage != null) {
+          _refreshNotifications();
+        }
+      } catch (error, stack) {
+        AppErrorReporter.report(
+          error,
+          stack,
+          source: 'fcm_initial_message',
+          showSnack: false,
+        );
       }
     });
   }
@@ -61,6 +90,7 @@ class _FaixaAmarelaAppState extends ConsumerState<FaixaAmarelaApp> {
       title: 'Faixa Amarela',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
+      scaffoldMessengerKey: rootScaffoldMessengerKey,
       routerConfig: router,
     );
   }

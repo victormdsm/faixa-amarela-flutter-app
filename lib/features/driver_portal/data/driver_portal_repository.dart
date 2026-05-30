@@ -264,6 +264,7 @@ class DriverPortalRepository {
     String? avatarImagePath,
     int? schoolId,
     int? shiftId,
+    required List<Map<String, dynamic>> addresses,
   }) async {
     try {
       final hasAvatarImage =
@@ -275,6 +276,7 @@ class DriverPortalRepository {
         ...?_numEntry('age', age),
         ...?_numEntry('school_id', schoolId),
         ...?_numEntry('shift_id', shiftId),
+        'addresses': addresses,
       };
 
       final response = hasAvatarImage
@@ -293,43 +295,6 @@ class DriverPortalRepository {
               options: Options(headers: {'Authorization': authHeader}),
               data: payload,
             );
-      return response.data ?? const <String, dynamic>{};
-    } catch (error) {
-      throw ApiException.fromDio(error);
-    }
-  }
-
-  Future<Map<String, dynamic>> createChildAddress(
-    String authHeader, {
-    required int childId,
-    required String zipcode,
-    required String street,
-    required String number,
-    String? reference,
-    int? districtId,
-    int? cityId,
-    String type = 'home',
-    bool isDefault = false,
-    String? latitude,
-    String? longitude,
-  }) async {
-    try {
-      final response = await _dio.post<Map<String, dynamic>>(
-        '/drivers/children/$childId/addresses',
-        options: Options(headers: {'Authorization': authHeader}),
-        data: {
-          'zipcode': zipcode,
-          'street': street,
-          'number': number,
-          ...?_stringEntry('reference', reference),
-          ...?_numEntry('district_id', districtId),
-          ...?_numEntry('city_id', cityId),
-          ...?_stringEntry('latitude', latitude),
-          ...?_stringEntry('longitude', longitude),
-          'type': type,
-          'is_default': isDefault,
-        },
-      );
       return response.data ?? const <String, dynamic>{};
     } catch (error) {
       throw ApiException.fromDio(error);
@@ -413,10 +378,7 @@ class DriverPortalRepository {
       authHeader,
       routeId,
       'alert-all',
-      data: <String, dynamic>{
-        'type': type,
-        'message': ?message,
-      },
+      data: <String, dynamic>{'type': type, 'message': ?message},
     );
   }
 
@@ -432,11 +394,7 @@ class DriverPortalRepository {
       authHeader,
       routeId,
       'remove-student',
-      data: <String, dynamic>{
-        'client_id': clientId,
-        'lat': ?lat,
-        'lng': ?lng,
-      },
+      data: <String, dynamic>{'client_id': clientId, 'lat': ?lat, 'lng': ?lng},
     );
   }
 
