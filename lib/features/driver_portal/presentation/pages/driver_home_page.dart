@@ -1471,6 +1471,9 @@ class _DriverRoutesTab extends ConsumerWidget {
     final routeManifest =
         (response['route_manifest'] as Map?)?.cast<String, dynamic>() ??
         const <String, dynamic>{};
+    final routing =
+        (response['routing'] as Map?)?.cast<String, dynamic>() ??
+        const <String, dynamic>{};
 
     final routeId = (routeMap['id'] as num?)?.toInt() ?? fallbackRouteId ?? 0;
     final manifestId = routeManifest['id']?.toString();
@@ -1495,6 +1498,12 @@ class _DriverRoutesTab extends ConsumerWidget {
       routeId: routeId,
       routeManifestId: manifestId,
       vanId: manifestVanId,
+      deviationDistanceMeters:
+          (routing['deviation_distance_meters'] as num?)?.toInt() ?? 100,
+      deviationSustainSeconds:
+          (routing['deviation_sustain_seconds'] as num?)?.toInt() ?? 10,
+      deviationDebounceSeconds:
+          (routing['deviation_debounce_seconds'] as num?)?.toInt() ?? 30,
     );
     if (!trackingStarted) {
       throw ApiException(
@@ -2194,8 +2203,10 @@ class _DriverRouteWorkspacePanelState
     }
     // Responsive height so the board/disembark (Students) list gets enough
     // room and its action buttons aren't clipped behind the floating dock.
-    final panelHeight =
-        (MediaQuery.sizeOf(context).height * 0.52).clamp(360.0, 560.0);
+    final panelHeight = (MediaQuery.sizeOf(context).height * 0.52).clamp(
+      360.0,
+      560.0,
+    );
     return SizedBox(height: panelHeight, child: shell);
   }
 

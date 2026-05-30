@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
@@ -59,6 +60,11 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
   DateTime? _lastGeofenceCheckAt;
   bool _isRouteRecalcInFlight = false;
   DateTime? _lastRouteRecalcAt;
+  int _deviationDistanceThresholdMeters = 100;
+  int _deviationSustainSeconds = 10;
+  int _deviationDebounceSeconds = 30;
+  DateTime? _offRouteSince;
+  DateTime? _lastDeviationRecalcAt;
 
   bool get _supportsBackgroundService =>
       !kIsWeb &&
@@ -102,6 +108,9 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
     required String routeManifestId,
     required int vanId,
     int geofenceRadiusMeters = 50,
+    int deviationDistanceMeters = 100,
+    int deviationSustainSeconds = 10,
+    int deviationDebounceSeconds = 30,
   }) async {
     await initialize();
     _authHeader = session.authorizationHeader;
@@ -133,6 +142,11 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
     );
     _lastRouteRecalcAt = null;
     _isRouteRecalcInFlight = false;
+    _offRouteSince = null;
+    _lastDeviationRecalcAt = null;
+    _deviationDistanceThresholdMeters = math.max(10, deviationDistanceMeters);
+    _deviationSustainSeconds = math.max(1, deviationSustainSeconds);
+    _deviationDebounceSeconds = math.max(1, deviationDebounceSeconds);
 
     if (_supportsBackgroundService) {
       try {
@@ -179,6 +193,8 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
 
     _lastRouteRecalcAt = null;
     _isRouteRecalcInFlight = false;
+    _offRouteSince = null;
+    _lastDeviationRecalcAt = null;
     _lastGeofenceCheckAt = null;
     _isGeofenceRequestInFlight = false;
 
@@ -481,7 +497,46 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
     _appendForegroundPointToTelemetryBuffer(point);
     _publishRealtimeLocationWhisper(point);
     unawaited(_performGeofenceCheck(position));
+    unawaited(_checkOffRouteAndMaybeRecalculate(position));
     unawaited(_performRoutePreviewRefresh(position));
+  }
+
+  Future<void> _checkOffRouteAndMaybeRecalculate(Position position) async {
+    final polyline = state.routePolyline;
+    if (polyline.length < 2) {
+      _offRouteSince = null;
+      return;
+    }
+
+    final now = DateTime.now();
+    final distanceMeters = _distancePointToPolylineMeters(
+      latitude: position.latitude,
+      longitude: position.longitude,
+      polyline: polyline,
+    );
+
+    if (!distanceMeters.isFinite ||
+        distanceMeters <= _deviationDistanceThresholdMeters) {
+      _offRouteSince = null;
+      return;
+    }
+
+    _offRouteSince ??= now;
+
+    if (now.difference(_offRouteSince!) <
+        Duration(seconds: _deviationSustainSeconds)) {
+      return;
+    }
+
+    if (_lastDeviationRecalcAt != null &&
+        now.difference(_lastDeviationRecalcAt!) <
+            Duration(seconds: _deviationDebounceSeconds)) {
+      return;
+    }
+
+    _lastDeviationRecalcAt = now;
+    _offRouteSince = null;
+    await _performRoutePreviewRefresh(position, force: true);
   }
 
   void _appendForegroundPointToTelemetryBuffer(Map<String, dynamic> point) {
@@ -540,7 +595,10 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
     }
   }
 
-  Future<void> _performRoutePreviewRefresh(Position position) async {
+  Future<void> _performRoutePreviewRefresh(
+    Position position, {
+    bool force = false,
+  }) async {
     if (_isRouteRecalcInFlight) return;
     if (!state.routeActive || state.routeManifestId == null) return;
     if (_authHeader == null || _authHeader!.isEmpty) return;
@@ -553,7 +611,8 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
     final minInterval = hasRouteVisual
         ? const Duration(seconds: 15)
         : const Duration(seconds: 3);
-    if (_lastRouteRecalcAt != null &&
+    if (!force &&
+        _lastRouteRecalcAt != null &&
         now.difference(_lastRouteRecalcAt!) < minInterval) {
       return;
     }
@@ -603,6 +662,7 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
           previous: state.routePlannedStops,
           incomingRemaining: stops,
         ),
+        clearWarning: true,
       );
     } catch (e) {
       final message = _extractRouteRecalcErrorMessage(e);
@@ -1167,6 +1227,70 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
     return null;
   }
 
+  double _distancePointToPolylineMeters({
+    required double latitude,
+    required double longitude,
+    required List<DriverTrackingLatLng> polyline,
+  }) {
+    if (polyline.length < 2) return double.infinity;
+
+    final latRad = latitude * math.pi / 180.0;
+    const earthRadius = 6371000.0;
+
+    double projectX(double lng) =>
+        (lng - longitude) * math.pi / 180.0 * earthRadius * math.cos(latRad);
+    double projectY(double lat) =>
+        (lat - latitude) * math.pi / 180.0 * earthRadius;
+
+    var best = double.infinity;
+    for (var i = 0; i < polyline.length - 1; i++) {
+      final a = polyline[i];
+      final b = polyline[i + 1];
+      final ax = projectX(a.lng);
+      final ay = projectY(a.lat);
+      final bx = projectX(b.lng);
+      final by = projectY(b.lat);
+      final distance = _distancePointToSegmentMeters(
+        px: 0,
+        py: 0,
+        ax: ax,
+        ay: ay,
+        bx: bx,
+        by: by,
+      );
+      if (distance < best) best = distance;
+    }
+
+    return best;
+  }
+
+  double _distancePointToSegmentMeters({
+    required double px,
+    required double py,
+    required double ax,
+    required double ay,
+    required double bx,
+    required double by,
+  }) {
+    final abx = bx - ax;
+    final aby = by - ay;
+    final apx = px - ax;
+    final apy = py - ay;
+    final abLenSquared = (abx * abx) + (aby * aby);
+
+    if (abLenSquared <= 0.000001) {
+      return math.sqrt((apx * apx) + (apy * apy));
+    }
+
+    final projection = ((apx * abx) + (apy * aby)) / abLenSquared;
+    final t = projection.clamp(0.0, 1.0);
+    final closestX = ax + (abx * t);
+    final closestY = ay + (aby * t);
+    final dx = px - closestX;
+    final dy = py - closestY;
+    return math.sqrt((dx * dx) + (dy * dy));
+  }
+
   List<DriverTrackingStopPoint> _parseStops(List<dynamic> rawStops) {
     return rawStops
         .whereType<Map>()
@@ -1299,5 +1423,4 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
       stop.lng.toStringAsFixed(6),
     ].join('|');
   }
-
 }
