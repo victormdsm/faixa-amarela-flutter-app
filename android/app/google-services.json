@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "14686391225",
+    "project_id": "faixa-amarela-app",
+    "storage_bucket": "faixa-amarela-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:14686391225:android:08be74d22e13214e73c468",
+        "android_client_info": {
+          "package_name": "com.faixaamarela.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCOhdK-ssIa7vuYSIrgvdYzbDQaBHEINFw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

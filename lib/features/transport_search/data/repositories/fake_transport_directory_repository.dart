@@ -1,0 +1,115 @@
+import '../../domain/entities/service_period.dart';
+import '../../domain/entities/transport_driver.dart';
+import '../../domain/repositories/transport_directory_repository.dart';
+
+class FakeTransportDirectoryRepository implements TransportDirectoryRepository {
+  @override
+  Future<List<TransportDriver>> listDrivers() async {
+    await Future<void>.delayed(const Duration(milliseconds: 450));
+
+    return const [
+      TransportDriver(
+        id: 'drv_1',
+        driverName: 'Carlos Henrique',
+        vanName: 'Van Escolar Sol Nascente',
+        whatsappNumber: '5511999990001',
+        schools: ['Escola Alfa', 'Colegio Horizonte'],
+        neighborhoods: ['Centro', 'Jardim Primavera', 'Vila Nova'],
+        periods: [ServicePeriod.morning, ServicePeriod.afternoon],
+        availableSeats: 3,
+        rating: 4.8,
+        yearsExperience: 9,
+        note: 'Atende reforco de sabado mediante combinado.',
+      ),
+      TransportDriver(
+        id: 'drv_2',
+        driverName: 'Marcos Silva',
+        vanName: 'Transporte Tio Marcos',
+        whatsappNumber: '5511999990002',
+        schools: ['Escola Alfa', 'Escola Municipal Aurora'],
+        neighborhoods: ['Centro', 'Bela Vista', 'Parque das Flores'],
+        periods: [ServicePeriod.morning, ServicePeriod.fullTime],
+        availableSeats: 2,
+        rating: 4.6,
+        yearsExperience: 6,
+      ),
+      TransportDriver(
+        id: 'drv_3',
+        driverName: 'Patricia Souza',
+        vanName: 'Van Amarelinha',
+        whatsappNumber: '5511999990003',
+        schools: ['Colegio Horizonte', 'Escola Futuro'],
+        neighborhoods: ['Jardim Primavera', 'Vila Nova', 'Sao Jose'],
+        periods: [ServicePeriod.afternoon, ServicePeriod.night],
+        availableSeats: 4,
+        rating: 4.9,
+        yearsExperience: 11,
+        note: 'Monitoria inclusa no periodo da tarde.',
+      ),
+      TransportDriver(
+        id: 'drv_4',
+        driverName: 'Roberto Lima',
+        vanName: 'Rota Segura Kids',
+        whatsappNumber: '5511999990004',
+        schools: ['Escola Municipal Aurora', 'Escola Futuro'],
+        neighborhoods: ['Parque das Flores', 'Sao Jose', 'Jardim Uniao'],
+        periods: [ServicePeriod.morning, ServicePeriod.afternoon],
+        availableSeats: 1,
+        rating: 4.4,
+        yearsExperience: 5,
+      ),
+      TransportDriver(
+        id: 'drv_5',
+        driverName: 'Aline Fernandes',
+        vanName: 'Van da Tia Aline',
+        whatsappNumber: '5511999990005',
+        schools: ['Colegio Horizonte', 'Instituto Saber'],
+        neighborhoods: ['Vila Nova', 'Jardim Uniao', 'Santa Luzia'],
+        periods: [ServicePeriod.afternoon, ServicePeriod.fullTime],
+        availableSeats: 5,
+        rating: 4.7,
+        yearsExperience: 8,
+      ),
+      TransportDriver(
+        id: 'drv_6',
+        driverName: 'Joao Pedro',
+        vanName: 'Noite Segura Escolar',
+        whatsappNumber: '5511999990006',
+        schools: ['Instituto Saber', 'Escola Futuro'],
+        neighborhoods: ['Santa Luzia', 'Sao Jose', 'Bela Vista'],
+        periods: [ServicePeriod.night],
+        availableSeats: 6,
+        rating: 4.5,
+        yearsExperience: 7,
+      ),
+      TransportDriver(
+        id: 'drv_7',
+        driverName: 'Luciana Gomes',
+        vanName: 'Integral Express Kids',
+        whatsappNumber: '5511999990007',
+        schools: ['Escola Alfa', 'Instituto Saber'],
+        neighborhoods: ['Centro', 'Santa Luzia', 'Bela Vista'],
+        periods: [ServicePeriod.fullTime],
+        availableSeats: 2,
+        rating: 4.9,
+        yearsExperience: 12,
+      ),
+      TransportDriver(
+        id: 'drv_8',
+        driverName: 'Fernando Costa',
+        vanName: 'Tio Fernando Escolar',
+        whatsappNumber: '5511999990008',
+        schools: ['Escola Municipal Aurora', 'Colegio Horizonte'],
+        neighborhoods: ['Jardim Uniao', 'Parque das Flores', 'Centro'],
+        periods: [
+          ServicePeriod.morning,
+          ServicePeriod.afternoon,
+          ServicePeriod.night,
+        ],
+        availableSeats: 3,
+        rating: 4.3,
+        yearsExperience: 4,
+      ),
+    ];
+  }
+}

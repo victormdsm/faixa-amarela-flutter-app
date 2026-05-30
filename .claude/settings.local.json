@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(sed '/latlong2:/d')",
+      "Bash(mv /tmp/pubspec_new.yaml /Users/victormatheusdesouzamuller/Documents/faixa-amarela-dev/app_faixa_amarela/pubspec.yaml)",
+      "Bash(chmod u+w /Users/victormatheusdesouzamuller/Documents/faixa-amarela-dev/app_faixa_amarela/pubspec.yaml)",
+      "Bash(node *)",
+      "Bash(/bin/ls -lO /Users/victormatheusdesouzamuller/Documents/faixa-amarela-dev/app_faixa_amarela/pubspec.yamlall)",
+      "Bash(osascript *)",
+      "Bash(diskutil info *)",
+      "Bash(sudo xattr -d com.apple.provenance /Users/victormatheusdesouzamuller/Documents/faixa-amarela-dev/app_faixa_amarela/pubspec.yaml)",
+      "Bash(xargs cat)",
+      "Bash(flutter pub *)",
+      "Bash(flutter analyze *)",
+      "Bash(docker exec laravel-db *)",
+      "Bash(docker exec *)"
+    ]
+  }
+}
