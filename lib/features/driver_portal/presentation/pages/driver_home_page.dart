@@ -2145,7 +2145,7 @@ class _DriverRouteWorkspacePanelState
     final studentsTab = _buildStudentsTab(context, tracking);
 
     final body = switch (_viewIndex) {
-      0 => summaryTab,
+      0 => summaryTab, // _buildSummaryTab already returns its own Expanded
       1 => Expanded(child: mapStage),
       2 => Expanded(child: studentsTab),
       _ => summaryTab,
@@ -2168,7 +2168,9 @@ class _DriverRouteWorkspacePanelState
       child: Stack(
         children: [
           Padding(
-            padding: const EdgeInsets.only(bottom: 66),
+            // Reserve the full floating-dock height (~76px) so tab content —
+            // notably the board/disembark buttons — never sits under the dock.
+            padding: const EdgeInsets.only(bottom: 78),
             child: Column(
               children: [
                 _buildWorkspaceStatusHeader(context, tracking),
@@ -2190,7 +2192,11 @@ class _DriverRouteWorkspacePanelState
     if (widget.expandMapStage) {
       return shell;
     }
-    return SizedBox(height: 370, child: shell);
+    // Responsive height so the board/disembark (Students) list gets enough
+    // room and its action buttons aren't clipped behind the floating dock.
+    final panelHeight =
+        (MediaQuery.sizeOf(context).height * 0.52).clamp(360.0, 560.0);
+    return SizedBox(height: panelHeight, child: shell);
   }
 
   Widget _buildRouteInfoPanelContent(
@@ -2577,7 +2583,9 @@ class _DriverRouteWorkspacePanelState
     }
 
     return ListView.separated(
-      padding: const EdgeInsets.only(top: 4, bottom: 4),
+      // Reserve space for the floating dock so the last student's
+      // Embarcou/Desembarcou buttons stay visible and tappable.
+      padding: const EdgeInsets.only(top: 4, bottom: 12),
       itemCount: students.length,
       separatorBuilder: (_, _) => const SizedBox(height: 8),
       itemBuilder: (context, index) {

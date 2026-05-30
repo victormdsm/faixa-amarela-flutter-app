@@ -1,7 +1,3 @@
-import org.gradle.api.tasks.compile.JavaCompile
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
-
 allprojects {
     repositories {
         google()
@@ -21,16 +17,9 @@ subprojects {
 }
 subprojects {
     project.evaluationDependsOn(":app")
-
-    tasks.withType<JavaCompile>().configureEach {
-        sourceCompatibility = JavaVersion.VERSION_17.toString()
-        targetCompatibility = JavaVersion.VERSION_17.toString()
-        options.release.set(17)
-    }
-
-    tasks.withType<KotlinJvmCompile>().configureEach {
-        compilerOptions.jvmTarget.set(JvmTarget.JVM_17)
-    }
+    // Note: do not force a global Java/Kotlin jvmTarget here. Each plugin sets
+    // its own (internally consistent) target; overriding only Kotlin caused
+    // "Inconsistent JVM-target" failures (maplibre 21, pusher 11, app 17).
 }
 
 tasks.register<Delete>("clean") {
