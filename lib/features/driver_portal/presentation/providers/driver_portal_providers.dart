@@ -37,7 +37,8 @@ final driverClientChildrenProvider = FutureProvider.autoDispose.family((
       .clientChildren(auth, clientId);
 });
 
-final driverProfileProvider = FutureProvider.autoDispose((ref) async {
+// Not autoDispose — profile and van image stay cached in memory for the session.
+final driverProfileProvider = FutureProvider((ref) async {
   final auth = _requireDriverAuthHeader(ref);
   return ref.watch(driverPortalRepositoryProvider).profile(auth);
 });

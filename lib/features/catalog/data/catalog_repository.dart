@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 import '../../../core/models/catalog_option.dart';
 import '../../../core/network/api_exception.dart';
@@ -34,17 +35,72 @@ class CatalogRepository {
 
   final Dio _dio;
 
+  static const _boxName = 'catalog_cache';
+  static const _ttlMs = 24 * 60 * 60 * 1000; // 24 hours
+
+  static Future<void> openCacheBox() => Hive.openBox<dynamic>(_boxName);
+
+  Box<dynamic> get _box => Hive.box<dynamic>(_boxName);
+
   Future<List<CatalogOption>> listSchools() =>
-      _loadLegacyList('/catalog/schools');
+      _cachedLegacyList('schools', '/catalog/schools');
 
   Future<List<CatalogOption>> listDistricts() =>
-      _loadLegacyList('/catalog/districts');
+      _cachedLegacyList('districts', '/catalog/districts');
 
   Future<List<CatalogOption>> listShifts() =>
-      _loadLegacyList('/catalog/shifts');
+      _cachedLegacyList('shifts', '/catalog/shifts');
 
   Future<List<CatalogOption>> listRelatives() =>
       _loadPlainList('/catalog/relatives');
+
+  Future<List<CatalogOption>> _cachedLegacyList(
+    String cacheKey,
+    String path,
+  ) async {
+    final cached = _loadFromCache(cacheKey);
+    if (cached != null) return cached;
+
+    final result = await _loadLegacyList(path);
+    await _saveToCache(cacheKey, result);
+    return result;
+  }
+
+  List<CatalogOption>? _loadFromCache(String key) {
+    try {
+      final fetchedAt = _box.get('${key}_at') as int?;
+      if (fetchedAt == null) return null;
+      if (DateTime.now().millisecondsSinceEpoch - fetchedAt > _ttlMs) {
+        return null;
+      }
+      final raw = _box.get('${key}_data') as List?;
+      if (raw == null) return null;
+      return raw
+          .whereType<Map>()
+          .map(
+            (e) => CatalogOption.fromJson(
+              Map<String, dynamic>.from(e),
+            ),
+          )
+          .where((e) => e.id > 0 && e.name.trim().isNotEmpty)
+          .toList(growable: false);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _saveToCache(String key, List<CatalogOption> items) async {
+    try {
+      await _box.put(
+        '${key}_data',
+        items.map((e) => <String, dynamic>{'id': e.id, 'name': e.name}).toList(growable: false),
+      );
+      await _box.put(
+        '${key}_at',
+        DateTime.now().millisecondsSinceEpoch,
+      );
+    } catch (_) {}
+  }
 
   Future<List<CatalogOption>> _loadLegacyList(String path) async {
     try {

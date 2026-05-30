@@ -45,6 +45,7 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
 
   bool _hydrated = false;
   bool _isSaving = false;
+  bool _vehicleEditMode = false;
   String? _avatarImageUrl;
   String? _avatarImageLocalPath;
   String? _vehicleImageUrl;
@@ -296,11 +297,57 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Edit toggle row
+                      Row(
+                        children: [
+                          const Spacer(),
+                          if (!_vehicleEditMode)
+                            TextButton.icon(
+                              onPressed: _isSaving
+                                  ? null
+                                  : () => setState(() => _vehicleEditMode = true),
+                              icon: const Icon(Icons.edit_rounded, size: 16),
+                              label: const Text('Editar dados do veiculo'),
+                            )
+                          else
+                            TextButton.icon(
+                              onPressed: _isSaving
+                                  ? null
+                                  : () => setState(() => _vehicleEditMode = false),
+                              icon: const Icon(Icons.lock_outline_rounded, size: 16),
+                              label: const Text('Cancelar edicao'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: AppColors.slate,
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
                       _VehicleImagePreview(
                         imageUrl: _vehicleImageUrl,
                         localPath: _vehicleImageLocalPath,
-                        onTap: _isSaving ? null : _pickVehicleImage,
+                        onTap: (_isSaving || !_vehicleEditMode)
+                            ? null
+                            : _pickVehicleImage,
                       ),
+                      if (!_vehicleEditMode) ...[
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.lock_outline_rounded,
+                              size: 14,
+                              color: AppColors.muted,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Toque em "Editar dados" para alterar',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(color: AppColors.muted),
+                            ),
+                          ],
+                        ),
+                      ],
                       if (_vehicleImageLocalPath != null) ...[
                         const SizedBox(height: 8),
                         TextButton.icon(
@@ -316,7 +363,8 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _vehicleBrandController,
-                        enabled: !_isSaving,
+                        enabled: !_isSaving && _vehicleEditMode,
+                        readOnly: !_vehicleEditMode,
                         decoration: const InputDecoration(
                           labelText: 'Marca / Modelo',
                           prefixIcon: Icon(Icons.directions_bus_outlined),
@@ -328,7 +376,8 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                           Expanded(
                             child: TextFormField(
                               controller: _vehicleColorController,
-                              enabled: !_isSaving,
+                              enabled: !_isSaving && _vehicleEditMode,
+                              readOnly: !_vehicleEditMode,
                               decoration: const InputDecoration(
                                 labelText: 'Cor',
                                 prefixIcon: Icon(Icons.palette_outlined),
@@ -339,7 +388,8 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                           Expanded(
                             child: TextFormField(
                               controller: _vehicleYearController,
-                              enabled: !_isSaving,
+                              enabled: !_isSaving && _vehicleEditMode,
+                              readOnly: !_vehicleEditMode,
                               keyboardType: TextInputType.number,
                               decoration: const InputDecoration(
                                 labelText: 'Ano',
@@ -352,7 +402,8 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _vehiclePlateController,
-                        enabled: !_isSaving,
+                        enabled: !_isSaving && _vehicleEditMode,
+                        readOnly: !_vehicleEditMode,
                         textCapitalization: TextCapitalization.characters,
                         decoration: const InputDecoration(
                           labelText: 'Placa',
@@ -473,6 +524,7 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
 
   void _applyProfile(Map<String, dynamic> data) {
     _hydrated = true;
+    _vehicleEditMode = false;
     _email = data['email']?.toString();
     _cpf = data['cpf']?.toString();
     _nameController.text = (data['name'] ?? '').toString();

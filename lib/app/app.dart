@@ -4,6 +4,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 
 import '../core/error/app_error_reporter.dart';
 import '../core/notifications/push_notifications.dart';
+import '../features/driver_portal/presentation/providers/driver_portal_providers.dart';
 import '../features/notifications/presentation/providers/notification_providers.dart';
 import '../features/tracking/presentation/providers/tracking_providers.dart';
 import 'router/app_router.dart';
@@ -22,6 +23,13 @@ class _FaixaAmarelaAppState extends ConsumerState<FaixaAmarelaApp> {
     ref.invalidate(notificationsProvider);
   }
 
+  void _handleFcmData(Map<String, dynamic> data) {
+    final type = data['type']?.toString() ?? '';
+    if (type == 'driver_profile_change_reviewed') {
+      ref.invalidate(driverProfileProvider);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -33,6 +41,7 @@ class _FaixaAmarelaAppState extends ConsumerState<FaixaAmarelaApp> {
       try {
         PushNotifications.showForeground(message);
         _refreshNotifications();
+        _handleFcmData(message.data);
       } catch (error, stack) {
         AppErrorReporter.report(
           error,
@@ -42,9 +51,10 @@ class _FaixaAmarelaAppState extends ConsumerState<FaixaAmarelaApp> {
         );
       }
     });
-    FirebaseMessaging.onMessageOpenedApp.listen((_) {
+    FirebaseMessaging.onMessageOpenedApp.listen((message) {
       try {
         _refreshNotifications();
+        _handleFcmData(message.data);
       } catch (error, stack) {
         AppErrorReporter.report(
           error,

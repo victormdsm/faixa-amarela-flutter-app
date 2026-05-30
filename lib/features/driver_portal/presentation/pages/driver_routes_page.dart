@@ -18,11 +18,18 @@ import '../providers/driver_portal_providers.dart';
 // Page — full-screen map layout
 // ─────────────────────────────────────────────
 
-class DriverRoutesPage extends ConsumerWidget {
+class DriverRoutesPage extends ConsumerStatefulWidget {
   const DriverRoutesPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DriverRoutesPage> createState() => _DriverRoutesPageState();
+}
+
+class _DriverRoutesPageState extends ConsumerState<DriverRoutesPage> {
+  bool _isFinishing = false;
+
+  @override
+  Widget build(BuildContext context) {
     final routesAsync = ref.watch(driverRoutesProvider);
 
     DriverTrackingState tracking;
@@ -50,14 +57,21 @@ class DriverRoutesPage extends ConsumerWidget {
                 padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
                 child: _MapTopOverlay(
                   tracking: tracking,
-                  onFinish: () => _finishRoute(context, ref, tracking),
+                  isFinishing: _isFinishing,
+                  onFinish: _isFinishing
+                      ? null
+                      : () => _finishRoute(tracking),
                 ),
               ),
             ),
           ),
 
           // ── Bottom sheet: students / saved routes ─────────────
-          _BottomSheet(tracking: tracking, routesAsync: routesAsync),
+          _BottomSheet(
+            tracking: tracking,
+            routesAsync: routesAsync,
+            onAutoFinish: _finishRoute,
+          ),
         ],
       ),
       floatingActionButton: !tracking.routeActive
@@ -70,15 +84,14 @@ class DriverRoutesPage extends ConsumerWidget {
     );
   }
 
-  Future<void> _finishRoute(
-    BuildContext context,
-    WidgetRef ref,
-    DriverTrackingState tracking,
-  ) async {
+  Future<void> _finishRoute(DriverTrackingState tracking) async {
+    if (_isFinishing) return;
     final routeId = tracking.routeId;
     if (routeId == null || routeId <= 0) return;
     final session = ref.read(appSessionControllerProvider).session;
     if (session == null) return;
+
+    setState(() => _isFinishing = true);
     try {
       await ref
           .read(driverPortalRepositoryProvider)
@@ -87,15 +100,22 @@ class DriverRoutesPage extends ConsumerWidget {
           .read(driverTrackingControllerProvider.notifier)
           .stopRouteTracking(silent: true);
       ref.invalidate(driverRoutesProvider);
-      if (!context.mounted) return;
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Rota finalizada com sucesso.')),
       );
     } on ApiException catch (e) {
-      if (!context.mounted) return;
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppErrorReporter.messageFor(e))),
+      );
+    } finally {
+      if (mounted) setState(() => _isFinishing = false);
     }
   }
 }
@@ -105,9 +125,14 @@ class DriverRoutesPage extends ConsumerWidget {
 // ─────────────────────────────────────────────
 
 class _MapTopOverlay extends StatelessWidget {
-  const _MapTopOverlay({required this.tracking, required this.onFinish});
+  const _MapTopOverlay({
+    required this.tracking,
+    required this.isFinishing,
+    this.onFinish,
+  });
   final DriverTrackingState tracking;
-  final VoidCallback onFinish;
+  final bool isFinishing;
+  final VoidCallback? onFinish;
 
   @override
   Widget build(BuildContext context) {
@@ -120,7 +145,8 @@ class _MapTopOverlay extends StatelessWidget {
           _SpeedChip(speedKmh: tracking.lastSpeedKmh!),
           const SizedBox(width: 8),
         ],
-        if (tracking.routeActive) _FinishBtn(onTap: onFinish),
+        if (tracking.routeActive)
+          _FinishBtn(onTap: onFinish, loading: isFinishing),
       ],
     );
   }
@@ -193,17 +219,19 @@ class _SpeedChip extends StatelessWidget {
 }
 
 class _FinishBtn extends StatelessWidget {
-  const _FinishBtn({required this.onTap});
-  final VoidCallback onTap;
+  const _FinishBtn({this.onTap, this.loading = false});
+  final VoidCallback? onTap;
+  final bool loading;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: loading ? null : onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(
-          color: AppColors.danger.withValues(alpha: 0.93),
+          color: (loading ? AppColors.muted : AppColors.danger)
+              .withValues(alpha: 0.93),
           borderRadius: BorderRadius.circular(AppRadius.full),
           boxShadow: const [
             BoxShadow(
@@ -216,10 +244,20 @@ class _FinishBtn extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.stop_rounded, size: 13, color: Colors.white),
+            if (loading)
+              const SizedBox(
+                width: 13,
+                height: 13,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              )
+            else
+              const Icon(Icons.stop_rounded, size: 13, color: Colors.white),
             const SizedBox(width: 5),
             Text(
-              'Finalizar',
+              loading ? 'Finalizando...' : 'Finalizar',
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
                 fontWeight: FontWeight.w800,
                 color: Colors.white,
@@ -261,9 +299,14 @@ class _MapPill extends StatelessWidget {
 // ─────────────────────────────────────────────
 
 class _BottomSheet extends StatefulWidget {
-  const _BottomSheet({required this.tracking, required this.routesAsync});
+  const _BottomSheet({
+    required this.tracking,
+    required this.routesAsync,
+    this.onAutoFinish,
+  });
   final DriverTrackingState tracking;
   final AsyncValue<dynamic> routesAsync;
+  final Future<void> Function(DriverTrackingState)? onAutoFinish;
 
   @override
   State<_BottomSheet> createState() => _BottomSheetState();
@@ -477,6 +520,7 @@ class _BottomSheetState extends State<_BottomSheet> {
                             ? _ActiveContent(
                                 tracking: tracking,
                                 scrollController: scrollController,
+                                onAutoFinish: widget.onAutoFinish,
                               )
                             : _SavedRoutesContent(
                                 routesAsync: routesAsync,
@@ -503,8 +547,10 @@ class _ActiveContent extends ConsumerStatefulWidget {
   const _ActiveContent({
     required this.tracking,
     required this.scrollController,
+    this.onAutoFinish,
   });
   final DriverTrackingState tracking;
+  final Future<void> Function(DriverTrackingState)? onAutoFinish;
   final ScrollController scrollController;
 
   @override
@@ -591,6 +637,15 @@ class _ActiveContentState extends ConsumerState<_ActiveContent> {
       onLocal: (ctrl) => ctrl.markClientDisembarkedLocal(clientId),
       msg: 'Aluno desembarcou.',
     );
+
+    // Auto-finish when all students have disembarked
+    final tracking = ref.read(driverTrackingControllerProvider);
+    if (!tracking.routeActive) return;
+    final students = _studentRouteCards(tracking);
+    if (students.isNotEmpty &&
+        students.every((s) => s.status == _StopStatus.droppedOff)) {
+      await widget.onAutoFinish?.call(tracking);
+    }
   }
 
   Future<void> _notifyParent(int clientId, String type) async {
@@ -1779,9 +1834,9 @@ class _SavedRouteCard extends ConsumerWidget {
       );
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.toString())));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppErrorReporter.messageFor(e))),
+      );
     }
   }
 }

@@ -20,8 +20,8 @@ if [ -f "$SCRIPT_DIR/.env.build" ]; then
   set +a
 fi
 
-API_BASE_URL="${API_BASE_URL:-https://c8b1-2804-2610-6752-3e00-4d11-702d-6b00-cf10.ngrok-free.app/api}"
-PUSHER_APP_KEY="${PUSHER_APP_KEY:-app-key}"
+# API_BASE_URL="${API_BASE_URL:-https://c8b1-2804-2610-6752-3e00-4d11-702d-6b00-cf10.ngrok-free.app/api}"
+# PUSHER_APP_KEY="${PUSHER_APP_KEY:-app-key}"
 
 echo "==> flutter pub get"
 flutter pub get

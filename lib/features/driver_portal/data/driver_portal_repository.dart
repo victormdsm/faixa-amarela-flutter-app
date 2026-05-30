@@ -220,6 +220,23 @@ class DriverPortalRepository {
     }
   }
 
+  Future<Map<String, dynamic>> linkClient(
+    String authHeader, {
+    required int parentId,
+    required int childId,
+  }) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/drivers/clients/link',
+        options: Options(headers: {'Authorization': authHeader}),
+        data: <String, dynamic>{'parent_id': parentId, 'child_id': childId},
+      );
+      return response.data ?? const <String, dynamic>{};
+    } catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
   Future<void> unlinkClient(String authHeader, int clientId) async {
     try {
       await _dio.delete<Map<String, dynamic>>(

@@ -10,9 +10,9 @@ part 'network_providers.g.dart';
 Dio dio(Ref ref) {
   final dio = Dio(
     BaseOptions(
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
-      sendTimeout: const Duration(seconds: 10),
+      connectTimeout: const Duration(seconds: 15),
+      receiveTimeout: const Duration(seconds: 60),
+      sendTimeout: const Duration(seconds: 60),
       baseUrl: BackendConfig.apiBaseUrl,
       headers: const {
         'Accept': 'application/json',

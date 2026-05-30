@@ -43,8 +43,8 @@ class _DriverClientsPageState extends ConsumerState<DriverClientsPage> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.push(AppRoutes.driverAddClient),
-        icon: const Icon(Icons.person_add_alt_1_rounded, size: 20),
-        label: const Text('Novo cliente'),
+        icon: const Icon(Icons.link_rounded, size: 20),
+        label: const Text('Vincular responsavel'),
       ),
       body: clientsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),

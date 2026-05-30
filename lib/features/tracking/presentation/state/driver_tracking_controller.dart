@@ -92,9 +92,11 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
     if (_supportsBackgroundService &&
         _authHeader != null &&
         _authHeader!.isNotEmpty) {
-      _backgroundService.invoke(trackingCommandUpdateAuth, <String, dynamic>{
-        'auth_header': _authHeader,
-      });
+      try {
+        _backgroundService.invoke(trackingCommandUpdateAuth, <String, dynamic>{
+          'auth_header': _authHeader,
+        });
+      } catch (_) {}
     }
 
     if (session == null && state.routeActive) {
@@ -162,16 +164,18 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
           await Future<void>.delayed(const Duration(milliseconds: 600));
         }
 
-        _backgroundService.invoke(trackingCommandStart, <String, dynamic>{
-          'active': true,
-          'mode': 'foreground',
-          'auth_header': _authHeader,
-          'api_base_url': BackendConfig.apiBaseUrl,
-          'route_id': routeId,
-          'route_manifest_id': routeManifestId,
-          'van_id': vanId,
-          'flush_interval_seconds': 15,
-        });
+        try {
+          _backgroundService.invoke(trackingCommandStart, <String, dynamic>{
+            'active': true,
+            'mode': 'foreground',
+            'auth_header': _authHeader,
+            'api_base_url': BackendConfig.apiBaseUrl,
+            'route_id': routeId,
+            'route_manifest_id': routeManifestId,
+            'van_id': vanId,
+            'flush_interval_seconds': 15,
+          });
+        } catch (_) {}
       } catch (e) {
         state = state.copyWith(warning: 'Servico background indisponivel: $e');
       }
@@ -411,9 +415,11 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
     if (!state.routeActive) return;
 
     if (_supportsBackgroundService) {
-      _backgroundService.invoke(trackingCommandSetMode, <String, dynamic>{
-        'mode': 'foreground',
-      });
+      try {
+        _backgroundService.invoke(trackingCommandSetMode, <String, dynamic>{
+          'mode': 'foreground',
+        });
+      } catch (_) {}
     }
 
     await _startForegroundStream();
@@ -427,9 +433,11 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
     await _disconnectRealtimeSocket();
 
     if (_supportsBackgroundService) {
-      _backgroundService.invoke(trackingCommandSetMode, <String, dynamic>{
-        'mode': 'background',
-      });
+      try {
+        _backgroundService.invoke(trackingCommandSetMode, <String, dynamic>{
+          'mode': 'background',
+        });
+      } catch (_) {}
     }
 
     state = state.copyWith(
@@ -555,7 +563,9 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
       return;
     }
 
-    _backgroundService.invoke(trackingCommandAppendPoint, point);
+    try {
+      _backgroundService.invoke(trackingCommandAppendPoint, point);
+    } catch (_) {}
   }
 
   Future<void> _performGeofenceCheck(Position position) async {
