@@ -41,3 +41,8 @@ final driverProfileProvider = FutureProvider.autoDispose((ref) async {
   final auth = _requireDriverAuthHeader(ref);
   return ref.watch(driverPortalRepositoryProvider).profile(auth);
 });
+
+final driverRoutePresetsProvider = FutureProvider.autoDispose((ref) async {
+  final auth = _requireDriverAuthHeader(ref);
+  return ref.watch(driverPortalRepositoryProvider).listRoutePresets(auth);
+});

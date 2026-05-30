@@ -252,51 +252,111 @@ class _MapPill extends StatelessWidget {
 // Bottom sheet (Google Maps-style)
 // ─────────────────────────────────────────────
 
-class _BottomSheet extends StatelessWidget {
+class _BottomSheet extends StatefulWidget {
   const _BottomSheet({required this.tracking, required this.routesAsync});
   final DriverTrackingState tracking;
   final AsyncValue<dynamic> routesAsync;
 
   @override
+  State<_BottomSheet> createState() => _BottomSheetState();
+}
+
+class _BottomSheetState extends State<_BottomSheet> {
+  final _sheetController = DraggableScrollableController();
+  static const _minSize = 0.12;
+  static const _maxSize = 0.88;
+  static const _snaps = [0.12, 0.32, 0.65, 0.88];
+
+  @override
+  void dispose() {
+    _sheetController.dispose();
+    super.dispose();
+  }
+
+  // The drag handle + header sit above the scrollable content, so they are not
+  // driven by the sheet's scrollController. Forward their vertical drags to the
+  // sheet manually so the user can pull it up/down from the handle.
+  void _onHandleDragUpdate(DragUpdateDetails details, double maxHeight) {
+    if (!_sheetController.isAttached || maxHeight <= 0) return;
+    final delta = details.primaryDelta! / maxHeight;
+    final next = (_sheetController.size - delta).clamp(_minSize, _maxSize);
+    _sheetController.jumpTo(next);
+  }
+
+  void _onHandleDragEnd(DragEndDetails details) {
+    if (!_sheetController.isAttached) return;
+    final current = _sheetController.size;
+    var target = _snaps.first;
+    var bestDelta = double.infinity;
+    for (final s in _snaps) {
+      final d = (s - current).abs();
+      if (d < bestDelta) {
+        bestDelta = d;
+        target = s;
+      }
+    }
+    _sheetController.animateTo(
+      target,
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOut,
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      initialChildSize: tracking.routeActive ? 0.30 : 0.20,
-      minChildSize: 0.12,
-      maxChildSize: 0.88,
-      snap: true,
-      snapSizes: const [0.12, 0.32, 0.65, 0.88],
-      builder: (ctx, scrollController) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-            boxShadow: [
-              BoxShadow(
-                color: Color(0x28000000),
-                blurRadius: 20,
-                offset: Offset(0, -4),
-              ),
-            ],
-          ),
-          child: Consumer(
-            builder: (context, ref, _) {
-              final students = _studentRouteCards(tracking);
-              return Column(
-                children: [
-                  // Drag handle
-                  Padding(
-                    padding: const EdgeInsets.only(top: 10, bottom: 4),
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: AppColors.border,
-                        borderRadius: BorderRadius.circular(AppRadius.full),
-                      ),
-                    ),
+    final tracking = widget.tracking;
+    final routesAsync = widget.routesAsync;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxHeight = constraints.maxHeight;
+        return DraggableScrollableSheet(
+          controller: _sheetController,
+          initialChildSize: tracking.routeActive ? 0.30 : 0.20,
+          minChildSize: _minSize,
+          maxChildSize: _maxSize,
+          snap: true,
+          snapSizes: _snaps,
+          builder: (ctx, scrollController) {
+            return Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Color(0x28000000),
+                    blurRadius: 20,
+                    offset: Offset(0, -4),
                   ),
-                  // Sheet header
-                  Padding(
+                ],
+              ),
+              child: Consumer(
+                builder: (context, ref, _) {
+                  final students = _studentRouteCards(tracking);
+                  return Column(
+                    children: [
+                      // Drag handle + header (forward drags to the sheet)
+                      GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onVerticalDragUpdate: (d) =>
+                            _onHandleDragUpdate(d, maxHeight),
+                        onVerticalDragEnd: _onHandleDragEnd,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(top: 10, bottom: 4),
+                              child: Container(
+                                width: 40,
+                                height: 4,
+                                decoration: BoxDecoration(
+                                  color: AppColors.border,
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadius.full),
+                                ),
+                              ),
+                            ),
+                            // Sheet header
+                            Padding(
                     padding: const EdgeInsets.fromLTRB(16, 6, 12, 8),
                     child: Row(
                       children: [
@@ -360,18 +420,21 @@ class _BottomSheet extends StatelessWidget {
                             color: AppColors.slate,
                           ),
                         ],
-                      ],
-                    ),
-                  ),
-                  const Divider(height: 1),
-                  // Content
-                  Expanded(
-                    child: tracking.routeActive
-                        ? _ActiveContent(
-                            tracking: tracking,
-                            scrollController: scrollController,
-                          )
-                        : _SavedRoutesContent(
+                              ],
+                            ),
+                          ),
+                          ],
+                        ),
+                      ),
+                      const Divider(height: 1),
+                      // Content
+                      Expanded(
+                        child: tracking.routeActive
+                            ? _ActiveContent(
+                                tracking: tracking,
+                                scrollController: scrollController,
+                              )
+                            : _SavedRoutesContent(
                             routesAsync: routesAsync,
                             scrollController: scrollController,
                           ),
@@ -380,6 +443,8 @@ class _BottomSheet extends StatelessWidget {
               );
             },
           ),
+        );
+          },
         );
       },
     );
@@ -625,20 +690,7 @@ class _SavedRoutesContent extends ConsumerWidget {
               })
               .toList(growable: false);
 
-          if (items.isEmpty) {
-            return ListView(
-              controller: scrollController,
-              children: const [
-                AppEmptyState(
-                  message: 'Nenhuma rota encontrada.',
-                  icon: Icons.route_outlined,
-                  subtitle: 'Gere uma rota para comecar.',
-                ),
-              ],
-            );
-          }
-
-          return ListView.separated(
+          return ListView(
             controller: scrollController,
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.lg,
@@ -646,10 +698,20 @@ class _SavedRoutesContent extends ConsumerWidget {
               AppSpacing.lg,
               100,
             ),
-            itemCount: items.length,
-            separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
-            itemBuilder: (context, index) =>
-                _SavedRouteCard(route: items[index]),
+            children: [
+              const _PresetsStrip(),
+              if (items.isEmpty)
+                const AppEmptyState(
+                  message: 'Nenhuma rota encontrada.',
+                  icon: Icons.route_outlined,
+                  subtitle: 'Gere uma rota para comecar.',
+                )
+              else
+                for (final route in items) ...[
+                  _SavedRouteCard(route: route),
+                  const SizedBox(height: AppSpacing.sm),
+                ],
+            ],
           );
         } catch (e) {
           return AppErrorState(
@@ -658,6 +720,64 @@ class _SavedRoutesContent extends ConsumerWidget {
           );
         }
       },
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// Saved presets quick-load strip
+// ─────────────────────────────────────────────
+
+class _PresetsStrip extends ConsumerWidget {
+  const _PresetsStrip();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final presetsAsync = ref.watch(driverRoutePresetsProvider);
+    final presets = presetsAsync.value ?? const <Map<String, dynamic>>[];
+    if (presets.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.bookmarks_outlined, size: 16, color: AppColors.slate),
+              const SizedBox(width: 6),
+              Text(
+                'Presets salvos',
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.slate,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          SizedBox(
+            height: 38,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: presets.length,
+              separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.sm),
+              itemBuilder: (context, i) {
+                final preset = presets[i];
+                final id = (preset['id'] as num?)?.toInt();
+                final name = (preset['name'] ?? 'Preset').toString();
+                return ActionChip(
+                  avatar: const Icon(Icons.play_arrow_rounded, size: 18),
+                  label: Text(name, overflow: TextOverflow.ellipsis),
+                  onPressed: id == null
+                      ? null
+                      : () => _openAdhocPlanner(context, ref, presetId: id),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1594,7 +1714,11 @@ class _SavedRouteCard extends ConsumerWidget {
 // Adhoc Route Planner
 // ─────────────────────────────────────────────
 
-Future<void> _openAdhocPlanner(BuildContext context, WidgetRef ref) async {
+Future<void> _openAdhocPlanner(
+  BuildContext context,
+  WidgetRef ref, {
+  int? presetId,
+}) async {
   final session = ref.read(appSessionControllerProvider).session;
   if (session == null) {
     if (!context.mounted) return;
@@ -1605,15 +1729,19 @@ Future<void> _openAdhocPlanner(BuildContext context, WidgetRef ref) async {
   }
 
   final repo = ref.read(driverPortalRepositoryProvider);
-  final optionsFuture = repo.routePlanningOptions(session.authorizationHeader);
+  final auth = session.authorizationHeader;
+  final bundleFuture = Future.wait<Object>([
+    repo.routePlanningOptions(auth),
+    repo.listRoutePresets(auth),
+  ]);
 
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
     showDragHandle: true,
-    builder: (ctx) => FutureBuilder<Map<String, dynamic>>(
-      future: optionsFuture,
+    builder: (ctx) => FutureBuilder<List<Object>>(
+      future: bundleFuture,
       builder: (ctx, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
           return const Padding(
@@ -1627,8 +1755,25 @@ Future<void> _openAdhocPlanner(BuildContext context, WidgetRef ref) async {
             child: Text(snapshot.error.toString(), textAlign: TextAlign.center),
           );
         }
+        final bundle = snapshot.data ?? const [];
+        final options = bundle.isNotEmpty
+            ? bundle[0] as Map<String, dynamic>
+            : const <String, dynamic>{};
+        final presets = bundle.length > 1
+            ? bundle[1] as List<Map<String, dynamic>>
+            : const <Map<String, dynamic>>[];
         return _AdhocPlannerContent(
-          data: snapshot.data ?? const {},
+          data: options,
+          presets: presets,
+          initialPresetId: presetId,
+          onSavePreset: (name, payload) => repo.createRoutePreset(
+            auth,
+            name: name,
+            operationId: payload.operationId,
+            tripMode: payload.tripModeId,
+            selections: payload.selections,
+          ),
+          onDeletePreset: (id) => repo.deleteRoutePreset(auth, id),
           onStart: (payload) async {
             double? originLat, originLng;
             try {
@@ -1672,9 +1817,21 @@ class _PlannerPayload {
 }
 
 class _AdhocPlannerContent extends StatefulWidget {
-  const _AdhocPlannerContent({required this.data, required this.onStart});
+  const _AdhocPlannerContent({
+    required this.data,
+    required this.onStart,
+    this.presets = const [],
+    this.onSavePreset,
+    this.onDeletePreset,
+    this.initialPresetId,
+  });
   final Map<String, dynamic> data;
   final Future<void> Function(_PlannerPayload) onStart;
+  final List<Map<String, dynamic>> presets;
+  final int? initialPresetId;
+  final Future<Map<String, dynamic>> Function(String name, _PlannerPayload)?
+      onSavePreset;
+  final Future<void> Function(int presetId)? onDeletePreset;
 
   @override
   State<_AdhocPlannerContent> createState() => _AdhocPlannerContentState();
@@ -1687,11 +1844,175 @@ class _AdhocPlannerContentState extends State<_AdhocPlannerContent> {
   String? _opId;
   final Map<int, bool> _selected = {};
   final Map<int, int> _addressOf = {};
+  late List<Map<String, dynamic>> _presets = [...widget.presets];
+  int? _selectedPresetId;
+
+  @override
+  void initState() {
+    super.initState();
+    final id = widget.initialPresetId;
+    if (id != null) {
+      // Apply after first build so widget.data['students'] is available.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final preset = _presets.firstWhere(
+          (p) => (p['id'] as num?)?.toInt() == id,
+          orElse: () => const {},
+        );
+        if (preset.isNotEmpty) _applyPreset(preset);
+      });
+    }
+  }
 
   @override
   void dispose() {
     _nameCtrl.dispose();
     super.dispose();
+  }
+
+  /// Builds the {client_id, child_id, address_id} list from current selection.
+  /// Returns null and sets [_error] when the selection is invalid.
+  List<Map<String, int>>? _collectSelections(
+    List<Map<String, dynamic>> filtered,
+  ) {
+    final selections = <Map<String, int>>[];
+    for (final s in filtered) {
+      final cid = _numId(s['child_id']);
+      final clid = _numId(s['client_id']);
+      if (!(_selected[cid] ?? false)) continue;
+      final aid = _addressOf[cid];
+      if (cid <= 0 || clid <= 0 || aid == null || aid <= 0) {
+        setState(() => _error = 'Selecione o endereco dos alunos marcados.');
+        return null;
+      }
+      selections.add({'client_id': clid, 'child_id': cid, 'address_id': aid});
+    }
+    if (selections.isEmpty) {
+      setState(() => _error = 'Selecione pelo menos um aluno.');
+      return null;
+    }
+    return selections;
+  }
+
+  void _applyPreset(Map<String, dynamic> preset) {
+    final students = _listOf(widget.data['students']);
+    final sel = (preset['selections'] as List?) ?? const [];
+    final addrByChild = <int, int>{};
+    for (final raw in sel.whereType<Map>()) {
+      final cid = _numId(raw['child_id']);
+      final aid = _numId(raw['address_id']);
+      if (cid > 0) addrByChild[cid] = aid;
+    }
+    setState(() {
+      _selectedPresetId = (preset['id'] as num?)?.toInt();
+      final opId = (preset['operation_id'] ?? '').toString();
+      if (opId.isNotEmpty) _opId = opId;
+      _nameCtrl.text = (preset['name'] ?? '').toString();
+      // Mark every known child explicitly so the build() auto-default loop
+      // (which selects unseen children) does not re-add the excluded ones.
+      for (final s in students) {
+        final cid = _numId(s['child_id']);
+        if (cid <= 0) continue;
+        if (addrByChild.containsKey(cid)) {
+          _selected[cid] = true;
+          final aid = addrByChild[cid]!;
+          if (aid > 0) _addressOf[cid] = aid;
+        } else {
+          _selected[cid] = false;
+        }
+      }
+      _error = null;
+    });
+  }
+
+  Future<void> _savePreset(
+    List<Map<String, dynamic>> filtered,
+    String? tripModeId,
+  ) async {
+    final onSave = widget.onSavePreset;
+    if (onSave == null) return;
+    final selections = _collectSelections(filtered);
+    if (selections == null) return;
+
+    final suggested = _nameCtrl.text.trim();
+    final name = await _promptPresetName(suggested);
+    if (name == null || name.trim().isEmpty) return;
+
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final created = await onSave(
+        name.trim(),
+        _PlannerPayload(
+          operationId: _opId,
+          tripModeId: tripModeId ?? '',
+          routeName: suggested.isEmpty ? null : suggested,
+          selections: selections,
+        ),
+      );
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        if (created.isNotEmpty) {
+          _presets = [created, ..._presets];
+          _selectedPresetId = (created['id'] as num?)?.toInt();
+        }
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Preset salvo.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = e.toString();
+      });
+    }
+  }
+
+  Future<String?> _promptPresetName(String initial) {
+    final ctrl = TextEditingController(text: initial);
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Salvar preset'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'Nome do preset'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(ctrl.text),
+            child: const Text('Salvar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deletePreset(int presetId) async {
+    final onDelete = widget.onDeletePreset;
+    if (onDelete == null) return;
+    try {
+      await onDelete(presetId);
+      if (!mounted) return;
+      setState(() {
+        _presets = _presets
+            .where((p) => (p['id'] as num?)?.toInt() != presetId)
+            .toList(growable: false);
+        if (_selectedPresetId == presetId) _selectedPresetId = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e.toString());
+    }
   }
 
   @override
@@ -1763,6 +2084,10 @@ class _AdhocPlannerContentState extends State<_AdhocPlannerContent> {
                 .bodySmall
                 ?.copyWith(color: AppColors.slate),
           ),
+          if (_presets.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.lg),
+            _buildPresetPicker(),
+          ],
           const SizedBox(height: AppSpacing.lg),
           DropdownButtonFormField<String?>(
             initialValue: _opId,
@@ -1804,6 +2129,14 @@ class _AdhocPlannerContentState extends State<_AdhocPlannerContent> {
             Text(_error!, style: TextStyle(color: AppColors.danger, fontSize: 13)),
           ],
           const SizedBox(height: AppSpacing.md),
+          if (widget.onSavePreset != null) ...[
+            OutlinedButton.icon(
+              onPressed: _busy ? null : () => _savePreset(filtered, tripModeId),
+              icon: const Icon(Icons.bookmark_add_outlined, size: 18),
+              label: const Text('Salvar como preset'),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+          ],
           FilledButton.icon(
             onPressed: _busy ? null : () => _submit(filtered, tripModeId),
             icon: _busy
@@ -1815,6 +2148,61 @@ class _AdhocPlannerContentState extends State<_AdhocPlannerContent> {
                 : const Icon(Icons.play_arrow_rounded),
             label: Text(_busy ? 'Iniciando...' : 'Iniciar rota'),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPresetPicker() {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceSoft,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.bookmarks_outlined, size: 18),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<int?>(
+                value: _selectedPresetId,
+                isExpanded: true,
+                hint: const Text('Carregar preset salvo'),
+                items: _presets.map((p) {
+                  final id = (p['id'] as num?)?.toInt();
+                  return DropdownMenuItem<int?>(
+                    value: id,
+                    child: Text(
+                      (p['name'] ?? 'Preset #$id').toString(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  );
+                }).toList(growable: false),
+                onChanged: _busy
+                    ? null
+                    : (id) {
+                        final preset = _presets.firstWhere(
+                          (p) => (p['id'] as num?)?.toInt() == id,
+                          orElse: () => const {},
+                        );
+                        if (preset.isNotEmpty) _applyPreset(preset);
+                      },
+              ),
+            ),
+          ),
+          if (_selectedPresetId != null && widget.onDeletePreset != null)
+            IconButton(
+              tooltip: 'Excluir preset',
+              onPressed: _busy ? null : () => _deletePreset(_selectedPresetId!),
+              icon: const Icon(Icons.delete_outline_rounded, size: 20),
+            ),
         ],
       ),
     );
@@ -1902,22 +2290,8 @@ class _AdhocPlannerContentState extends State<_AdhocPlannerContent> {
       );
       return;
     }
-    final selections = <Map<String, int>>[];
-    for (final s in filtered) {
-      final cid = _numId(s['child_id']);
-      final clid = _numId(s['client_id']);
-      if (!(_selected[cid] ?? false)) continue;
-      final aid = _addressOf[cid];
-      if (cid <= 0 || clid <= 0 || aid == null || aid <= 0) {
-        setState(() => _error = 'Selecione o endereco dos alunos marcados.');
-        return;
-      }
-      selections.add({'client_id': clid, 'child_id': cid, 'address_id': aid});
-    }
-    if (selections.isEmpty) {
-      setState(() => _error = 'Selecione pelo menos um aluno.');
-      return;
-    }
+    final selections = _collectSelections(filtered);
+    if (selections == null) return;
     setState(() {
       _busy = true;
       _error = null;

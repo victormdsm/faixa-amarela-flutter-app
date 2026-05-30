@@ -458,6 +458,58 @@ class DriverPortalRepository {
     }
   }
 
+  Future<List<Map<String, dynamic>>> listRoutePresets(String authHeader) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/drivers/route-presets',
+        options: Options(headers: {'Authorization': authHeader}),
+      );
+      final raw = (response.data?['data'] as List?) ?? const [];
+      return raw
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList(growable: false);
+    } catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
+  Future<Map<String, dynamic>> createRoutePreset(
+    String authHeader, {
+    required String name,
+    String? operationId,
+    String? tripMode,
+    required List<Map<String, int>> selections,
+  }) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/drivers/route-presets',
+        options: Options(headers: {'Authorization': authHeader}),
+        data: {
+          'name': name,
+          ...?_stringEntry('operation_id', operationId),
+          ...?_stringEntry('trip_mode', tripMode),
+          'selections': selections,
+        },
+      );
+      return (response.data?['data'] as Map?)?.cast<String, dynamic>() ??
+          const <String, dynamic>{};
+    } catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
+  Future<void> deleteRoutePreset(String authHeader, int presetId) async {
+    try {
+      await _dio.delete<Map<String, dynamic>>(
+        '/drivers/route-presets/$presetId',
+        options: Options(headers: {'Authorization': authHeader}),
+      );
+    } catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
   Future<PaginatedResult<Map<String, dynamic>>> _getPaginated(
     String path,
     String authHeader,

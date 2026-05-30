@@ -386,9 +386,9 @@ class _DependentFormDialogState extends ConsumerState<_DependentFormDialog> {
     final schoolsAsync = ref.watch(schoolsCatalogProvider);
     final shiftsAsync = ref.watch(shiftsCatalogProvider);
     _ensureSelections(
-      relsAsync.valueOrNull ?? const [],
-      schoolsAsync.valueOrNull ?? const [],
-      shiftsAsync.valueOrNull ?? const [],
+      relsAsync.value ?? const [],
+      schoolsAsync.value ?? const [],
+      shiftsAsync.value ?? const [],
     );
 
     return AlertDialog(
@@ -467,21 +467,21 @@ class _DependentFormDialogState extends ConsumerState<_DependentFormDialog> {
               const SizedBox(height: AppSpacing.md),
               _catDropdown(
                 label: 'Parentesco',
-                items: relsAsync.valueOrNull ?? const [],
+                items: relsAsync.value ?? const [],
                 value: _relative,
                 onChanged: (v) => setState(() => _relative = v),
               ),
               const SizedBox(height: AppSpacing.md),
               _catDropdown(
                 label: 'Escola',
-                items: schoolsAsync.valueOrNull ?? const [],
+                items: schoolsAsync.value ?? const [],
                 value: _school,
                 onChanged: (v) => setState(() => _school = v),
               ),
               const SizedBox(height: AppSpacing.md),
               _catDropdown(
                 label: 'Turno',
-                items: shiftsAsync.valueOrNull ?? const [],
+                items: shiftsAsync.value ?? const [],
                 value: _shift,
                 onChanged: (v) => setState(() => _shift = v),
               ),
