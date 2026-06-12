@@ -43,25 +43,31 @@ class CatalogRepository {
   Box<dynamic> get _box => Hive.box<dynamic>(_boxName);
 
   Future<List<CatalogOption>> listSchools() =>
-      _cachedLegacyList('schools', '/catalog/schools');
+      _cachedList('schools', '/catalogs/schools');
 
   Future<List<CatalogOption>> listDistricts() =>
-      _cachedLegacyList('districts', '/catalog/districts');
+      _cachedList('districts', '/catalogs/districts');
 
   Future<List<CatalogOption>> listShifts() =>
-      _cachedLegacyList('shifts', '/catalog/shifts');
+      _cachedList('shifts', '/catalogs/shifts');
 
   Future<List<CatalogOption>> listRelatives() =>
-      _loadPlainList('/catalog/relatives');
+      _loadPlainList('/catalogs/relatives');
 
-  Future<List<CatalogOption>> _cachedLegacyList(
-    String cacheKey,
-    String path,
-  ) async {
+  Future<List<CatalogOption>> listPlans() =>
+      _cachedList('plans', '/catalogs/plans');
+
+  Future<List<CatalogOption>> listCities() =>
+      _cachedList('cities', '/catalogs/cities');
+
+  Future<List<CatalogOption>> listProvinces() =>
+      _cachedList('provinces', '/catalogs/provinces');
+
+  Future<List<CatalogOption>> _cachedList(String cacheKey, String path) async {
     final cached = _loadFromCache(cacheKey);
     if (cached != null) return cached;
 
-    final result = await _loadLegacyList(path);
+    final result = await _loadList(path);
     await _saveToCache(cacheKey, result);
     return result;
   }
@@ -77,11 +83,7 @@ class CatalogRepository {
       if (raw == null) return null;
       return raw
           .whereType<Map>()
-          .map(
-            (e) => CatalogOption.fromJson(
-              Map<String, dynamic>.from(e),
-            ),
-          )
+          .map((e) => CatalogOption.fromJson(Map<String, dynamic>.from(e)))
           .where((e) => e.id > 0 && e.name.trim().isNotEmpty)
           .toList(growable: false);
     } catch (_) {
@@ -93,27 +95,20 @@ class CatalogRepository {
     try {
       await _box.put(
         '${key}_data',
-        items.map((e) => <String, dynamic>{'id': e.id, 'name': e.name}).toList(growable: false),
+        items
+            .map((e) => <String, dynamic>{'id': e.id, 'name': e.name})
+            .toList(growable: false),
       );
-      await _box.put(
-        '${key}_at',
-        DateTime.now().millisecondsSinceEpoch,
-      );
+      await _box.put('${key}_at', DateTime.now().millisecondsSinceEpoch);
     } catch (_) {}
   }
 
-  Future<List<CatalogOption>> _loadLegacyList(String path) async {
+  Future<List<CatalogOption>> _loadList(String path) async {
     try {
-      final response = await _dio.get<Map<String, dynamic>>(
-        path,
-        queryParameters: const {'hide_paginate': 1, 'total_pages': 3000},
-      );
+      final response = await _dio.get<Map<String, dynamic>>(path);
+      final raw = _unwrapList(response.data);
 
-      final root = response.data ?? const <String, dynamic>{};
-      final raw = root['data'];
-      final list = raw is List ? raw : const <dynamic>[];
-
-      return list
+      return raw
           .whereType<Map>()
           .map((e) => CatalogOption.fromJson(Map<String, dynamic>.from(e)))
           .where((e) => e.id > 0 && e.name.trim().isNotEmpty)
@@ -125,8 +120,8 @@ class CatalogRepository {
 
   Future<List<CatalogOption>> _loadPlainList(String path) async {
     try {
-      final response = await _dio.get<List<dynamic>>(path);
-      final raw = response.data ?? const <dynamic>[];
+      final response = await _dio.get<Map<String, dynamic>>(path);
+      final raw = _unwrapList(response.data);
       return raw
           .whereType<Map>()
           .map((e) {
@@ -142,5 +137,14 @@ class CatalogRepository {
     } catch (error) {
       throw ApiException.fromDio(error);
     }
+  }
+
+  /// Extrai a lista do envelope { data: [...] } do NestJS ou retorna a lista
+  /// direta caso o contrato mude.
+  List<dynamic> _unwrapList(Map<String, dynamic>? response) {
+    if (response == null) return const [];
+    final data = response['data'];
+    if (data is List) return data;
+    return const [];
   }
 }
