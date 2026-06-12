@@ -25,8 +25,7 @@ class PublicTransportDriver {
     List<String> names(dynamic raw) {
       if (raw is! List) return const [];
       return raw
-          .whereType<Map>()
-          .map((e) => (e['name'] ?? '').toString())
+          .map((e) => e.toString())
           .where((e) => e.trim().isNotEmpty)
           .toList(growable: false);
     }
@@ -40,16 +39,22 @@ class PublicTransportDriver {
           .toList(growable: false);
     }
 
+    int parseId(dynamic raw) {
+      if (raw is num) return raw.toInt();
+      if (raw is String) return int.tryParse(raw) ?? 0;
+      return 0;
+    }
+
     return PublicTransportDriver(
-      id: (json['id'] as num?)?.toInt() ?? 0,
+      id: parseId(json['id']),
       name: (json['name'] ?? '').toString(),
-      cellPhone: json['cell_phone']?.toString(),
+      cellPhone: json['phone']?.toString(),
       information: json['information']?.toString(),
-      avatarUrl: json['avatar_url']?.toString(),
-      vehicleImageUrl: json['vehicle_image_url']?.toString(),
+      avatarUrl: json['avatarUrl']?.toString(),
+      vehicleImageUrl: json['vehicleImageUrl']?.toString(),
       schools: names(json['schools']),
       districts: names(json['districts']),
-      shiftIds: ids(json['shift_ids']),
+      shiftIds: ids(json['shiftIds']),
     );
   }
 }
