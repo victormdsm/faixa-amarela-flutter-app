@@ -1,14 +1,21 @@
 import 'package:hive_flutter/hive_flutter.dart';
 
+import '../../../../core/storage/secure_token_storage.dart';
 import '../domain/entities/auth_session.dart';
 import '../domain/entities/auth_user.dart';
 
+/// Armazena metadados não sensíveis do usuário no Hive para startup rápido.
+/// Access token e refresh token ficam exclusivamente em [SecureTokenStorage].
 class SessionStorage {
+  SessionStorage({required SecureTokenStorage secureStorage, Box<dynamic>? box})
+    : _secureStorage = secureStorage,
+      _boxOverride = box;
+
+  final SecureTokenStorage _secureStorage;
+  final Box<dynamic>? _boxOverride;
+
   static const _boxName = 'auth_session';
 
-  static const _kToken = 'access_token';
-  static const _kTokenType = 'token_type';
-  static const _kExpiresAt = 'expires_at';
   static const _kUserId = 'user_id';
   static const _kUserName = 'user_name';
   static const _kUserEmail = 'user_email';
@@ -17,20 +24,27 @@ class SessionStorage {
   static const _kUserAvatar = 'user_avatar';
   static const _kUserPrimaryDriverId = 'user_primary_driver_id';
   static const _kUserIsActivated = 'user_is_activated';
+  static const _kTokenType = 'token_type';
+  static const _kExpiresAt = 'expires_at';
 
   static Future<void> openBox() => Hive.openBox<dynamic>(_boxName);
 
-  Box<dynamic> get _box => Hive.box<dynamic>(_boxName);
+  Box<dynamic> get _box => _boxOverride ?? Hive.box<dynamic>(_boxName);
 
-  AuthSession? load() {
+  /// Carrega sessão de forma assíncrona. O token é lido do secure storage;
+  /// metadados do usuário vêm do Hive.
+  Future<AuthSession?> load() async {
     try {
-      final token = _box.get(_kToken) as String?;
-      final tokenType = _box.get(_kTokenType) as String?;
+      final token = await _secureStorage.readAccessToken();
+      final tokenType = (_box.get(_kTokenType) as String?) ?? 'Bearer';
       final userId = _box.get(_kUserId);
       final userName = _box.get(_kUserName) as String?;
       final userRole = _box.get(_kUserRole) as String?;
 
-      if (token == null || token.isEmpty || userId == null || userRole == null) {
+      if (token == null ||
+          token.isEmpty ||
+          userId == null ||
+          userRole == null) {
         return null;
       }
 
@@ -42,12 +56,12 @@ class SessionStorage {
         cellPhone: _box.get(_kUserCellPhone) as String?,
         avatar: _box.get(_kUserAvatar) as String?,
         primaryDriverId: (_box.get(_kUserPrimaryDriverId) as num?)?.toInt(),
-        isActivated: _box.get(_kUserIsActivated) as bool? ?? false,
+        isActivated: _box.get(_kUserIsActivated) as bool? ?? true,
       );
 
       return AuthSession(
         accessToken: token,
-        tokenType: tokenType ?? 'Bearer',
+        tokenType: tokenType,
         user: user,
         expiresAt: _box.get(_kExpiresAt) as String?,
       );
@@ -57,10 +71,8 @@ class SessionStorage {
   }
 
   Future<void> save(AuthSession session) async {
+    await _secureStorage.writeAccessToken(session.accessToken);
     await _box.putAll(<String, dynamic>{
-      _kToken: session.accessToken,
-      _kTokenType: session.tokenType,
-      _kExpiresAt: session.expiresAt,
       _kUserId: session.user.id,
       _kUserName: session.user.name,
       _kUserEmail: session.user.email,
@@ -69,10 +81,13 @@ class SessionStorage {
       _kUserAvatar: session.user.avatar,
       _kUserPrimaryDriverId: session.user.primaryDriverId,
       _kUserIsActivated: session.user.isActivated,
+      _kTokenType: session.tokenType,
+      _kExpiresAt: session.expiresAt,
     });
   }
 
   Future<void> clear() async {
+    await _secureStorage.clearAll();
     await _box.clear();
   }
 }

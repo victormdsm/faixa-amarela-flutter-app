@@ -105,7 +105,7 @@ class CatalogRepository {
 
   Future<List<CatalogOption>> _loadList(String path) async {
     try {
-      final response = await _dio.get<Map<String, dynamic>>(path);
+      final response = await _dio.get<dynamic>(path);
       final raw = _unwrapList(response.data);
 
       return raw
@@ -120,7 +120,7 @@ class CatalogRepository {
 
   Future<List<CatalogOption>> _loadPlainList(String path) async {
     try {
-      final response = await _dio.get<Map<String, dynamic>>(path);
+      final response = await _dio.get<dynamic>(path);
       final raw = _unwrapList(response.data);
       return raw
           .whereType<Map>()
@@ -141,8 +141,9 @@ class CatalogRepository {
 
   /// Extrai a lista do envelope { data: [...] } do NestJS ou retorna a lista
   /// direta caso o contrato mude.
-  List<dynamic> _unwrapList(Map<String, dynamic>? response) {
+  List<dynamic> _unwrapList(dynamic response) {
     if (response == null) return const [];
+    if (response is List) return response;
     final data = response['data'];
     if (data is List) return data;
     return const [];

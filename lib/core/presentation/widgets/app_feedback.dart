@@ -18,10 +18,5 @@ void showAppSnackBar(
 
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
-    ..showSnackBar(
-      SnackBar(
-        backgroundColor: color,
-        content: Text(message),
-      ),
-    );
+    ..showSnackBar(SnackBar(backgroundColor: color, content: Text(message)));
 }

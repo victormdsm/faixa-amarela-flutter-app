@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/network/api_exception.dart';
-import '../../../auth/presentation/state/app_session_controller.dart';
+import '../../../../domain/repositories/enrollments_repository.dart';
 import '../providers/driver_portal_providers.dart';
 
 class DriverAddClientPage extends ConsumerStatefulWidget {
@@ -20,13 +20,9 @@ class _DriverAddClientPageState extends ConsumerState<DriverAddClientPage> {
   bool _lookingUpCpf = false;
   bool _submitting = false;
 
-  int? _linkedParentId;
-  String? _parentInfo;
+  ChildLookupResult? _lookupResult;
   String? _inadimplencyWarning;
   String? _error;
-
-  List<_DepOption> _dependents = const [];
-  _DepOption? _selectedDependent;
 
   @override
   void dispose() {
@@ -37,12 +33,11 @@ class _DriverAddClientPageState extends ConsumerState<DriverAddClientPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final canLink = _linkedParentId != null &&
-        _selectedDependent != null &&
-        !_selectedDependent!.blockedByOtherDriver;
+    final result = _lookupResult;
+    final canLink = result != null && result.found && result.childId != null;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Vincular responsavel')),
+      appBar: AppBar(title: const Text('Vincular crianca')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(16),
@@ -54,7 +49,7 @@ class _DriverAddClientPageState extends ConsumerState<DriverAddClientPage> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      'O responsavel deve criar a conta no app. Aqui o motorista apenas vincula pelo CPF.',
+                      'Busque a crianca pelo CPF para solicitar o vinculo ao seu veiculo.',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: AppColors.slate,
                       ),
@@ -68,7 +63,7 @@ class _DriverAddClientPageState extends ConsumerState<DriverAddClientPage> {
                       enabled: !_submitting,
                       onChanged: (_) => _resetLookup(),
                       decoration: const InputDecoration(
-                        labelText: 'CPF do responsavel',
+                        labelText: 'CPF da crianca',
                         hintText: '000.000.000-00',
                         prefixIcon: Icon(Icons.badge_outlined),
                       ),
@@ -87,11 +82,11 @@ class _DriverAddClientPageState extends ConsumerState<DriverAddClientPage> {
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Icon(Icons.person_search_rounded),
-                      label: const Text('Buscar responsavel pelo CPF'),
+                      label: const Text('Buscar crianca pelo CPF'),
                     ),
 
-                    // Parent info banner
-                    if (_parentInfo != null) ...[
+                    // Child info banner
+                    if (result != null) ...[
                       const SizedBox(height: 12),
                       Container(
                         padding: const EdgeInsets.all(12),
@@ -100,9 +95,61 @@ class _DriverAddClientPageState extends ConsumerState<DriverAddClientPage> {
                           borderRadius: BorderRadius.circular(AppRadius.md),
                           border: Border.all(color: AppColors.border),
                         ),
-                        child: Text(
-                          _parentInfo!,
-                          style: theme.textTheme.bodySmall,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              result.found
+                                  ? (result.childName ?? 'Crianca encontrada')
+                                  : (result.childName ??
+                                        'Nenhuma crianca encontrada para este CPF.'),
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            if (result.schoolName != null &&
+                                result.schoolName!.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                'Escola: ${result.schoolName}',
+                                style: theme.textTheme.bodySmall,
+                              ),
+                            ],
+                            if (result.shiftName != null &&
+                                result.shiftName!.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                'Turno: ${result.shiftName}',
+                                style: theme.textTheme.bodySmall,
+                              ),
+                            ],
+                            if (result.parentName != null &&
+                                result.parentName!.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                'Responsavel: ${result.parentName}',
+                                style: theme.textTheme.bodySmall,
+                              ),
+                            ],
+                            if (result.address != null &&
+                                result.address!.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                'Endereco: ${result.address}',
+                                style: theme.textTheme.bodySmall,
+                              ),
+                            ],
+                            if (result.hasPendingEnrollment) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                'Ja existe uma solicitacao de vinculo pendente.',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: AppColors.yellowDark,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
                     ],
@@ -133,45 +180,6 @@ class _DriverAddClientPageState extends ConsumerState<DriverAddClientPage> {
                             ),
                           ],
                         ),
-                      ),
-                    ],
-
-                    // Dependent dropdown
-                    if (_dependents.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      DropdownButtonFormField<_DepOption>(
-                        initialValue: _selectedDependent,
-                        isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Dependente para vincular',
-                        ),
-                        items: _dependents
-                            .map(
-                              (d) => DropdownMenuItem(
-                                value: d,
-                                child: Text(
-                                  d.label,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            )
-                            .toList(growable: false),
-                        onChanged: _submitting
-                            ? null
-                            : (v) {
-                                if (v == null) return;
-                                if (v.blockedByOtherDriver) {
-                                  setState(() {
-                                    _error =
-                                        'Dependente vinculado a outro motorista.';
-                                  });
-                                  return;
-                                }
-                                setState(() {
-                                  _selectedDependent = v;
-                                  _error = null;
-                                });
-                              },
                       ),
                     ],
 
@@ -211,13 +219,10 @@ class _DriverAddClientPageState extends ConsumerState<DriverAddClientPage> {
   }
 
   void _resetLookup() {
-    if (_linkedParentId != null) {
+    if (_lookupResult != null) {
       setState(() {
-        _linkedParentId = null;
-        _parentInfo = null;
+        _lookupResult = null;
         _inadimplencyWarning = null;
-        _dependents = const [];
-        _selectedDependent = null;
         _error = null;
       });
     }
@@ -230,113 +235,37 @@ class _DriverAddClientPageState extends ConsumerState<DriverAddClientPage> {
       return;
     }
 
-    final session = ref.read(appSessionControllerProvider).session;
-    if (session == null) {
-      setState(() => _error = 'Sessao expirada. Faca login novamente.');
-      return;
-    }
-
     setState(() {
       _lookingUpCpf = true;
       _error = null;
-      _parentInfo = null;
       _inadimplencyWarning = null;
-      _linkedParentId = null;
-      _dependents = const [];
-      _selectedDependent = null;
+      _lookupResult = null;
     });
 
     try {
       final result = await ref
-          .read(driverPortalRepositoryProvider)
-          .lookupParentByCpf(session.authorizationHeader, cpf);
-
-      if (result['found'] != true) {
-        setState(() {
-          _parentInfo = (result['message'] ??
-                  'Nenhum responsavel encontrado para este CPF.')
-              .toString();
-        });
-        return;
-      }
-
-      final parent = (result['parent'] as Map?) ?? const {};
-      final dependents = (result['dependents'] as List?) ?? const [];
-      final parentId = (parent['id'] as num?)?.toInt();
-      final parentName = (parent['name'] ?? '').toString();
-      final alreadyLinked = result['already_linked_to_driver'] == true;
-      final hasDebt = result['inadimplency_alert'] == true;
-
-      final linkedIds = ((result['linked_dependent_ids'] as List?) ?? [])
-          .whereType<num>()
-          .map((e) => e.toInt())
-          .toSet();
-
-      final options = dependents
-          .whereType<Map>()
-          .map((raw) {
-            final id = (raw['id'] as num?)?.toInt() ?? 0;
-            final name = (raw['name'] ?? 'Dependente').toString();
-            final school = (raw['school_name'] ?? '').toString();
-            final shift = (raw['shift_name'] ?? '').toString();
-            final blocked = raw['linked_to_other_driver'] == true;
-            final alreadyThis = linkedIds.contains(id);
-
-            final parts = [
-              name,
-              if (school.isNotEmpty) school,
-              if (shift.isNotEmpty) shift,
-              if (alreadyThis) 'ja vinculado',
-              if (blocked) 'outro motorista',
-            ];
-
-            return _DepOption(
-              id: id,
-              label: parts.join(' · '),
-              blockedByOtherDriver: blocked,
-            );
-          })
-          .where((d) => d.id > 0)
-          .toList(growable: false);
-
-      final firstAvailable = options
-          .where((d) => !d.blockedByOtherDriver)
-          .toList(growable: false);
-
-      final inadimplency = (result['inadimplency'] as Map?) ?? const {};
-      final debtAmount = inadimplency['amount'];
+          .read(driverEnrollmentsRepositoryProvider)
+          .lookupChildByCpf(cpf);
 
       setState(() {
-        _linkedParentId = parentId;
-        _dependents = options;
-        _selectedDependent = firstAvailable.isNotEmpty
-            ? firstAvailable.first
-            : (options.isNotEmpty ? options.first : null);
-        _parentInfo = alreadyLinked
-            ? '$parentName (ja vinculado a este motorista).'
-            : 'Responsavel encontrado: $parentName.';
-        if (options.isEmpty) {
-          _parentInfo =
-              '$parentName encontrado, mas sem dependentes cadastrados.';
-        }
-        if (hasDebt) {
-          _inadimplencyWarning = [
-            'Atencao: este responsavel possui debitos.',
-            if (debtAmount != null) 'Valor: R\$ $debtAmount',
-          ].join(' ');
+        _lookupResult = result;
+        if (result.isInDebt) {
+          _inadimplencyWarning =
+              'Atencao: a crianca possui pendencias financeiras.';
         }
       });
     } on ApiException catch (e) {
       setState(() => _error = e.message);
     } catch (_) {
-      setState(() => _error = 'Falha ao buscar o responsavel.');
+      setState(() => _error = 'Falha ao buscar a crianca.');
     } finally {
       if (mounted) setState(() => _lookingUpCpf = false);
     }
   }
 
   Future<void> _link() async {
-    if (_linkedParentId == null || _selectedDependent == null) return;
+    final childId = _lookupResult?.childId;
+    if (childId == null) return;
     if (_inadimplencyWarning != null) {
       final confirmed = await showDialog<bool>(
         context: context,
@@ -360,21 +289,16 @@ class _DriverAddClientPageState extends ConsumerState<DriverAddClientPage> {
       if (confirmed != true || !mounted) return;
     }
 
-    final session = ref.read(appSessionControllerProvider).session;
-    if (session == null) return;
-
     setState(() {
       _submitting = true;
       _error = null;
     });
 
     try {
-      await ref.read(driverPortalRepositoryProvider).linkClient(
-        session.authorizationHeader,
-        parentId: _linkedParentId!,
-        childId: _selectedDependent!.id,
-      );
-      ref.invalidate(driverClientsProvider);
+      await ref
+          .read(driverEnrollmentsRepositoryProvider)
+          .requestEnrollment(childId);
+      ref.invalidate(driverEnrollmentsControllerProvider);
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } on ApiException catch (e) {
@@ -385,20 +309,8 @@ class _DriverAddClientPageState extends ConsumerState<DriverAddClientPage> {
     } catch (_) {
       setState(() {
         _submitting = false;
-        _error = 'Falha ao vincular responsavel.';
+        _error = 'Falha ao vincular crianca.';
       });
     }
   }
-}
-
-class _DepOption {
-  const _DepOption({
-    required this.id,
-    required this.label,
-    required this.blockedByOtherDriver,
-  });
-
-  final int id;
-  final String label;
-  final bool blockedByOtherDriver;
 }

@@ -77,8 +77,7 @@ class _ParentRoutesPageState extends ConsumerState<ParentRoutesPage> {
           final activeRoutes = routesPage.items.where((r) {
             final manifest = r['active_manifest'] as Map?;
             if (manifest == null) return false;
-            final status =
-                manifest['status']?.toString().toLowerCase() ?? '';
+            final status = manifest['status']?.toString().toLowerCase() ?? '';
             return status != 'finished' && status != 'cancelled';
           }).toList();
 
@@ -91,26 +90,23 @@ class _ParentRoutesPageState extends ConsumerState<ParentRoutesPage> {
           }
 
           final route = activeRoutes[_selectedRouteIndex];
-          final routeDriverId =
-              (route['driver'] as Map?)?['id'] as num?;
+          final routeDriverId = (route['driver'] as Map?)?['id'] as num?;
 
           // Dependentes do pai nesta rota
           final myDependents = children.where((c) {
-            final driverId = (c['driver_id'] as num?) ??
+            final driverId =
+                (c['driver_id'] as num?) ??
                 ((c['client'] as Map?)?['driver_id'] as num?);
             return routeDriverId != null && driverId == routeDriverId;
           }).toList();
 
-          final latestLocation =
-              (route['latest_location'] as Map?)?.cast<String, dynamic>();
-          final driverLat =
-              (latestLocation?['latitude'] as num?)?.toDouble();
-          final driverLng =
-              (latestLocation?['longitude'] as num?)?.toDouble();
-          final driverPos =
-              (driverLat != null && driverLng != null)
-                  ? LatLng(driverLat, driverLng)
-                  : null;
+          final latestLocation = (route['latest_location'] as Map?)
+              ?.cast<String, dynamic>();
+          final driverLat = (latestLocation?['latitude'] as num?)?.toDouble();
+          final driverLng = (latestLocation?['longitude'] as num?)?.toDouble();
+          final driverPos = (driverLat != null && driverLng != null)
+              ? LatLng(driverLat, driverLng)
+              : null;
 
           return Stack(
             children: [
@@ -175,15 +171,15 @@ class _FullScreenDriverMap extends StatelessWidget {
         initialCenter: center,
         initialZoom: driverPos != null ? 15.0 : 13.0,
         interactionOptions: const InteractionOptions(
-          flags: InteractiveFlag.drag |
+          flags:
+              InteractiveFlag.drag |
               InteractiveFlag.pinchZoom |
               InteractiveFlag.doubleTapZoom,
         ),
       ),
       children: [
         TileLayer(
-          urlTemplate:
-              'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
           userAgentPackageName: 'br.com.faixaamarela.app',
         ),
         if (driverPos != null)
@@ -197,8 +193,7 @@ class _FullScreenDriverMap extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: AppColors.yellow,
                     shape: BoxShape.circle,
-                    border:
-                        Border.all(color: AppColors.ink, width: 2.5),
+                    border: Border.all(color: AppColors.ink, width: 2.5),
                     boxShadow: const [
                       BoxShadow(
                         color: Color(0x55000000),
@@ -268,18 +263,20 @@ class _RouteSelectorBar extends StatelessWidget {
               children: List.generate(routes.length, (i) {
                 final r = routes[i];
                 final driverName =
-                    ((r['driver'] as Map?)?['name'] ?? 'Motorista')
-                        .toString();
+                    ((r['driver'] as Map?)?['name'] ?? 'Motorista').toString();
                 final selected = i == selectedIndex;
                 return Padding(
                   padding: EdgeInsets.only(
-                      right: i < routes.length - 1 ? 8 : 0),
+                    right: i < routes.length - 1 ? 8 : 0,
+                  ),
                   child: GestureDetector(
                     onTap: () => onSelect(i),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 180),
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 7),
+                        horizontal: 14,
+                        vertical: 7,
+                      ),
                       decoration: BoxDecoration(
                         color: selected
                             ? AppColors.yellow
@@ -324,10 +321,7 @@ class _RouteSelectorBar extends StatelessWidget {
 // ─── Bottom Live Overlay ──────────────────────────────────────────────────────
 
 class _LiveBottomOverlay extends StatelessWidget {
-  const _LiveBottomOverlay({
-    required this.dependents,
-    required this.driverPos,
-  });
+  const _LiveBottomOverlay({required this.dependents, required this.driverPos});
   final List<Map<String, dynamic>> dependents;
   final LatLng? driverPos;
 
@@ -356,7 +350,9 @@ class _LiveBottomOverlay extends StatelessWidget {
             children: [
               Container(
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 5),
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.success.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
@@ -406,18 +402,18 @@ class _LiveBottomOverlay extends StatelessWidget {
               spacing: 6,
               runSpacing: 6,
               children: dependents.map((dep) {
-                final name =
-                    (dep['name'] ?? dep['child']?['name'] ?? '')
-                        .toString();
+                final name = (dep['name'] ?? dep['child']?['name'] ?? '')
+                    .toString();
                 return Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 5),
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.yellow.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color:
-                          AppColors.yellow.withValues(alpha: 0.4),
+                      color: AppColors.yellow.withValues(alpha: 0.4),
                     ),
                   ),
                   child: Row(
@@ -527,9 +523,10 @@ class _PulsingDotState extends State<_PulsingDot>
       vsync: this,
       duration: const Duration(milliseconds: 900),
     )..repeat(reverse: true);
-    _anim = Tween<double>(begin: 0.5, end: 1.0).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
-    );
+    _anim = Tween<double>(
+      begin: 0.5,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
   }
 
   @override

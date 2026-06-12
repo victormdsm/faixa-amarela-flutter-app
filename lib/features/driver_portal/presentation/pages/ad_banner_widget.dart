@@ -187,7 +187,10 @@ class _AdBannerWidgetState extends ConsumerState<AdBannerWidget>
     );
     if (openedExternally) return;
 
-    final openedDefault = await launchUrl(uri, mode: LaunchMode.platformDefault);
+    final openedDefault = await launchUrl(
+      uri,
+      mode: LaunchMode.platformDefault,
+    );
     if (openedDefault) return;
 
     await launchUrl(uri, mode: LaunchMode.inAppBrowserView);

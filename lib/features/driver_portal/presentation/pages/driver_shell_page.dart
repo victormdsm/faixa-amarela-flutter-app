@@ -24,9 +24,9 @@ class DriverShellPage extends ConsumerWidget {
             label: 'Inicio',
           ),
           const FaixaNavItem(
-            icon: Icons.groups_outlined,
-            activeIcon: Icons.groups_rounded,
-            label: 'Clientes',
+            icon: Icons.school_outlined,
+            activeIcon: Icons.school_rounded,
+            label: 'Matriculas',
           ),
           const FaixaNavItem(
             icon: Icons.route_outlined,

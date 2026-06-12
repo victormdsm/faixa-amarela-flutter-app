@@ -15,12 +15,12 @@ class PublicTransportSearchRepository {
   }) async {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
-        '/catalog/transport-search',
+        '/public-transport/search',
         queryParameters: {
-          ...?_entry('school_id', schoolId),
-          ...?_entry('district_id', districtId),
-          ...?_entry('shift_id', shiftId),
-          'per_page': 100,
+          ...?_entry('schoolId', schoolId),
+          ...?_entry('districtId', districtId),
+          ...?_entry('shiftId', shiftId),
+          'perPage': 100,
         },
       );
 

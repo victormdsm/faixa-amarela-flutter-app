@@ -262,26 +262,26 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
     );
   }
 
-  void markClientBoardedLocal(int clientId) {
+  void markClientBoardedLocal(int childId) {
     _applyClientStopStatusLocal(
-      clientId: clientId,
+      childId: childId,
       targetTypes: const {'pickup_home', 'pickup_school'},
       nextStatus: 'picked_up',
     );
   }
 
-  void markClientDisembarkedLocal(int clientId) {
+  void markClientDisembarkedLocal(int childId) {
     _applyClientStopStatusLocal(
-      clientId: clientId,
+      childId: childId,
       targetTypes: const {'dropoff_home', 'dropoff_school'},
       nextStatus: 'delivered',
     );
   }
 
-  /// Remove all stops for a given client from local state.
-  void removeClientLocal(int clientId) {
+  /// Remove all stops for a given child from local state.
+  void removeClientLocal(int childId) {
     final planned = state.routePlannedStops
-        .where((s) => (s.clientId ?? 0) != clientId)
+        .where((s) => (s.childId ?? 0) != childId)
         .toList(growable: false);
 
     final remaining = planned
@@ -584,12 +584,13 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
 
     try {
       final response = await _dio.post<Map<String, dynamic>>(
-        '/drivers/geofences/check',
+        '/driver/geofences/check',
         data: <String, dynamic>{
           'lat': position.latitude,
           'lng': position.longitude,
-          'route_manifest_id': state.routeManifestId,
-          'radius_meters': state.geofenceRadiusMeters,
+          'routeId': state.routeId,
+          'routeManifestId': state.routeManifestId,
+          'radiusMeters': state.geofenceRadiusMeters,
           'limit': 10,
         },
         options: Options(
@@ -642,10 +643,18 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
     _lastRouteRecalcAt = now;
 
     try {
+      final routeId = state.routeId;
+      if (routeId == null || routeId <= 0) {
+        state = state.copyWith(
+          routeRecalculating: false,
+          warning: 'Rota não identificada para recálculo.',
+        );
+        return;
+      }
+
       final response = await _dio.post<Map<String, dynamic>>(
-        '/drivers/route/recalculate',
+        '/driver/routes/$routeId/recalculate',
         data: <String, dynamic>{
-          'route_manifest_id': state.routeManifestId,
           'lat': position.latitude,
           'lng': position.longitude,
         },
@@ -1388,7 +1397,7 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
   }
 
   void _applyClientStopStatusLocal({
-    required int clientId,
+    required int childId,
     required Set<String> targetTypes,
     required String nextStatus,
   }) {
@@ -1396,7 +1405,7 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
     var changed = false;
     for (var i = 0; i < planned.length; i++) {
       final stop = planned[i];
-      if ((stop.clientId ?? 0) != clientId) continue;
+      if ((stop.childId ?? 0) != childId) continue;
       if (!targetTypes.contains((stop.type ?? '').toLowerCase())) continue;
       final current = stop.status.toLowerCase();
       if (current == 'delivered' || current == 'done') continue;

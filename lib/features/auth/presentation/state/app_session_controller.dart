@@ -4,10 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/session_storage.dart';
 import '../../domain/entities/auth_session.dart';
+import '../providers/auth_providers.dart';
+import '../../../notifications/presentation/providers/notification_providers.dart';
 import 'app_session_state.dart';
 
 final _sessionStorageProvider = Provider<SessionStorage>(
-  (_) => SessionStorage(),
+  (ref) => SessionStorage(secureStorage: ref.watch(secureTokenStorageProvider)),
 );
 
 final appSessionControllerProvider =
@@ -18,8 +20,24 @@ final appSessionControllerProvider =
 class AppSessionController extends Notifier<AppSessionState> {
   @override
   AppSessionState build() {
-    final stored = ref.read(_sessionStorageProvider).load();
-    return AppSessionState(session: stored);
+    // Bootstrap assíncrono: o token está no secure storage; metadados no Hive.
+    // Chame [loadFromStorage] no initState do app para completar o carregamento.
+    return const AppSessionState(session: null, isLoading: true);
+  }
+
+  Future<void> loadFromStorage() async {
+    final stored = await ref.read(_sessionStorageProvider).load();
+    state = AppSessionState(session: stored, isLoading: false);
+
+    if (stored != null) {
+      try {
+        await ref
+            .read(pushRegistrationServiceProvider)
+            .registerCurrentDevice(stored.authorizationHeader);
+      } catch (_) {
+        // Ignore push registration errors on startup.
+      }
+    }
   }
 
   void setSession(AuthSession session) {
@@ -32,7 +50,7 @@ class AppSessionController extends Notifier<AppSessionState> {
   }
 
   void clear() {
-    state = state.copyWith(clearSession: true, isLoading: false);
+    state = const AppSessionState(session: null, isLoading: false);
     unawaited(ref.read(_sessionStorageProvider).clear());
   }
 }

@@ -69,7 +69,10 @@ abstract final class AppTheme {
       bodyMedium: GoogleFonts.outfit(fontWeight: FontWeight.w400),
       bodySmall: GoogleFonts.outfit(fontWeight: FontWeight.w400, fontSize: 12),
       labelLarge: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 14),
-      labelMedium: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 12),
+      labelMedium: GoogleFonts.outfit(
+        fontWeight: FontWeight.w600,
+        fontSize: 12,
+      ),
       labelSmall: GoogleFonts.outfit(fontWeight: FontWeight.w500, fontSize: 11),
     );
 

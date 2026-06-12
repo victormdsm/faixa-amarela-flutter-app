@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
 import '../core/error/app_error_reporter.dart';
+import '../core/network/auth_interceptor.dart';
 import '../core/notifications/push_notifications.dart';
+import '../features/auth/presentation/state/app_session_controller.dart';
 import '../features/driver_portal/presentation/providers/driver_portal_providers.dart';
 import '../features/notifications/presentation/providers/notification_providers.dart';
 import '../features/tracking/presentation/providers/tracking_providers.dart';
@@ -18,6 +22,8 @@ class FaixaAmarelaApp extends ConsumerStatefulWidget {
 }
 
 class _FaixaAmarelaAppState extends ConsumerState<FaixaAmarelaApp> {
+  late final StreamSubscription<void> _logoutSubscription;
+
   void _refreshNotifications() {
     ref.invalidate(unreadNotificationsCountProvider);
     ref.invalidate(notificationsProvider);
@@ -33,6 +39,12 @@ class _FaixaAmarelaAppState extends ConsumerState<FaixaAmarelaApp> {
   @override
   void initState() {
     super.initState();
+    _logoutSubscription = AuthLogoutStream.stream.listen((_) {
+      ref.read(appSessionControllerProvider.notifier).clear();
+    });
+    Future<void>.microtask(
+      () => ref.read(appSessionControllerProvider.notifier).loadFromStorage(),
+    );
     Future<void>.microtask(
       () => ref.read(driverTrackingControllerProvider.notifier).initialize(),
     );
@@ -88,6 +100,7 @@ class _FaixaAmarelaAppState extends ConsumerState<FaixaAmarelaApp> {
 
   @override
   void dispose() {
+    _logoutSubscription.cancel();
     WidgetsBinding.instance.removeObserver(_lifecycleObserver);
     super.dispose();
   }

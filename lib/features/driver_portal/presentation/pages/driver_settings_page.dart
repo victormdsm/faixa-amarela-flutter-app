@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -8,6 +9,7 @@ import '../../../../app/theme/app_theme.dart';
 import '../../../../core/models/catalog_option.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/presentation/widgets/app_feedback.dart';
+import '../../../../domain/models/driver_profile.dart';
 import '../../../auth/presentation/state/app_session_controller.dart';
 import '../../../catalog/data/catalog_repository.dart';
 import '../providers/driver_portal_providers.dart';
@@ -57,6 +59,12 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
       const <Map<String, dynamic>>[];
   final Set<int> _selectedSchoolIds = <int>{};
   final Map<int, Set<int>> _districtShiftMap = <int, Set<int>>{};
+  Set<int> _originalSelectedSchoolIds = <int>{};
+  Map<int, Set<int>> _originalDistrictShiftMap = <int, Set<int>>{};
+  // ignore: unused_field
+  String? _originalAvatarImageUrl;
+  // ignore: unused_field
+  String? _originalVehicleImageUrl;
 
   @override
   void dispose() {
@@ -305,7 +313,8 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                             TextButton.icon(
                               onPressed: _isSaving
                                   ? null
-                                  : () => setState(() => _vehicleEditMode = true),
+                                  : () =>
+                                        setState(() => _vehicleEditMode = true),
                               icon: const Icon(Icons.edit_rounded, size: 16),
                               label: const Text('Editar dados do veiculo'),
                             )
@@ -313,8 +322,13 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                             TextButton.icon(
                               onPressed: _isSaving
                                   ? null
-                                  : () => setState(() => _vehicleEditMode = false),
-                              icon: const Icon(Icons.lock_outline_rounded, size: 16),
+                                  : () => setState(
+                                      () => _vehicleEditMode = false,
+                                    ),
+                              icon: const Icon(
+                                Icons.lock_outline_rounded,
+                                size: 16,
+                              ),
                               label: const Text('Cancelar edicao'),
                               style: TextButton.styleFrom(
                                 foregroundColor: AppColors.slate,
@@ -571,6 +585,14 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
       _districtShiftMap[districtId] = shifts;
     }
 
+    _originalSelectedSchoolIds = Set<int>.from(_selectedSchoolIds);
+    _originalDistrictShiftMap = <int, Set<int>>{
+      for (final entry in _districtShiftMap.entries)
+        entry.key: Set<int>.from(entry.value),
+    };
+    _originalAvatarImageUrl = _avatarImageUrl;
+    _originalVehicleImageUrl = _vehicleImageUrl;
+
     if (mounted) setState(() {});
   }
 
@@ -629,6 +651,26 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
     });
   }
 
+  bool _hasCoverageChanges() {
+    if (!const SetEquality<int>().equals(
+      _selectedSchoolIds,
+      _originalSelectedSchoolIds,
+    )) {
+      return true;
+    }
+    if (_districtShiftMap.length != _originalDistrictShiftMap.length) {
+      return true;
+    }
+    for (final entry in _districtShiftMap.entries) {
+      final original = _originalDistrictShiftMap[entry.key];
+      if (original == null) return true;
+      if (!const SetEquality<int>().equals(entry.value, original)) return true;
+    }
+    if (_avatarImageLocalPath != null) return true;
+    if (_vehicleImageLocalPath != null) return true;
+    return false;
+  }
+
   Future<void> _save(BuildContext context) async {
     if (!_formKey.currentState!.validate()) return;
     final messenger = ScaffoldMessenger.of(context);
@@ -662,44 +704,53 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
       }
     }
 
+    final hasCoverageChanges = _hasCoverageChanges();
+
     setState(() => _isSaving = true);
+    DriverProfile? updatedProfile;
     try {
-      final updated = await ref
-          .read(driverPortalRepositoryProvider)
-          .updateProfile(
-            session.authorizationHeader,
+      bool coverageRequestSubmitted = false;
+
+      // 1. Se houver mudancas de cobertura/imagens, submeter solicitacao no NestJS
+      if (hasCoverageChanges) {
+        final repo = ref.read(driverProfileChangeRequestRepositoryProvider);
+        String? avatarUrl;
+        String? vehicleImageUrl;
+        if (_avatarImageLocalPath != null) {
+          avatarUrl = await repo.uploadImage(_avatarImageLocalPath!);
+        }
+        if (_vehicleImageLocalPath != null) {
+          vehicleImageUrl = await repo.uploadImage(_vehicleImageLocalPath!);
+        }
+        await repo.submitRequest(
+          schoolIds: _selectedSchoolIds.toList()..sort(),
+          districtShiftMap: {
+            for (final entry in _districtShiftMap.entries)
+              entry.key: (entry.value.toList()..sort()),
+          },
+          avatarImagePath: avatarUrl,
+          vehicleImagePath: vehicleImageUrl,
+          requestNote: null,
+        );
+        coverageRequestSubmitted = true;
+      }
+
+      // 2. Salvar dados basicos via endpoint canônico NestJS.
+      updatedProfile = await ref
+          .read(driverProfileRepositoryProvider)
+          .updateBasicProfile(
             name: _nameController.text.trim(),
             email: isAdminAppUser ? _emailController.text.trim() : null,
             cellPhone: _phoneController.text.trim(),
-            password: isAdminAppUser && newPassword.isNotEmpty
-                ? newPassword
-                : null,
-            passwordConfirmation: isAdminAppUser && newPassword.isNotEmpty
-                ? confirmPassword
-                : null,
             information: _infoController.text.trim(),
             cnh: _cnhController.text.trim(),
-            schoolIds: _selectedSchoolIds.toList()..sort(),
-            districtShiftMap: {
-              for (final entry in _districtShiftMap.entries)
-                entry.key: (entry.value.toList()..sort()),
-            },
-            avatarImagePath: _avatarImageLocalPath,
-            vehicleBrand: _vehicleBrandController.text.trim(),
-            vehicleColor: _vehicleColorController.text.trim(),
-            vehicleYear: _vehicleYearController.text.trim(),
-            vehicleLicensePlate: _vehiclePlateController.text
-                .trim()
-                .toUpperCase(),
-            vehicleImagePath: _vehicleImageLocalPath,
           );
 
-      _applyProfile(updated);
+      _applyProfile(updatedProfile.toJson());
       ref.invalidate(driverProfileProvider);
 
       if (context.mounted) {
-        final coverageRequest = _map(updated['coverage_change_request']);
-        if (coverageRequest.isNotEmpty) {
+        if (coverageRequestSubmitted) {
           showAppSnackBar(
             context,
             message:

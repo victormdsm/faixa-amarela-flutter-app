@@ -38,6 +38,11 @@ class ParentShellPage extends ConsumerWidget {
             activeIcon: Icons.fact_check_rounded,
             label: 'Embarques',
           ),
+          const FaixaNavItem(
+            icon: Icons.school_outlined,
+            activeIcon: Icons.school_rounded,
+            label: 'Matriculas',
+          ),
           FaixaNavItem(
             icon: Icons.notifications_none_rounded,
             activeIcon: Icons.notifications_rounded,

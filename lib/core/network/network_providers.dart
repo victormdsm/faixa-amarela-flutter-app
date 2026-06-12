@@ -1,8 +1,12 @@
 import 'package:dio/dio.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../storage/secure_token_storage.dart';
 import 'api_client.dart';
+import 'auth_interceptor.dart';
 import 'backend_config.dart';
+import 'nestjs_response_unwrap_interceptor.dart';
+import 'safe_log_interceptor.dart';
 
 part 'network_providers.g.dart';
 
@@ -21,14 +25,9 @@ Dio dio(Ref ref) {
     ),
   );
 
-  dio.interceptors.add(
-    LogInterceptor(
-      requestBody: true,
-      responseBody: false,
-      requestHeader: false,
-      responseHeader: false,
-    ),
-  );
+  dio.interceptors.add(NestjsResponseUnwrapInterceptor());
+  dio.interceptors.add(AuthInterceptor(secureStorage: SecureTokenStorage()));
+  dio.interceptors.add(SafeLogInterceptor());
 
   return dio;
 }

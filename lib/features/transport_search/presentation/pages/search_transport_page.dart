@@ -23,7 +23,8 @@ class SearchTransportPage extends ConsumerWidget {
     final driversAsync = ref.watch(transportDriversProvider);
     final drivers = ref.watch(filteredTransportDriversProvider);
 
-    final hasAnyFilter = filters.school != null ||
+    final hasAnyFilter =
+        filters.school != null ||
         filters.neighborhood != null ||
         filters.period != null;
 
@@ -75,14 +76,13 @@ class SearchTransportPage extends ConsumerWidget {
               ),
             )
           else ...[
-            SliverToBoxAdapter(
-              child: _ResultsHeader(count: drivers.length),
-            ),
+            SliverToBoxAdapter(child: _ResultsHeader(count: drivers.length)),
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
               sliver: SliverList.separated(
                 itemCount: drivers.length,
-                separatorBuilder: (context, index) => const SizedBox(height: 12),
+                separatorBuilder: (context, index) =>
+                    const SizedBox(height: 12),
                 itemBuilder: (_, i) => _DriverCard(driver: drivers[i]),
               ),
             ),
@@ -137,7 +137,11 @@ class _FilterCard extends StatelessWidget {
                   color: AppColors.yellow,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.tune_rounded, color: AppColors.ink, size: 20),
+                child: const Icon(
+                  Icons.tune_rounded,
+                  color: AppColors.ink,
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 10),
               Text(
@@ -155,7 +159,9 @@ class _FilterCard extends StatelessWidget {
             value: filters.school,
             options: schools,
             onSelected: onSchoolSelected,
-            onCleared: filters.school == null ? null : () => onSchoolSelected(null),
+            onCleared: filters.school == null
+                ? null
+                : () => onSchoolSelected(null),
             emptyResultsText: 'Nenhuma escola carregada da API.',
           ),
           const SizedBox(height: 10),
@@ -239,7 +245,9 @@ class _SearchPrompt extends StatelessWidget {
           const SizedBox(height: 16),
           Text(
             'Preencha os filtros',
-            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 6),
@@ -284,7 +292,9 @@ class _EmptyState extends StatelessWidget {
           const SizedBox(height: 16),
           Text(
             'Nenhum motorista encontrado',
-            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 6),
@@ -317,7 +327,8 @@ class _EmptyState extends StatelessWidget {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
-                    result.errorMessage ?? 'Falha ao abrir contato da SINPROVETE.',
+                    result.errorMessage ??
+                        'Falha ao abrir contato da SINPROVETE.',
                   ),
                 ),
               );
@@ -469,7 +480,8 @@ class _DriverCard extends StatelessWidget {
                   child: Image.network(
                     driver.vehicleImageUrl!,
                     fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => const _VehicleBannerFallback(),
+                    errorBuilder: (context, error, stackTrace) =>
+                        const _VehicleBannerFallback(),
                   ),
                 ),
                 Positioned(
@@ -525,7 +537,8 @@ class _DriverCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                if (driver.schools.isNotEmpty || driver.districts.isNotEmpty) ...[
+                if (driver.schools.isNotEmpty ||
+                    driver.districts.isNotEmpty) ...[
                   const SizedBox(height: 10),
                   const Divider(height: 1),
                   const SizedBox(height: 10),
@@ -602,11 +615,7 @@ class _VehicleBannerFallback extends StatelessWidget {
 }
 
 class _InfoRow extends StatelessWidget {
-  const _InfoRow({
-    required this.icon,
-    required this.text,
-    this.italic = false,
-  });
+  const _InfoRow({required this.icon, required this.text, this.italic = false});
 
   final IconData icon;
   final String text;

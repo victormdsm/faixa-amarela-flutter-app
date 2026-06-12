@@ -13,25 +13,32 @@ abstract final class BackendConfig {
 
   static String get apiBaseUrl {
     if (_envBaseUrl.isNotEmpty) {
-      return _normalize(_envBaseUrl);
+      return _normalizeWithApiV1(_envBaseUrl);
+    }
+
+    if (kReleaseMode) {
+      throw StateError(
+        'API_BASE_URL deve ser definida via --dart-define=API_BASE_URL=... em release.',
+      );
     }
 
     if (kIsWeb) {
-      return 'http://127.0.0.1:8000/api';
+      return 'http://127.0.0.1:3000/api/v1';
     }
 
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
-        return 'http://10.0.2.2:8000/api';
+        return 'http://10.0.2.2:3000/api/v1';
       default:
-        return 'http://127.0.0.1:8000/api';
+        return 'http://127.0.0.1:3000/api/v1';
     }
   }
 
   static String get appBaseUrl {
     final api = apiBaseUrl;
-    if (api.endsWith('/api')) {
-      return api.substring(0, api.length - 4);
+    const suffix = '/api/v1';
+    if (api.endsWith(suffix)) {
+      return api.substring(0, api.length - suffix.length);
     }
     return api;
   }
@@ -80,9 +87,17 @@ abstract final class BackendConfig {
     return '$appBaseUrl/broadcasting/auth';
   }
 
+  static String apiBaseUrlFrom(String value) => _normalizeWithApiV1(value);
+
   static String _normalize(String value) {
     final trimmed = value.trim();
     if (trimmed.endsWith('/')) return trimmed.substring(0, trimmed.length - 1);
     return trimmed;
+  }
+
+  static String _normalizeWithApiV1(String value) {
+    final normalized = _normalize(value);
+    if (normalized.endsWith('/api/v1')) return normalized;
+    return '$normalized/api/v1';
   }
 }

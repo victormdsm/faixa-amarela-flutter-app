@@ -288,10 +288,10 @@ class _BackgroundTrackingRuntime {
     _isFlushing = true;
     try {
       final response = await dio.post<Map<String, dynamic>>(
-        '/drivers/telemetry/batch',
+        '/driver/telemetry/batch',
         data: <String, dynamic>{
-          'route_manifest_id': _routeManifestId,
-          'van_id': _vanId,
+          'routeManifestId': _routeManifestId,
+          'vanId': _vanId,
           'points': points,
         },
       );

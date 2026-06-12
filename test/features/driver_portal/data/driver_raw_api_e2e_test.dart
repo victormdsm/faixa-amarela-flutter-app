@@ -46,16 +46,20 @@ void main() {
 
     test('GET /driver/routes retorna dados esperados', () async {
       await login();
-      final response = await dio.get<Map<String, dynamic>>('/driver/routes');
+      final response = await dio.get<dynamic>('/driver/routes');
       print('Status: ${response.statusCode}');
       print('Data type: ${response.data?.runtimeType}');
-      print('Data keys: ${response.data?.keys.toList()}');
-      if (response.data?['data'] is List) {
-        final list = response.data!['data'] as List;
-        print('Rotas: ${list.length}');
-        if (list.isNotEmpty) {
-          print('Primeira: ${list.first}');
+      final data = response.data;
+      if (data is Map<String, dynamic>) {
+        print('Data keys: ${data.keys.toList()}');
+        if (data['data'] is List) {
+          final list = data['data'] as List;
+          print('Rotas: ${list.length}');
+          if (list.isNotEmpty) print('Primeira: ${list.first}');
         }
+      } else if (data is List) {
+        print('Rotas: ${data.length}');
+        if (data.isNotEmpty) print('Primeira: ${data.first}');
       }
     });
 
@@ -63,26 +67,32 @@ void main() {
       await login();
 
       // Finaliza rota ativa se existir
-      final active = await dio.get<Map<String, dynamic>>('/driver/routes/active');
-      if (active.data != null && active.data!.isNotEmpty) {
-        final routeId = active.data!['id'];
+      final active = await dio.get<dynamic>('/driver/routes/active');
+      final activeData = active.data;
+      if (activeData is Map<String, dynamic> && activeData.isNotEmpty) {
+        final routeId = activeData['id'];
         if (routeId != null) {
-          await dio.post<Map<String, dynamic>>('/driver/routes/$routeId/finish');
+          await dio.post<dynamic>('/driver/routes/$routeId/finish');
         }
       }
 
-      final response = await dio.post<Map<String, dynamic>>(
+      final response = await dio.post<dynamic>(
         '/driver/routes/start',
         data: const <String, dynamic>{},
       );
       print('Status: ${response.statusCode}');
       print('Data type: ${response.data?.runtimeType}');
-      print('Data keys: ${response.data?.keys.toList()}');
-      print('Data: ${response.data}');
+      if (response.data is Map<String, dynamic>) {
+        final data = response.data as Map<String, dynamic>;
+        print('Data keys: ${data.keys.toList()}');
+        print('Data: $data');
+      }
 
-      final routeId = response.data?['id'];
+      final routeId = response.data is Map<String, dynamic>
+          ? (response.data as Map<String, dynamic>)['id']
+          : null;
       if (routeId != null) {
-        await dio.post<Map<String, dynamic>>('/driver/routes/$routeId/finish');
+        await dio.post<dynamic>('/driver/routes/$routeId/finish');
       }
     });
   });

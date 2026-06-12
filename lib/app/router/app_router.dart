@@ -2,19 +2,28 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'app_router_guard.dart';
+import '../../domain/models/child.dart';
+import '../../features/auth/presentation/pages/activation_page.dart';
 import '../../features/auth/presentation/pages/finalize_registration_page.dart';
 import '../../features/auth/presentation/pages/forgot_password_page.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/parent_sign_up_page.dart';
+import '../../features/auth/presentation/pages/reset_password_page.dart';
+import '../../features/auth/presentation/state/app_session_controller.dart';
 import '../../features/driver_portal/presentation/pages/driver_add_client_page.dart';
-import '../../features/driver_portal/presentation/pages/driver_clients_page.dart';
 import '../../features/driver_portal/presentation/pages/driver_dashboard_page.dart';
+import '../../features/driver_portal/presentation/pages/driver_enrollments_page.dart';
+import '../../features/driver_portal/presentation/pages/driver_lookup_child_page.dart';
+import '../../features/driver_portal/presentation/pages/driver_route_execution_page.dart';
 import '../../features/driver_portal/presentation/pages/driver_routes_page.dart';
 import '../../features/driver_portal/presentation/pages/driver_settings_page.dart';
 import '../../features/driver_portal/presentation/pages/driver_shell_page.dart';
+import '../../features/parent_portal/presentation/pages/add_child_page.dart';
 import '../../features/parent_portal/presentation/pages/parent_boardings_page.dart';
 import '../../features/parent_portal/presentation/pages/parent_children_page.dart';
 import '../../features/parent_portal/presentation/pages/parent_dashboard_page.dart';
+import '../../features/parent_portal/presentation/pages/parent_enrollments_page.dart';
 import '../../features/parent_portal/presentation/pages/parent_routes_page.dart';
 import '../../features/parent_portal/presentation/pages/parent_shell_page.dart';
 import '../../features/notifications/presentation/pages/notifications_page.dart';
@@ -29,9 +38,11 @@ class AppRoutes {
   // Auth
   static const login = '/';
   static const forgotPassword = '/forgot-password';
+  static const resetPassword = '/reset-password';
   static const parentSignUp = '/parent-sign-up';
   static const finalizeRegistration = '/finalize-registration';
   static const searchTransport = '/search-transport';
+  static const activation = '/activation';
 
   // Driver portal
   static const driverHome = '/motorista';
@@ -40,6 +51,9 @@ class AppRoutes {
   static const driverRoutes = '/motorista/rotas';
   static const driverProfile = '/motorista/perfil';
   static const driverNotifications = '/motorista/notificacoes';
+  static const driverLookup = '/motorista/lookup';
+  static const driverRouteExecution = '/motorista/rota';
+  static const driverEnrollments = '/motorista/enrollments';
 
   // Driver push routes (open on top of shell)
   static const driverSettings = '/motorista/settings';
@@ -47,8 +61,10 @@ class AppRoutes {
   // Parent portal
   static const parentHome = '/pais';
   static const parentChildren = '/pais/dependentes';
+  static const parentChildrenAdd = '/pais/dependentes/adicionar';
   static const parentRoutes = '/pais/rotas';
   static const parentBoardings = '/pais/embarques';
+  static const parentEnrollments = '/pais/enrollments';
   static const parentNotifications = '/pais/notificacoes';
 }
 
@@ -59,9 +75,25 @@ class AppRoutes {
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
 final appRouterProvider = Provider<GoRouter>((ref) {
+  final refreshNotifier = ValueNotifier<int>(0);
+
+  ref.listen(appSessionControllerProvider, (previous, next) {
+    refreshNotifier.value++;
+  });
+
+  String? redirectLogic(BuildContext context, GoRouterState state) {
+    return AppRouterGuard.redirect(
+      session: ref.read(appSessionControllerProvider).session,
+      isLoading: ref.read(appSessionControllerProvider).isLoading,
+      location: state.matchedLocation,
+    );
+  }
+
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: AppRoutes.login,
+    refreshListenable: refreshNotifier,
+    redirect: redirectLogic,
     routes: [
       // ── Auth routes (no shell) ──────────────────────────────────────
       GoRoute(
@@ -71,6 +103,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.forgotPassword,
         builder: (context, state) => const ForgotPasswordPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.resetPassword,
+        builder: (context, state) => const ResetPasswordPage(),
       ),
       GoRoute(
         path: AppRoutes.parentSignUp,
@@ -83,6 +119,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.searchTransport,
         builder: (context, state) => const SearchTransportPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.activation,
+        builder: (context, state) => const ActivationPage(),
       ),
 
       // ── Driver portal (bottom navigation shell) ────────────────────
@@ -102,8 +142,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: AppRoutes.driverClients,
-                builder: (context, state) => const DriverClientsPage(),
+                path: AppRoutes.driverEnrollments,
+                builder: (context, state) => const DriverEnrollmentsPage(),
               ),
             ],
           ),
@@ -145,6 +185,24 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.driverAddClient,
         builder: (context, state) => const DriverAddClientPage(),
       ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: AppRoutes.driverLookup,
+        builder: (context, state) => const DriverLookupChildPage(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: AppRoutes.driverRouteExecution,
+        builder: (context, state) => const DriverRouteExecutionPage(),
+      ),
+
+      // Parent push routes (displayed on top of the shell)
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: AppRoutes.parentChildrenAdd,
+        builder: (context, state) =>
+            AddChildPage(childToEdit: state.extra as Child?),
+      ),
 
       // ── Parent portal (bottom navigation shell) ────────────────────
       StatefulShellRoute.indexedStack(
@@ -181,6 +239,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: AppRoutes.parentBoardings,
                 builder: (context, state) => const ParentBoardingsPage(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppRoutes.parentEnrollments,
+                builder: (context, state) => const ParentEnrollmentsPage(),
               ),
             ],
           ),

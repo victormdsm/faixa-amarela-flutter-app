@@ -9,6 +9,54 @@ part of 'auth_providers.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 
+@ProviderFor(secureTokenStorage)
+final secureTokenStorageProvider = SecureTokenStorageProvider._();
+
+final class SecureTokenStorageProvider
+    extends
+        $FunctionalProvider<
+          SecureTokenStorage,
+          SecureTokenStorage,
+          SecureTokenStorage
+        >
+    with $Provider<SecureTokenStorage> {
+  SecureTokenStorageProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'secureTokenStorageProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$secureTokenStorageHash();
+
+  @$internal
+  @override
+  $ProviderElement<SecureTokenStorage> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  SecureTokenStorage create(Ref ref) {
+    return secureTokenStorage(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(SecureTokenStorage value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<SecureTokenStorage>(value),
+    );
+  }
+}
+
+String _$secureTokenStorageHash() =>
+    r'e5e69a815ffd6b90eeab1a23c33f70a8c9c2675c';
+
 @ProviderFor(authRepository)
 final authRepositoryProvider = AuthRepositoryProvider._();
 
@@ -48,7 +96,7 @@ final class AuthRepositoryProvider
   }
 }
 
-String _$authRepositoryHash() => r'1c1c046a87a1b548dccfe2922f61f3384fb9d174';
+String _$authRepositoryHash() => r'5432e08d0d78de6143bf05a83c53aa98b1dfe1a3';
 
 @ProviderFor(loginUseCase)
 final loginUseCaseProvider = LoginUseCaseProvider._();
@@ -188,3 +236,99 @@ final class RequestActivationLinkUseCaseProvider
 
 String _$requestActivationLinkUseCaseHash() =>
     r'47e1884afcbec0a57b93bab33afdc28fe72efcce';
+
+@ProviderFor(activateAccountUseCase)
+final activateAccountUseCaseProvider = ActivateAccountUseCaseProvider._();
+
+final class ActivateAccountUseCaseProvider
+    extends
+        $FunctionalProvider<
+          ActivateAccountUseCase,
+          ActivateAccountUseCase,
+          ActivateAccountUseCase
+        >
+    with $Provider<ActivateAccountUseCase> {
+  ActivateAccountUseCaseProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'activateAccountUseCaseProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$activateAccountUseCaseHash();
+
+  @$internal
+  @override
+  $ProviderElement<ActivateAccountUseCase> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  ActivateAccountUseCase create(Ref ref) {
+    return activateAccountUseCase(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ActivateAccountUseCase value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ActivateAccountUseCase>(value),
+    );
+  }
+}
+
+String _$activateAccountUseCaseHash() =>
+    r'158a07989c17bbbaf33e1bc2d8a65091be9acb50';
+
+@ProviderFor(resetPasswordUseCase)
+final resetPasswordUseCaseProvider = ResetPasswordUseCaseProvider._();
+
+final class ResetPasswordUseCaseProvider
+    extends
+        $FunctionalProvider<
+          ResetPasswordUseCase,
+          ResetPasswordUseCase,
+          ResetPasswordUseCase
+        >
+    with $Provider<ResetPasswordUseCase> {
+  ResetPasswordUseCaseProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'resetPasswordUseCaseProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$resetPasswordUseCaseHash();
+
+  @$internal
+  @override
+  $ProviderElement<ResetPasswordUseCase> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  ResetPasswordUseCase create(Ref ref) {
+    return resetPasswordUseCase(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ResetPasswordUseCase value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ResetPasswordUseCase>(value),
+    );
+  }
+}
+
+String _$resetPasswordUseCaseHash() =>
+    r'9a9295df0d0c380a87de0d22b3e8fd0b0d363386';

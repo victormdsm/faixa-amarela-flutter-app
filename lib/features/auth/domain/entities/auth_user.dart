@@ -21,7 +21,7 @@ class AuthUser {
 
   String get normalizedRole => role.trim().toLowerCase();
 
-  bool get isParent => normalizedRole == 'parent';
+  bool get isParent => normalizedRole == 'parent' || normalizedRole == 'user';
   bool get isDriver => normalizedRole == 'driver';
   bool get isAdmin =>
       normalizedRole == 'admin' ||
@@ -31,14 +31,38 @@ class AuthUser {
 
   factory AuthUser.fromJson(Map<String, dynamic> json) {
     return AuthUser(
-      id: (json['id'] as num?)?.toInt() ?? 0,
+      id: int.tryParse(json['id']?.toString() ?? '') ?? 0,
       name: (json['name'] ?? '').toString(),
       email: json['email']?.toString(),
-      role: (json['role'] ?? '').toString(),
-      cellPhone: json['cell_phone']?.toString(),
+      role: _extractRole(json),
+      cellPhone: (json['cell_phone'] ?? json['cellPhone'])?.toString(),
       avatar: json['avatar']?.toString(),
-      primaryDriverId: (json['primary_driver_id'] as num?)?.toInt(),
-      isActivated: json['is_activated'] == true || json['is_activated'] == 1,
+      primaryDriverId:
+          ((json['primary_driver_id'] ?? json['primaryDriverId']) as num?)
+              ?.toInt(),
+      // Defaults to true for backward compatibility with legacy backends
+      // that do not send is_activated.
+      isActivated: _extractIsActivated(json),
     );
+  }
+
+  static String _extractRole(Map<String, dynamic> json) {
+    final direct = json['role']?.toString();
+    if (direct != null && direct.isNotEmpty) return direct;
+    final roles = json['roles'];
+    if (roles is List && roles.isNotEmpty) {
+      return roles.first?.toString() ?? '';
+    }
+    return '';
+  }
+
+  static bool _extractIsActivated(Map<String, dynamic> json) {
+    final legacy = json['is_activated'];
+    if (legacy == false || legacy == 0) return false;
+    if (legacy == true || legacy == 1) return true;
+    final modern = json['isActive'];
+    if (modern == false || modern == 0) return false;
+    if (modern == true || modern == 1) return true;
+    return true; // default for backward compatibility
   }
 }

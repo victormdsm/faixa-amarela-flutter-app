@@ -52,10 +52,14 @@ void main() {
 
     test('RouteManifestDto parseia rota ativa', () async {
       await login();
-      final response = await dio.get<Map<String, dynamic>>('/driver/routes/active');
+      final response = await dio.get<dynamic>('/driver/routes/active');
       final data = response.data;
-      if (data == null || data.isEmpty) {
+      if (data == null || (data is Map && data.isEmpty)) {
         print('Sem rota ativa');
+        return;
+      }
+      if (data is! Map<String, dynamic>) {
+        print('Tipo inesperado para rota ativa: ${data.runtimeType}');
         return;
       }
       print('Raw route: $data');
@@ -70,19 +74,20 @@ void main() {
       await login();
 
       // Finaliza rota ativa se existir
-      final active = await dio.get<Map<String, dynamic>>('/driver/routes/active');
-      if (active.data != null && active.data!.isNotEmpty) {
-        final routeId = active.data!['id'];
+      final active = await dio.get<dynamic>('/driver/routes/active');
+      final activeData = active.data;
+      if (activeData is Map<String, dynamic> && activeData.isNotEmpty) {
+        final routeId = activeData['id'];
         if (routeId != null) {
-          await dio.post<Map<String, dynamic>>('/driver/routes/$routeId/finish');
+          await dio.post<dynamic>('/driver/routes/$routeId/finish');
         }
       }
 
-      final response = await dio.post<Map<String, dynamic>>(
+      final response = await dio.post<dynamic>(
         '/driver/routes/start',
         data: const <String, dynamic>{},
       );
-      final data = response.data!;
+      final data = response.data! as Map<String, dynamic>;
       print('Raw route: $data');
       final manifestData = data['manifest'] as Map<String, dynamic>;
       final manifest = RouteManifestDto.fromJson(manifestData).toDomain();
@@ -90,7 +95,7 @@ void main() {
       expect(manifest.manifestId, isNotNull);
       print('Parse OK: routeId=${manifest.id} manifestId=${manifest.manifestId}');
 
-      await dio.post<Map<String, dynamic>>('/driver/routes/${manifest.id}/finish');
+      await dio.post<dynamic>('/driver/routes/${manifest.id}/finish');
     });
   });
 }

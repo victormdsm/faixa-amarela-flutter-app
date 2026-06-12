@@ -39,11 +39,13 @@ class ParentBoardingsPage extends ConsumerWidget {
           }
           return ListView.separated(
             padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.lg,
+              AppSpacing.lg,
+              AppSpacing.md,
+              AppSpacing.lg,
+              AppSpacing.lg,
             ),
             itemCount: page.items.length,
-            separatorBuilder: (_, _) =>
-                const SizedBox(height: AppSpacing.sm),
+            separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
             itemBuilder: (context, index) =>
                 _BoardingCard(item: page.items[index]),
           );
@@ -69,28 +71,27 @@ class _BoardingCard extends StatelessWidget {
     final hour = (boarding['hour_boarding'] ?? '').toString();
     final theme = Theme.of(context);
 
-    final isDisembarked = status.toLowerCase() == 'disembarked' ||
+    final isDisembarked =
+        status.toLowerCase() == 'disembarked' ||
         status.toLowerCase() == 'desembarcado';
-    final isBoarded = status.toLowerCase() == 'boarded' ||
+    final isBoarded =
+        status.toLowerCase() == 'boarded' ||
         status.toLowerCase() == 'embarcado';
     final (statusColor, statusBg) = switch (status.toLowerCase()) {
       'boarded' || 'embarcado' => (
-          const Color(0xFF0A7E52),
-          const Color(0xFF0A7E52).withValues(alpha: 0.10),
-        ),
-      'disembarked' || 'desembarcado' => (
-          AppColors.slate,
-          AppColors.surfaceSoft,
-        ),
+        const Color(0xFF0A7E52),
+        const Color(0xFF0A7E52).withValues(alpha: 0.10),
+      ),
+      'disembarked' ||
+      'desembarcado' => (AppColors.slate, AppColors.surfaceSoft),
       _ => (AppColors.ink, AppColors.surfaceSoft),
     };
     final statusLabel = isBoarded
         ? 'Embarcado'
         : isDisembarked
-            ? 'Desembarcado'
-            : status;
-    final tileIcon =
-        isDisembarked ? Icons.logout_rounded : Icons.login_rounded;
+        ? 'Desembarcado'
+        : status;
+    final tileIcon = isDisembarked ? Icons.logout_rounded : Icons.login_rounded;
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
@@ -109,11 +110,7 @@ class _BoardingCard extends StatelessWidget {
               color: statusBg,
               borderRadius: BorderRadius.circular(AppRadius.md),
             ),
-            child: Icon(
-              tileIcon,
-              color: statusColor,
-              size: 20,
-            ),
+            child: Icon(tileIcon, color: statusColor, size: 20),
           ),
           const SizedBox(width: AppSpacing.md),
           Expanded(
@@ -126,7 +123,9 @@ class _BoardingCard extends StatelessWidget {
                       child: Text(
                         childName.isNotEmpty
                             ? childName
-                            : isDisembarked ? 'Desembarque' : 'Embarque',
+                            : isDisembarked
+                            ? 'Desembarque'
+                            : 'Embarque',
                         style: theme.textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.w700,
                         ),
@@ -139,10 +138,10 @@ class _BoardingCard extends StatelessWidget {
                       ),
                       decoration: BoxDecoration(
                         color: statusBg,
-                        borderRadius:
-                            BorderRadius.circular(AppRadius.full),
-                        border:
-                            Border.all(color: statusColor.withValues(alpha: 0.3)),
+                        borderRadius: BorderRadius.circular(AppRadius.full),
+                        border: Border.all(
+                          color: statusColor.withValues(alpha: 0.3),
+                        ),
                       ),
                       child: Text(
                         statusLabel,

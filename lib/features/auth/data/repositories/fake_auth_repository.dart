@@ -77,6 +77,29 @@ class FakeAuthRepository implements AuthRepository {
       throw const AuthException('A senha deve ter pelo menos 6 caracteres.');
     }
   }
+
+  @override
+  Future<void> activateAccount({
+    required String emailOrCpf,
+    required String code,
+  }) async {
+    await Future<void>.delayed(const Duration(milliseconds: 700));
+    if (code != '123456') {
+      throw const AuthException('Codigo de ativacao invalido.');
+    }
+  }
+
+  @override
+  Future<void> resetPassword({
+    required String token,
+    required String password,
+    required String passwordConfirmation,
+  }) async {
+    await Future<void>.delayed(const Duration(milliseconds: 700));
+    if (password != passwordConfirmation) {
+      throw const AuthException('A confirmacao de senha nao confere.');
+    }
+  }
 }
 
 class AuthException implements Exception {

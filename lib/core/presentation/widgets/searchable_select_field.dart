@@ -47,10 +47,7 @@ class SearchableSelectField extends StatelessWidget {
                 .map(
                   (option) => DropdownMenuItem<String>(
                     value: option,
-                    child: Text(
-                      option,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    child: Text(option, overflow: TextOverflow.ellipsis),
                   ),
                 )
                 .toList(growable: false),

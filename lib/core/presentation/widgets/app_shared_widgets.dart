@@ -3,11 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../app/theme/app_theme.dart';
 
 class AppErrorState extends StatelessWidget {
-  const AppErrorState({
-    super.key,
-    required this.message,
-    this.onRetry,
-  });
+  const AppErrorState({super.key, required this.message, this.onRetry});
 
   final String message;
   final VoidCallback? onRetry;
@@ -28,9 +24,9 @@ class AppErrorState extends StatelessWidget {
             const SizedBox(height: AppSpacing.md),
             Text(
               'Algo deu errado',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: AppSpacing.sm),
@@ -88,9 +84,9 @@ class AppEmptyState extends StatelessWidget {
             const SizedBox(height: AppSpacing.md),
             Text(
               message,
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
               textAlign: TextAlign.center,
             ),
             if ((subtitle ?? '').isNotEmpty) ...[
@@ -169,11 +165,7 @@ class AppMetricCard extends StatelessWidget {
 }
 
 class AppInfoPill extends StatelessWidget {
-  const AppInfoPill({
-    super.key,
-    required this.icon,
-    required this.text,
-  });
+  const AppInfoPill({super.key, required this.icon, required this.text});
 
   final IconData icon;
   final String text;

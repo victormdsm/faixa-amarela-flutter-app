@@ -20,4 +20,15 @@ abstract interface class AuthRepository {
     required String password,
     required String passwordConfirmation,
   });
+
+  Future<void> activateAccount({
+    required String emailOrCpf,
+    required String code,
+  });
+
+  Future<void> resetPassword({
+    required String token,
+    required String password,
+    required String passwordConfirmation,
+  });
 }

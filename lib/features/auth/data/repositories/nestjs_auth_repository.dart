@@ -1,17 +1,21 @@
 import 'package:dio/dio.dart';
 
 import '../../../../core/network/api_exception.dart';
+import '../../../../core/storage/secure_token_storage.dart';
 import '../../domain/entities/auth_session.dart';
 import '../../domain/entities/user_role.dart';
 import '../../domain/repositories/auth_repository.dart';
 
-const _wrongAccessMessage =
-    'Meio de acesso incorreto. Use o canal adequado para sua conta.';
-
-class LaravelAuthRepository implements AuthRepository {
-  LaravelAuthRepository(this._dio);
+class NestjsAuthRepository implements AuthRepository {
+  NestjsAuthRepository(this._dio, this._secureStorage);
 
   final Dio _dio;
+  final SecureTokenStorage _secureStorage;
+
+  String _loginEndpoint(UserRole role) => switch (role) {
+    UserRole.parent => '/auth/user/login',
+    UserRole.driver => '/auth/driver/login',
+  };
 
   @override
   Future<AuthSession> signIn({
@@ -21,13 +25,8 @@ class LaravelAuthRepository implements AuthRepository {
   }) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
-        '/auth/login',
-        data: {
-          if (role == UserRole.parent) 'email': email,
-          if (role == UserRole.driver) 'login': email,
-          'password': password,
-          'device_name': 'flutter-app',
-        },
+        _loginEndpoint(role),
+        data: {'email': email.trim(), 'password': password},
       );
 
       final data = response.data;
@@ -35,20 +34,9 @@ class LaravelAuthRepository implements AuthRepository {
         throw ApiException(message: 'Resposta vazia da API no login.');
       }
 
-      final session = AuthSession.fromJson(data);
-      if (session.user.isAdmin) {
-        throw ApiException(message: _wrongAccessMessage, statusCode: 403);
-      }
-
-      final isRoleAllowed = switch (role) {
-        UserRole.parent => session.user.isParent,
-        UserRole.driver => session.user.isDriver,
-      };
-
-      if (!isRoleAllowed) {
-        throw ApiException(message: _wrongAccessMessage, statusCode: 403);
-      }
-
+      final payload = data['data'] as Map<String, dynamic>? ?? data;
+      final session = AuthSession.fromJson(payload);
+      await _secureStorage.writeAccessToken(session.accessToken);
       return session;
     } on ApiException {
       rethrow;
@@ -62,7 +50,7 @@ class LaravelAuthRepository implements AuthRepository {
     try {
       await _dio.post<Map<String, dynamic>>(
         '/auth/forgot-password',
-        data: {'email': email},
+        data: {'email': email.trim()},
       );
     } catch (error) {
       throw ApiException.fromDio(error);
@@ -71,16 +59,9 @@ class LaravelAuthRepository implements AuthRepository {
 
   @override
   Future<void> requestActivationLink({required String login}) async {
-    try {
-      await _dio.post<Map<String, dynamic>>(
-        '/auth/resend-activation',
-        data: {
-          if (_isEmail(login)) 'email': login.trim() else 'login': login.trim(),
-        },
-      );
-    } catch (error) {
-      throw ApiException.fromDio(error);
-    }
+    throw ApiException(
+      message: 'Reenvio de link de ativacao nao suportado neste backend.',
+    );
   }
 
   @override
@@ -94,15 +75,13 @@ class LaravelAuthRepository implements AuthRepository {
   }) async {
     try {
       await _dio.post<Map<String, dynamic>>(
-        '/auth/register-parent',
+        '/auth/user/register',
         data: {
           'name': name.trim(),
           'email': email.trim(),
           'cpf': cpf.trim(),
-          'cell_phone': cellPhone.trim(),
+          'cellPhone': cellPhone.trim(),
           'password': password,
-          'password_confirmation': passwordConfirmation,
-          'device_name': 'flutter-app',
         },
       );
     } on ApiException {
@@ -112,19 +91,38 @@ class LaravelAuthRepository implements AuthRepository {
     }
   }
 
-  Future<void> logout(String authorizationHeader) async {
+  @override
+  Future<void> activateAccount({
+    required String emailOrCpf,
+    required String code,
+  }) async {
     try {
       await _dio.post<Map<String, dynamic>>(
-        '/auth/logout',
-        options: Options(headers: {'Authorization': authorizationHeader}),
+        '/auth/activate',
+        data: {'email': emailOrCpf.trim(), 'code': code.trim()},
       );
-    } catch (_) {
-      // Mantem o logout local mesmo se a API falhar.
+    } on ApiException {
+      rethrow;
+    } catch (error) {
+      throw ApiException.fromDio(error);
     }
   }
 
-  bool _isEmail(String value) {
-    final trimmed = value.trim();
-    return RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(trimmed);
+  @override
+  Future<void> resetPassword({
+    required String token,
+    required String password,
+    required String passwordConfirmation,
+  }) async {
+    try {
+      await _dio.post<Map<String, dynamic>>(
+        '/auth/reset-password',
+        data: {'token': token, 'newPassword': password},
+      );
+    } on ApiException {
+      rethrow;
+    } catch (error) {
+      throw ApiException.fromDio(error);
+    }
   }
 }

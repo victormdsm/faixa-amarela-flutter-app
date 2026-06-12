@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/error/app_error_reporter.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/presentation/widgets/app_shared_widgets.dart';
+import '../../../../domain/models/route_manifest.dart';
+import '../../../../domain/repositories/routes_repository.dart';
 import '../../../auth/presentation/state/app_session_controller.dart';
 import '../../../tracking/presentation/providers/tracking_providers.dart';
 import '../../../tracking/presentation/state/driver_tracking_controller.dart';
 import '../../../tracking/presentation/state/driver_tracking_state.dart';
-import '../../data/driver_portal_repository.dart';
 import '../providers/driver_portal_providers.dart';
 
 // ─────────────────────────────────────────────
@@ -58,9 +58,7 @@ class _DriverRoutesPageState extends ConsumerState<DriverRoutesPage> {
                 child: _MapTopOverlay(
                   tracking: tracking,
                   isFinishing: _isFinishing,
-                  onFinish: _isFinishing
-                      ? null
-                      : () => _finishRoute(tracking),
+                  onFinish: _isFinishing ? null : () => _finishRoute(tracking),
                 ),
               ),
             ),
@@ -88,14 +86,10 @@ class _DriverRoutesPageState extends ConsumerState<DriverRoutesPage> {
     if (_isFinishing) return;
     final routeId = tracking.routeId;
     if (routeId == null || routeId <= 0) return;
-    final session = ref.read(appSessionControllerProvider).session;
-    if (session == null) return;
 
     setState(() => _isFinishing = true);
     try {
-      await ref
-          .read(driverPortalRepositoryProvider)
-          .finishRoute(session.authorizationHeader, routeId);
+      await ref.read(driverRoutesRepositoryProvider).finishRoute(routeId);
       await ref
           .read(driverTrackingControllerProvider.notifier)
           .stopRouteTracking(silent: true);
@@ -111,9 +105,9 @@ class _DriverRoutesPageState extends ConsumerState<DriverRoutesPage> {
       ).showSnackBar(SnackBar(content: Text(e.message)));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppErrorReporter.messageFor(e))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppErrorReporter.messageFor(e))));
     } finally {
       if (mounted) setState(() => _isFinishing = false);
     }
@@ -230,8 +224,9 @@ class _FinishBtn extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(
-          color: (loading ? AppColors.muted : AppColors.danger)
-              .withValues(alpha: 0.93),
+          color: (loading ? AppColors.muted : AppColors.danger).withValues(
+            alpha: 0.93,
+          ),
           borderRadius: BorderRadius.circular(AppRadius.full),
           boxShadow: const [
             BoxShadow(
@@ -595,22 +590,22 @@ class _ActiveContentState extends ConsumerState<_ActiveContent> {
             submitting: _submitting,
             routeActive: widget.tracking.routeActive,
             onBoard:
-                s.clientId != null &&
+                s.childId != null &&
                     (s.status == _StopStatus.onTheWay ||
                         s.status == _StopStatus.pending)
-                ? () => _markBoarded(s.clientId!)
+                ? () => _markBoarded(s.childId!)
                 : null,
-            onDisembark: s.clientId != null && s.status == _StopStatus.boarded
-                ? () => _markDisembarked(s.clientId!)
+            onDisembark: s.childId != null && s.status == _StopStatus.boarded
+                ? () => _markDisembarked(s.childId!)
                 : null,
-            onNotifyArrived: s.clientId != null
-                ? () => _notifyParent(s.clientId!, 'arrived')
+            onNotifyArrived: s.childId != null
+                ? () => _notifyParent(s.childId!, 'arrived')
                 : null,
-            onNotifyDelayed: s.clientId != null
-                ? () => _notifyParent(s.clientId!, 'delayed')
+            onNotifyDelayed: s.childId != null
+                ? () => _notifyParent(s.childId!, 'delayed')
                 : null,
-            onRemove: s.clientId != null && s.status != _StopStatus.droppedOff
-                ? () => _removeStudent(s.clientId!, s.name)
+            onRemove: s.childId != null && s.status != _StopStatus.droppedOff
+                ? () => _removeStudent(s.childId!, s.name)
                 : null,
           );
         }
@@ -619,22 +614,20 @@ class _ActiveContentState extends ConsumerState<_ActiveContent> {
     );
   }
 
-  Future<void> _markBoarded(int clientId) async {
+  Future<void> _markBoarded(int childId) async {
     await _runAction(
-      clientId: clientId,
-      apiCall: (repo, auth, routeId) =>
-          repo.markBoarding(auth, routeId, clientId: clientId),
-      onLocal: (ctrl) => ctrl.markClientBoardedLocal(clientId),
+      childId: childId,
+      apiCall: (repo, routeId) => repo.markBoarding(routeId, childId),
+      onLocal: (ctrl) => ctrl.markClientBoardedLocal(childId),
       msg: 'Aluno embarcou.',
     );
   }
 
-  Future<void> _markDisembarked(int clientId) async {
+  Future<void> _markDisembarked(int childId) async {
     await _runAction(
-      clientId: clientId,
-      apiCall: (repo, auth, routeId) =>
-          repo.markDisembarking(auth, routeId, clientId: clientId),
-      onLocal: (ctrl) => ctrl.markClientDisembarkedLocal(clientId),
+      childId: childId,
+      apiCall: (repo, routeId) => repo.markDisembarking(routeId, childId),
+      onLocal: (ctrl) => ctrl.markClientDisembarkedLocal(childId),
       msg: 'Aluno desembarcou.',
     );
 
@@ -648,11 +641,10 @@ class _ActiveContentState extends ConsumerState<_ActiveContent> {
     }
   }
 
-  Future<void> _notifyParent(int clientId, String type) async {
+  Future<void> _notifyParent(int childId, String type) async {
     await _runAction(
-      clientId: clientId,
-      apiCall: (repo, auth, routeId) =>
-          repo.notifyParent(auth, routeId, clientId: clientId, type: type),
+      childId: childId,
+      apiCall: (repo, routeId) => repo.notifyParent(routeId, childId, type),
       onLocal: (_) {},
       msg: type == 'arrived'
           ? 'Responsável notificado: cheguei!'
@@ -660,7 +652,7 @@ class _ActiveContentState extends ConsumerState<_ActiveContent> {
     );
   }
 
-  Future<void> _removeStudent(int clientId, String name) async {
+  Future<void> _removeStudent(int childId, String name) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -683,23 +675,16 @@ class _ActiveContentState extends ConsumerState<_ActiveContent> {
     if (_submitting) return;
 
     final routeId = widget.tracking.routeId;
-    final session = ref.read(appSessionControllerProvider).session;
-    if (routeId == null || routeId <= 0 || session == null) return;
+    if (routeId == null || routeId <= 0) return;
 
     setState(() => _submitting = true);
     try {
       await ref
-          .read(driverPortalRepositoryProvider)
-          .removeStudentFromRoute(
-            session.authorizationHeader,
-            routeId,
-            clientId: clientId,
-            lat: widget.tracking.lastLatitude,
-            lng: widget.tracking.lastLongitude,
-          );
+          .read(driverRoutesRepositoryProvider)
+          .removeStudent(routeId, childId);
       ref
           .read(driverTrackingControllerProvider.notifier)
-          .removeClientLocal(clientId);
+          .removeClientLocal(childId);
       await ref
           .read(driverTrackingControllerProvider.notifier)
           .refreshRoutePreviewNow();
@@ -719,28 +704,18 @@ class _ActiveContentState extends ConsumerState<_ActiveContent> {
   }
 
   Future<void> _runAction({
-    required int clientId,
-    required Future<Map<String, dynamic>> Function(
-      DriverPortalRepository,
-      String,
-      int,
-    )
-    apiCall,
+    required int childId,
+    required Future<void> Function(RoutesRepository, int) apiCall,
     required void Function(DriverTrackingController) onLocal,
     required String msg,
   }) async {
     if (_submitting) return;
     final routeId = widget.tracking.routeId;
-    final session = ref.read(appSessionControllerProvider).session;
-    if (routeId == null || routeId <= 0 || session == null) return;
+    if (routeId == null || routeId <= 0) return;
 
     setState(() => _submitting = true);
     try {
-      await apiCall(
-        ref.read(driverPortalRepositoryProvider),
-        session.authorizationHeader,
-        routeId,
-      );
+      await apiCall(ref.read(driverRoutesRepositoryProvider), routeId);
       onLocal(ref.read(driverTrackingControllerProvider.notifier));
       await ref
           .read(driverTrackingControllerProvider.notifier)
@@ -806,7 +781,6 @@ class _SavedRoutesContent extends ConsumerWidget {
               100,
             ),
             children: [
-              const _PresetsStrip(),
               if (items.isEmpty)
                 const AppEmptyState(
                   message: 'Nenhuma rota encontrada.',
@@ -827,64 +801,6 @@ class _SavedRoutesContent extends ConsumerWidget {
           );
         }
       },
-    );
-  }
-}
-
-// ─────────────────────────────────────────────
-// Saved presets quick-load strip
-// ─────────────────────────────────────────────
-
-class _PresetsStrip extends ConsumerWidget {
-  const _PresetsStrip();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final presetsAsync = ref.watch(driverRoutePresetsProvider);
-    final presets = presetsAsync.value ?? const <Map<String, dynamic>>[];
-    if (presets.isEmpty) return const SizedBox.shrink();
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.md),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.bookmarks_outlined, size: 16, color: AppColors.slate),
-              const SizedBox(width: 6),
-              Text(
-                'Presets salvos',
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.slate,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          SizedBox(
-            height: 38,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: presets.length,
-              separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.sm),
-              itemBuilder: (context, i) {
-                final preset = presets[i];
-                final id = (preset['id'] as num?)?.toInt();
-                final name = (preset['name'] ?? 'Preset').toString();
-                return ActionChip(
-                  avatar: const Icon(Icons.play_arrow_rounded, size: 18),
-                  label: Text(name, overflow: TextOverflow.ellipsis),
-                  onPressed: id == null
-                      ? null
-                      : () => _openAdhocPlanner(context, ref, presetId: id),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -1647,18 +1563,14 @@ class _GeneralAlertSectionState extends ConsumerState<_GeneralAlertSection> {
     if (confirmed != true || !mounted) return;
 
     final routeId = widget.tracking.routeId;
-    final session = ref.read(appSessionControllerProvider).session;
-    if (routeId == null || routeId <= 0 || session == null) return;
+    if (routeId == null || routeId <= 0) return;
 
     setState(() => _sending = true);
     try {
-      final result = await ref
-          .read(driverPortalRepositoryProvider)
-          .alertAllParents(session.authorizationHeader, routeId, type: type);
+      await ref.read(driverRoutesRepositoryProvider).alertAll(routeId, type);
       if (!mounted) return;
-      final count = result['notified_count'] ?? 0;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Alerta enviado para $count responsável(is).')),
+        const SnackBar(content: Text('Alerta enviado aos responsáveis.')),
       );
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -1802,19 +1714,13 @@ class _SavedRouteCard extends ConsumerWidget {
   ) async {
     try {
       final routeId = (route['id'] as num?)?.toInt() ?? 0;
-      if (routeId <= 0) throw ApiException(message: 'Rota invalida.');
       final session = ref.read(appSessionControllerProvider).session;
       if (session == null) throw ApiException(message: 'Sessao expirada.');
-      final auth = session.authorizationHeader;
-      final repo = ref.read(driverPortalRepositoryProvider);
+      final repo = ref.read(driverRoutesRepositoryProvider);
       final ctrl = ref.read(driverTrackingControllerProvider.notifier);
 
       if (start) {
-        final response = await repo.startRoute(
-          auth,
-          routeId,
-          vanId: session.user.id,
-        );
+        final response = await repo.startRoute();
         if (!context.mounted) return;
         await _startTrackingFromResponse(
           context,
@@ -1824,7 +1730,8 @@ class _SavedRouteCard extends ConsumerWidget {
         );
         if (!context.mounted) return;
       } else {
-        await repo.finishRoute(auth, routeId);
+        if (routeId <= 0) throw ApiException(message: 'Rota invalida.');
+        await repo.finishRoute(routeId);
         await ctrl.stopRouteTracking(silent: true);
       }
       ref.invalidate(driverRoutesProvider);
@@ -1834,9 +1741,9 @@ class _SavedRouteCard extends ConsumerWidget {
       );
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppErrorReporter.messageFor(e))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppErrorReporter.messageFor(e))));
     }
   }
 }
@@ -1845,34 +1752,16 @@ class _SavedRouteCard extends ConsumerWidget {
 // Adhoc Route Planner
 // ─────────────────────────────────────────────
 
-Future<void> _openAdhocPlanner(
-  BuildContext context,
-  WidgetRef ref, {
-  int? presetId,
-}) async {
-  final session = ref.read(appSessionControllerProvider).session;
-  if (session == null) {
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Sessao expirada. Faca login novamente.')),
-    );
-    return;
-  }
-
-  final repo = ref.read(driverPortalRepositoryProvider);
-  final auth = session.authorizationHeader;
-  final bundleFuture = Future.wait<Object>([
-    repo.routePlanningOptions(auth),
-    repo.listRoutePresets(auth),
-  ]);
+Future<void> _openAdhocPlanner(BuildContext context, WidgetRef ref) async {
+  final repo = ref.read(driverRoutesRepositoryProvider);
 
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
     showDragHandle: true,
-    builder: (ctx) => FutureBuilder<List<Object>>(
-      future: bundleFuture,
+    builder: (ctx) => FutureBuilder<RoutePlanningOptions>(
+      future: repo.getPlanningOptions(),
       builder: (ctx, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
           return const Padding(
@@ -1891,43 +1780,12 @@ Future<void> _openAdhocPlanner(
             ),
           );
         }
-        final bundle = snapshot.data ?? const [];
-        final options = bundle.isNotEmpty
-            ? bundle[0] as Map<String, dynamic>
-            : const <String, dynamic>{};
-        final presets = bundle.length > 1
-            ? bundle[1] as List<Map<String, dynamic>>
-            : const <Map<String, dynamic>>[];
+        final options =
+            snapshot.data ?? const RoutePlanningOptions(vans: [], children: []);
         return _AdhocPlannerContent(
-          data: options,
-          presets: presets,
-          initialPresetId: presetId,
-          onSavePreset: (name, payload) => repo.createRoutePreset(
-            auth,
-            name: name,
-            operationId: payload.operationId,
-            tripMode: payload.tripModeId,
-            selections: payload.selections,
-          ),
-          onDeletePreset: (id) => repo.deleteRoutePreset(auth, id),
-          onStart: (payload) async {
-            double? originLat, originLng;
-            try {
-              final pos = await Geolocator.getCurrentPosition();
-              originLat = pos.latitude;
-              originLng = pos.longitude;
-            } catch (_) {}
-
-            final response = await repo.startAdhocRoute(
-              session.authorizationHeader,
-              shiftId: null,
-              tripMode: payload.tripModeId,
-              operationId: payload.operationId,
-              routeName: payload.routeName,
-              originLat: originLat,
-              originLng: originLng,
-              selections: payload.selections,
-            );
+          options: options,
+          onStart: () async {
+            final response = await repo.startRoute();
             if (!context.mounted) return;
             await _startTrackingFromResponse(context, ref, response);
             if (!context.mounted) return;
@@ -1939,262 +1797,27 @@ Future<void> _openAdhocPlanner(
   );
 }
 
-class _PlannerPayload {
-  const _PlannerPayload({
-    this.operationId,
-    required this.tripModeId,
-    this.routeName,
-    required this.selections,
-  });
-  final String? operationId;
-  final String tripModeId;
-  final String? routeName;
-  final List<Map<String, int>> selections;
-}
-
 class _AdhocPlannerContent extends StatefulWidget {
-  const _AdhocPlannerContent({
-    required this.data,
-    required this.onStart,
-    this.presets = const [],
-    this.onSavePreset,
-    this.onDeletePreset,
-    this.initialPresetId,
-  });
-  final Map<String, dynamic> data;
-  final Future<void> Function(_PlannerPayload) onStart;
-  final List<Map<String, dynamic>> presets;
-  final int? initialPresetId;
-  final Future<Map<String, dynamic>> Function(String name, _PlannerPayload)?
-  onSavePreset;
-  final Future<void> Function(int presetId)? onDeletePreset;
+  const _AdhocPlannerContent({required this.options, required this.onStart});
+  final RoutePlanningOptions options;
+  final Future<void> Function() onStart;
 
   @override
   State<_AdhocPlannerContent> createState() => _AdhocPlannerContentState();
 }
 
 class _AdhocPlannerContentState extends State<_AdhocPlannerContent> {
-  final _nameCtrl = TextEditingController();
   bool _busy = false;
   String? _error;
-  String? _opId;
-  final Map<int, bool> _selected = {};
-  final Map<int, int> _addressOf = {};
-  late List<Map<String, dynamic>> _presets = [...widget.presets];
-  int? _selectedPresetId;
 
   @override
   void initState() {
     super.initState();
-    final id = widget.initialPresetId;
-    if (id != null) {
-      // Apply after first build so widget.data['students'] is available.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        final preset = _presets.firstWhere(
-          (p) => (p['id'] as num?)?.toInt() == id,
-          orElse: () => const {},
-        );
-        if (preset.isNotEmpty) _applyPreset(preset);
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    _nameCtrl.dispose();
-    super.dispose();
-  }
-
-  /// Builds the {client_id, child_id, address_id} list from current selection.
-  /// Returns null and sets [_error] when the selection is invalid.
-  List<Map<String, int>>? _collectSelections(
-    List<Map<String, dynamic>> filtered,
-  ) {
-    final selections = <Map<String, int>>[];
-    for (final s in filtered) {
-      final cid = _numId(s['child_id']);
-      final clid = _numId(s['client_id']);
-      if (!(_selected[cid] ?? false)) continue;
-      final aid = _addressOf[cid];
-      if (cid <= 0 || clid <= 0 || aid == null || aid <= 0) {
-        setState(() => _error = 'Selecione o endereco dos alunos marcados.');
-        return null;
-      }
-      selections.add({'client_id': clid, 'child_id': cid, 'address_id': aid});
-    }
-    if (selections.isEmpty) {
-      setState(() => _error = 'Selecione pelo menos um aluno.');
-      return null;
-    }
-    return selections;
-  }
-
-  void _applyPreset(Map<String, dynamic> preset) {
-    final students = _listOf(widget.data['students']);
-    final sel = (preset['selections'] as List?) ?? const [];
-    final addrByChild = <int, int>{};
-    for (final raw in sel.whereType<Map>()) {
-      final cid = _numId(raw['child_id']);
-      final aid = _numId(raw['address_id']);
-      if (cid > 0) addrByChild[cid] = aid;
-    }
-    setState(() {
-      _selectedPresetId = (preset['id'] as num?)?.toInt();
-      final opId = (preset['operation_id'] ?? '').toString();
-      if (opId.isNotEmpty) _opId = opId;
-      _nameCtrl.text = (preset['name'] ?? '').toString();
-      // Mark every known child explicitly so the build() auto-default loop
-      // (which selects unseen children) does not re-add the excluded ones.
-      for (final s in students) {
-        final cid = _numId(s['child_id']);
-        if (cid <= 0) continue;
-        if (addrByChild.containsKey(cid)) {
-          _selected[cid] = true;
-          final aid = addrByChild[cid]!;
-          if (aid > 0) _addressOf[cid] = aid;
-        } else {
-          _selected[cid] = false;
-        }
-      }
-      _error = null;
-    });
-  }
-
-  Future<void> _savePreset(
-    List<Map<String, dynamic>> filtered,
-    String? tripModeId,
-  ) async {
-    final onSave = widget.onSavePreset;
-    if (onSave == null) return;
-    final selections = _collectSelections(filtered);
-    if (selections == null) return;
-
-    final suggested = _nameCtrl.text.trim();
-    final name = await _promptPresetName(suggested);
-    if (name == null || name.trim().isEmpty) return;
-
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
-      final created = await onSave(
-        name.trim(),
-        _PlannerPayload(
-          operationId: _opId,
-          tripModeId: tripModeId ?? '',
-          routeName: suggested.isEmpty ? null : suggested,
-          selections: selections,
-        ),
-      );
-      if (!mounted) return;
-      setState(() {
-        _busy = false;
-        if (created.isNotEmpty) {
-          _presets = [created, ..._presets];
-          _selectedPresetId = (created['id'] as num?)?.toInt();
-        }
-      });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Preset salvo.')));
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _busy = false;
-        _error = e.toString();
-      });
-    }
-  }
-
-  Future<String?> _promptPresetName(String initial) {
-    final ctrl = TextEditingController(text: initial);
-    return showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Salvar preset'),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          decoration: const InputDecoration(labelText: 'Nome do preset'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(ctrl.text),
-            child: const Text('Salvar'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _deletePreset(int presetId) async {
-    final onDelete = widget.onDeletePreset;
-    if (onDelete == null) return;
-    try {
-      await onDelete(presetId);
-      if (!mounted) return;
-      setState(() {
-        _presets = _presets
-            .where((p) => (p['id'] as num?)?.toInt() != presetId)
-            .toList(growable: false);
-        if (_selectedPresetId == presetId) _selectedPresetId = null;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _error = e.toString());
-    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final ops = _listOf(widget.data['operation_windows']);
-    final tripModes = _listOf(widget.data['trip_modes']);
-    final students = _listOf(widget.data['students']);
-
-    if (_opId == null || !ops.any((e) => _idStr(e) == _opId)) {
-      _opId = ops.isNotEmpty ? _idStr(ops.first) : null;
-    }
-
-    final filtered =
-        students
-            .where((s) {
-              if (_opId == null) return true;
-              final ids = ((s['operation_window_ids'] as List?) ?? [])
-                  .map((e) => e.toString())
-                  .toSet();
-              return ids.contains(_opId);
-            })
-            .toList(growable: false)
-          ..sort((a, b) {
-            final c = (a['shift_name'] ?? '').toString();
-            final d = (b['shift_name'] ?? '').toString();
-            if (c != d) return c.compareTo(d);
-            return (a['child_name'] ?? '').toString().compareTo(
-              (b['child_name'] ?? '').toString(),
-            );
-          });
-
-    for (final s in filtered) {
-      final cid = _numId(s['child_id']);
-      final addrs = _listOf(s['addresses']);
-      if (cid > 0 && !_selected.containsKey(cid)) _selected[cid] = true;
-      if (cid > 0 && !_addressOf.containsKey(cid) && addrs.isNotEmpty) {
-        final def = addrs.firstWhere(
-          (e) => e['is_default'] == true,
-          orElse: () => addrs.first,
-        );
-        final aid = _numId(def['id']);
-        if (aid > 0) _addressOf[cid] = aid;
-      }
-    }
-
-    final tripModeId = _resolveTripMode(_opId, tripModes);
+    final children = widget.options.children;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(
@@ -2207,59 +1830,30 @@ class _AdhocPlannerContentState extends State<_AdhocPlannerContent> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Planejar rota',
+            'Iniciar rota',
             style: Theme.of(
               context,
             ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'Escolha o momento, confirme os alunos e endereco.',
+            'A rota sera criada com base nos alunos ativos vinculados ao seu veiculo.',
             style: Theme.of(
               context,
             ).textTheme.bodySmall?.copyWith(color: AppColors.slate),
           ),
-          if (_presets.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.lg),
-            _buildPresetPicker(),
-          ],
           const SizedBox(height: AppSpacing.lg),
-          DropdownButtonFormField<String?>(
-            initialValue: _opId,
-            isExpanded: true,
-            decoration: const InputDecoration(labelText: 'Momento da rota'),
-            items: ops
-                .map(
-                  (op) => DropdownMenuItem<String?>(
-                    value: _idStr(op),
-                    child: Text(
-                      (op['label'] ?? '').toString(),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                )
-                .toList(growable: false),
-            onChanged: _busy ? null : (v) => setState(() => _opId = v),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          TextField(
-            controller: _nameCtrl,
-            enabled: !_busy,
-            decoration: const InputDecoration(
-              labelText: 'Nome da rota (opcional)',
-            ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Flexible(
-            child: filtered.isEmpty
-                ? const Center(child: Text('Nenhum aluno para este momento.'))
+          Expanded(
+            child: children.isEmpty
+                ? const Center(
+                    child: Text('Nenhum aluno ativo vinculado no momento.'),
+                  )
                 : ListView.separated(
                     shrinkWrap: true,
-                    itemCount: filtered.length,
+                    itemCount: children.length,
                     separatorBuilder: (_, _) =>
                         const SizedBox(height: AppSpacing.sm),
-                    itemBuilder: (context, i) => _buildStudentItem(filtered[i]),
+                    itemBuilder: (context, i) => _buildChildItem(children[i]),
                   ),
           ),
           if (_error != null) ...[
@@ -2270,16 +1864,8 @@ class _AdhocPlannerContentState extends State<_AdhocPlannerContent> {
             ),
           ],
           const SizedBox(height: AppSpacing.md),
-          if (widget.onSavePreset != null) ...[
-            OutlinedButton.icon(
-              onPressed: _busy ? null : () => _savePreset(filtered, tripModeId),
-              icon: const Icon(Icons.bookmark_add_outlined, size: 18),
-              label: const Text('Salvar como preset'),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-          ],
           FilledButton.icon(
-            onPressed: _busy ? null : () => _submit(filtered, tripModeId),
+            onPressed: _busy ? null : _submit,
             icon: _busy
                 ? const SizedBox(
                     width: 16,
@@ -2294,67 +1880,7 @@ class _AdhocPlannerContentState extends State<_AdhocPlannerContent> {
     );
   }
 
-  Widget _buildPresetPicker() {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.sm,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceSoft,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.bookmarks_outlined, size: 18),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<int?>(
-                value: _selectedPresetId,
-                isExpanded: true,
-                hint: const Text('Carregar preset salvo'),
-                items: _presets
-                    .map((p) {
-                      final id = (p['id'] as num?)?.toInt();
-                      return DropdownMenuItem<int?>(
-                        value: id,
-                        child: Text(
-                          (p['name'] ?? 'Preset #$id').toString(),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      );
-                    })
-                    .toList(growable: false),
-                onChanged: _busy
-                    ? null
-                    : (id) {
-                        final preset = _presets.firstWhere(
-                          (p) => (p['id'] as num?)?.toInt() == id,
-                          orElse: () => const {},
-                        );
-                        if (preset.isNotEmpty) _applyPreset(preset);
-                      },
-              ),
-            ),
-          ),
-          if (_selectedPresetId != null && widget.onDeletePreset != null)
-            IconButton(
-              tooltip: 'Excluir preset',
-              onPressed: _busy ? null : () => _deletePreset(_selectedPresetId!),
-              icon: const Icon(Icons.delete_outline_rounded, size: 20),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStudentItem(Map<String, dynamic> s) {
-    final cid = _numId(s['child_id']);
-    final addrs = _listOf(s['addresses']);
-    final sel = _selected[cid] ?? false;
+  Widget _buildChildItem(PlanningChild child) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
@@ -2363,99 +1889,41 @@ class _AdhocPlannerContentState extends State<_AdhocPlannerContent> {
         color: AppColors.surface,
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CheckboxListTile(
-            value: sel,
-            dense: true,
-            contentPadding: EdgeInsets.zero,
-            title: Text(
-              (s['child_name'] ?? 'Aluno #$cid').toString(),
-              style: Theme.of(
-                context,
-              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-            ),
-            subtitle: Text(
-              [
-                if ((s['parent_name'] ?? '').toString().isNotEmpty)
-                  'Resp.: ${s['parent_name']}',
-                if ((s['school_name'] ?? '').toString().isNotEmpty)
-                  'Escola: ${s['school_name']}',
-              ].join(' · '),
-            ),
-            onChanged: _busy
-                ? null
-                : (v) => setState(() => _selected[cid] = v ?? false),
+          Text(
+            child.name,
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
           ),
-          if (sel && addrs.isNotEmpty)
-            DropdownButtonFormField<int>(
-              initialValue: _addressOf[cid],
-              isExpanded: true,
-              decoration: const InputDecoration(
-                labelText: 'Endereco de embarque',
-              ),
-              items: addrs
-                  .map((a) {
-                    final id = _numId(a['id']);
-                    return DropdownMenuItem<int>(
-                      value: id,
-                      child: Text(
-                        (a['label'] ?? 'Endereco #$id').toString(),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    );
-                  })
-                  .toList(growable: false),
-              onChanged: _busy
-                  ? null
-                  : (v) {
-                      if (v != null) setState(() => _addressOf[cid] = v);
-                    },
-            ),
-          if (sel && addrs.isEmpty)
+          if (child.schoolName.isNotEmpty)
             Text(
-              'Aluno sem endereco cadastrado.',
-              style: TextStyle(color: AppColors.danger, fontSize: 13),
+              'Escola: ${child.schoolName}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          if (child.address.isNotEmpty)
+            Text(
+              'Endereco: ${child.address}',
+              style: Theme.of(context).textTheme.bodySmall,
             ),
         ],
       ),
     );
   }
 
-  Future<void> _submit(
-    List<Map<String, dynamic>> filtered,
-    String? tripModeId,
-  ) async {
-    if (tripModeId == null || tripModeId.isEmpty) {
-      setState(
-        () =>
-            _error = 'Nao foi possivel determinar a operacao tecnica da rota.',
-      );
-      return;
-    }
-    final selections = _collectSelections(filtered);
-    if (selections == null) return;
+  Future<void> _submit() async {
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
-      await widget.onStart(
-        _PlannerPayload(
-          operationId: _opId,
-          tripModeId: tripModeId,
-          routeName: _nameCtrl.text.trim().isEmpty
-              ? null
-              : _nameCtrl.text.trim(),
-          selections: selections,
-        ),
-      );
+      await widget.onStart();
       if (!mounted) return;
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Rota planejada e iniciada.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Rota iniciada.')));
     } catch (e) {
       setState(() {
         _busy = false;
@@ -2472,26 +1940,22 @@ class _AdhocPlannerContentState extends State<_AdhocPlannerContent> {
 Future<void> _startTrackingFromResponse(
   BuildContext context,
   WidgetRef ref,
-  Map<String, dynamic> response, {
+  RouteManifest manifest, {
   int? fallbackRouteId,
 }) async {
   final session = ref.read(appSessionControllerProvider).session;
   if (session == null) throw ApiException(message: 'Sessao expirada.');
 
-  final routeMap =
-      (response['route'] as Map?)?.cast<String, dynamic>() ?? const {};
-  final manifest =
-      (response['route_manifest'] as Map?)?.cast<String, dynamic>() ?? const {};
-  final routeId = (routeMap['id'] as num?)?.toInt() ?? fallbackRouteId ?? 0;
-  final manifestId = manifest['id']?.toString();
-  final vanId = (manifest['van_id'] as num?)?.toInt();
+  final routeId = manifest.id > 0 ? manifest.id : fallbackRouteId ?? 0;
+  final manifestId = manifest.id.toString();
+  final vanId = manifest.vanId;
 
-  if (routeId <= 0 || manifestId == null || manifestId.isEmpty) {
+  if (routeId <= 0 || manifestId.isEmpty) {
     throw ApiException(
       message: 'Backend nao retornou dados suficientes para iniciar.',
     );
   }
-  if (vanId == null || vanId <= 0) {
+  if (vanId <= 0) {
     throw ApiException(message: 'Van ID invalido retornado pelo backend.');
   }
 
@@ -2509,22 +1973,7 @@ Future<void> _startTrackingFromResponse(
     );
   }
 
-  final preview =
-      (response['route_preview'] as Map?)?.cast<String, dynamic>() ?? const {};
-  final meta = (manifest['meta'] as Map?)?.cast<String, dynamic>() ?? const {};
-  final stops = ((meta['optimized_stops'] as List?) ?? [])
-      .whereType<Map>()
-      .map((e) => Map<String, dynamic>.from(e))
-      .toList(growable: false);
-
-  ctrl.primeRoutePreview(
-    remainingStops: stops,
-    geometry: preview['geometry'] is Map
-        ? Map<String, dynamic>.from(preview['geometry'] as Map)
-        : null,
-    distanceMeters: (preview['distance_meters'] as num?)?.toDouble(),
-    durationSeconds: (preview['duration_seconds'] as num?)?.toInt(),
-  );
+  // O preview da rota sera preenchido pelo primeiro recalculo de tracking.
 }
 
 List<_StudentCard> _studentRouteCards(DriverTrackingState tracking) {
@@ -2537,7 +1986,7 @@ List<_StudentCard> _studentRouteCards(DriverTrackingState tracking) {
 
   final grouped = <String, List<DriverTrackingStopPoint>>{};
   for (final stop in planned) {
-    if ((stop.clientId ?? 0) <= 0) continue;
+    if ((stop.childId ?? 0) <= 0) continue;
     grouped.putIfAbsent(_keyOf(stop), () => []).add(stop);
   }
 
@@ -2584,8 +2033,8 @@ List<_StudentCard> _studentRouteCards(DriverTrackingState tracking) {
 }
 
 String _keyOf(DriverTrackingStopPoint s) {
-  if ((s.clientId ?? 0) > 0) return 'c:${s.clientId}';
   if ((s.childId ?? 0) > 0) return 'ch:${s.childId}';
+  if ((s.clientId ?? 0) > 0) return 'c:${s.clientId}';
   return 's:${s.id ?? s.name ?? s.sequence ?? ''}';
 }
 
@@ -2611,27 +2060,3 @@ String _formatDistance(double meters) {
   if (meters < 1000) return '${meters.round()} m';
   return '${(meters / 1000).toStringAsFixed(1)} km';
 }
-
-String? _resolveTripMode(String? opId, List<Map<String, dynamic>> modes) {
-  if (opId == null || opId.isEmpty) return null;
-  final preferred = switch (opId) {
-    'morning_entry' => 'morning_home_to_school',
-    'morning_afternoon_transition' => 'afternoon_school_to_home_lunch',
-    'afternoon_night_transition' => 'afternoon_school_to_home_end',
-    'night_exit' => 'night_school_to_home',
-    _ => 'adhoc',
-  };
-  final ids = modes.map((m) => (m['id'] ?? '').toString()).toList();
-  if (ids.contains(preferred)) return preferred;
-  if (ids.isNotEmpty) return ids.first;
-  return preferred;
-}
-
-List<Map<String, dynamic>> _listOf(dynamic v) => ((v as List?) ?? const [])
-    .whereType<Map>()
-    .map((e) => Map<String, dynamic>.from(e))
-    .toList(growable: false);
-
-String _idStr(Map<String, dynamic> m) => (m['id'] ?? '').toString();
-
-int _numId(dynamic v) => (v as num?)?.toInt() ?? 0;
