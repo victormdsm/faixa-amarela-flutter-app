@@ -51,9 +51,14 @@ class AuthUser {
     if (direct != null && direct.isNotEmpty) return direct;
     final roles = json['roles'];
     if (roles is List && roles.isNotEmpty) {
-      return roles.first?.toString() ?? '';
+      for (final r in roles) {
+        final roleText = r?.toString();
+        if (roleText != null && roleText.isNotEmpty) return roleText;
+      }
     }
-    return '';
+    throw const FormatException(
+      'Usuario sem perfil (role) identificado pelo servidor.',
+    );
   }
 
   static bool _extractIsActivated(Map<String, dynamic> json) {

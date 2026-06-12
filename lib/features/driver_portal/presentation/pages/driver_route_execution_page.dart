@@ -183,14 +183,22 @@ class _RouteBody extends ConsumerWidget {
   }
 }
 
-class _StopCard extends ConsumerWidget {
+class _StopCard extends ConsumerStatefulWidget {
   const _StopCard({required this.stop, required this.routeId});
 
   final RouteStop stop;
   final int routeId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_StopCard> createState() => _StopCardState();
+}
+
+class _StopCardState extends ConsumerState<_StopCard> {
+  bool _isProcessing = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final stop = widget.stop;
     final (statusLabel, statusColor) = _stopStatusInfo(stop.status);
 
     return Card(
@@ -221,13 +229,17 @@ class _StopCard extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        stop.childName,
+                        stop.childName.isNotEmpty
+                            ? stop.childName
+                            : 'Aluno',
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.w800,
                         ),
                       ),
                       Text(
-                        stop.schoolName,
+                        stop.schoolName.isNotEmpty
+                            ? stop.schoolName
+                            : 'Escola nao informada',
                         style: Theme.of(
                           context,
                         ).textTheme.bodySmall?.copyWith(color: AppColors.slate),
@@ -256,7 +268,7 @@ class _StopCard extends ConsumerWidget {
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
-              stop.address,
+              stop.address.isNotEmpty ? stop.address : 'Endereco nao informado',
               style: Theme.of(
                 context,
               ).textTheme.bodySmall?.copyWith(color: AppColors.slate),
@@ -270,26 +282,29 @@ class _StopCard extends ConsumerWidget {
                   _ActionButton(
                     label: 'Embarcou',
                     icon: Icons.login_rounded,
-                    onPressed: () => ref
+                    loading: _isProcessing,
+                    onPressed: () => _run(() => ref
                         .read(driverRouteControllerProvider.notifier)
-                        .markBoarded(stop.childId),
+                        .markBoarded(stop.childId)),
                   ),
                 if (stop.status == StopStatus.boarded)
                   _ActionButton(
                     label: 'Desembarcou',
                     icon: Icons.logout_rounded,
-                    onPressed: () => ref
+                    loading: _isProcessing,
+                    onPressed: () => _run(() => ref
                         .read(driverRouteControllerProvider.notifier)
-                        .markDisembarked(stop.childId),
+                        .markDisembarked(stop.childId)),
                   ),
                 if (stop.status == StopStatus.pending)
                   _ActionButton(
                     label: 'Ausente',
                     icon: Icons.person_off_outlined,
                     isSecondary: true,
-                    onPressed: () => ref
+                    loading: _isProcessing,
+                    onPressed: () => _run(() => ref
                         .read(driverRouteControllerProvider.notifier)
-                        .markAbsent(stop.childId),
+                        .markAbsent(stop.childId)),
                   ),
               ],
             ),
@@ -297,6 +312,16 @@ class _StopCard extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _run(Future<void> Function() action) async {
+    if (_isProcessing) return;
+    setState(() => _isProcessing = true);
+    try {
+      await action();
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
+    }
   }
 
   (String, Color) _stopStatusInfo(StopStatus status) {
@@ -326,19 +351,28 @@ class _ActionButton extends StatelessWidget {
     required this.icon,
     required this.onPressed,
     this.isSecondary = false,
+    this.loading = false,
   });
 
   final String label;
   final IconData icon;
   final VoidCallback onPressed;
   final bool isSecondary;
+  final bool loading;
 
   @override
   Widget build(BuildContext context) {
+    final iconWidget = loading
+        ? const SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
+        : Icon(icon, size: 16);
     if (isSecondary) {
       return OutlinedButton.icon(
-        onPressed: onPressed,
-        icon: Icon(icon, size: 16),
+        onPressed: loading ? null : onPressed,
+        icon: iconWidget,
         label: Text(label),
         style: OutlinedButton.styleFrom(
           minimumSize: const Size(0, 36),
@@ -348,8 +382,8 @@ class _ActionButton extends StatelessWidget {
       );
     }
     return FilledButton.tonalIcon(
-      onPressed: onPressed,
-      icon: Icon(icon, size: 16),
+      onPressed: loading ? null : onPressed,
+      icon: iconWidget,
       label: Text(label),
       style: FilledButton.styleFrom(
         minimumSize: const Size(0, 36),

@@ -324,7 +324,9 @@ class _BottomSheetState extends State<_BottomSheet> {
   // sheet manually so the user can pull it up/down from the handle.
   void _onHandleDragUpdate(DragUpdateDetails details, double maxHeight) {
     if (!_sheetController.isAttached || maxHeight <= 0) return;
-    final delta = details.primaryDelta! / maxHeight;
+    final primaryDelta = details.primaryDelta;
+    if (primaryDelta == null) return;
+    final delta = primaryDelta / maxHeight;
     final next = (_sheetController.size - delta).clamp(_minSize, _maxSize);
     _sheetController.jumpTo(next);
   }
@@ -765,7 +767,8 @@ class _SavedRoutesContent extends ConsumerWidget {
       ),
       data: (page) {
         try {
-          final items = (page.items as List)
+          final items = page.items
+              .whereType<Map<String, dynamic>>()
               .where((r) {
                 final s = (r['status'] ?? '').toString().toLowerCase().trim();
                 return s != 'finished' && s != 'finalized' && s != 'completed';
@@ -1694,8 +1697,10 @@ class _SavedRouteCard extends ConsumerWidget {
                 child: const Text('Iniciar'),
               ),
               OutlinedButton(
-                onPressed:
-                    routeId <= 0 || (!isThisRoute && status != 'in_progress')
+                onPressed: routeId <= 0 ||
+                        (!isThisRoute &&
+                            status != 'in_progress' &&
+                            status != 'active')
                     ? null
                     : () => _handleAction(context, ref, false),
                 child: const Text('Finalizar'),
@@ -1964,7 +1969,7 @@ Future<void> _startTrackingFromResponse(
   if (session == null) throw ApiException(message: 'Sessao expirada.');
 
   final routeId = manifest.id > 0 ? manifest.id : fallbackRouteId ?? 0;
-  final manifestId = manifest.id.toString();
+  final manifestId = manifest.manifestId ?? '';
   final vanId = manifest.vanId;
 
   if (routeId <= 0 || manifestId.isEmpty) {

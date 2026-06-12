@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/app_router.dart';
 import '../../../../app/theme/app_theme.dart';
+import '../../../../core/error/app_error_reporter.dart';
 import '../../../../domain/models/driver_profile.dart';
 import '../../../../domain/models/route_manifest.dart';
 import '../providers/driver_portal_providers.dart';
@@ -35,7 +36,7 @@ class DriverDashboardPage extends ConsumerWidget {
       body: dashboardAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => _ErrorState(
-          message: error.toString(),
+          message: AppErrorReporter.messageFor(error),
           onRetry: () =>
               ref.read(driverDashboardControllerProvider.notifier).refresh(),
         ),
@@ -87,8 +88,12 @@ class _ProfileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = profile?.name ?? 'Motorista';
-    final vanPlate = profile?.vanPlate ?? 'Placa nao informada';
+    final name = (profile?.name ?? '').trim().isNotEmpty
+        ? profile!.name
+        : 'Motorista';
+    final vanPlate = (profile?.vanPlate ?? '').trim().isNotEmpty
+        ? profile!.vanPlate
+        : 'Placa nao informada';
 
     return Card(
       child: Padding(

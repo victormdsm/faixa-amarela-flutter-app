@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/theme/app_theme.dart';
+import '../../../../core/network/api_exception.dart';
 import '../../../../domain/repositories/enrollments_repository.dart';
 import '../providers/driver_portal_providers.dart';
 
@@ -125,9 +126,12 @@ class _DriverLookupChildPageState extends ConsumerState<DriverLookupChildPage> {
               ref.read(driverLookupControllerProvider.notifier).clear();
             } catch (e) {
               if (!mounted) return;
+              final message = e is ApiException
+                  ? e.message
+                  : 'Nao foi possivel solicitar a matricula. Tente novamente.';
               ScaffoldMessenger.of(
                 context,
-              ).showSnackBar(SnackBar(content: Text('Erro: $e')));
+              ).showSnackBar(SnackBar(content: Text(message)));
             }
           },
           maskCpf: _maskCpf,

@@ -450,12 +450,16 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
   Future<void> _startForegroundStream() async {
     if (_foregroundPositionSubscription != null) return;
 
-    if (state.routeManifestId == null) return;
+    final routeManifestId = state.routeManifestId ??
+        (state.routeId != null && state.routeId! > 0
+            ? 'route.${state.routeId}'
+            : null);
+    if (routeManifestId == null || routeManifestId.isEmpty) return;
 
     if (_authHeader != null && _authHeader!.isNotEmpty) {
       await _connectRealtimeSocketIfNeeded(
         authorizationHeader: _authHeader!,
-        routeManifestId: state.routeManifestId!,
+        routeManifestId: routeManifestId,
         vanId: state.vanId,
       );
     }
@@ -570,8 +574,13 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
 
   Future<void> _performGeofenceCheck(Position position) async {
     if (_isGeofenceRequestInFlight) return;
-    if (!state.routeActive || state.routeManifestId == null) return;
+    if (!state.routeActive) return;
     if (_authHeader == null || _authHeader!.isEmpty) return;
+    final routeManifestId = state.routeManifestId ??
+        (state.routeId != null && state.routeId! > 0
+            ? 'route.${state.routeId}'
+            : null);
+    if (routeManifestId == null || routeManifestId.isEmpty) return;
 
     final now = DateTime.now();
     if (_lastGeofenceCheckAt != null &&
@@ -589,7 +598,7 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
           'lat': position.latitude,
           'lng': position.longitude,
           'routeId': state.routeId,
-          'routeManifestId': state.routeManifestId,
+          'routeManifestId': routeManifestId,
           'radiusMeters': state.geofenceRadiusMeters,
           'limit': 10,
         },
@@ -622,8 +631,13 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
     bool force = false,
   }) async {
     if (_isRouteRecalcInFlight) return;
-    if (!state.routeActive || state.routeManifestId == null) return;
+    if (!state.routeActive) return;
     if (_authHeader == null || _authHeader!.isEmpty) return;
+    final routeManifestId = state.routeManifestId ??
+        (state.routeId != null && state.routeId! > 0
+            ? 'route.${state.routeId}'
+            : null);
+    if (routeManifestId == null || routeManifestId.isEmpty) return;
 
     final now = DateTime.now();
     final hasRouteVisual =
@@ -925,6 +939,11 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
     final channel = _privateTelemetryChannel;
     if (channel == null) return;
 
+    final routeManifestId = state.routeManifestId ??
+        (state.routeId != null && state.routeId! > 0
+            ? 'route.${state.routeId}'
+            : null);
+
     try {
       final payload = <String, dynamic>{
         'lat': point['lat'],
@@ -932,7 +951,7 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
         'speed': point['speed'],
         'heading': point['heading'],
         'timestamp': point['timestamp'],
-        'route_manifest_id': state.routeManifestId,
+        'route_manifest_id': routeManifestId,
         'van_id': state.vanId,
       };
       unawaited(

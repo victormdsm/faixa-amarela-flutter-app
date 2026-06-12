@@ -18,19 +18,7 @@ class LoginPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(loginControllerProvider);
     final controller = ref.read(loginControllerProvider.notifier);
-    final session = ref.watch(appSessionControllerProvider).session;
     final theme = Theme.of(context);
-
-    if (session != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!context.mounted) return;
-        if (session.user.isParent) {
-          context.go(AppRoutes.parentHome);
-        } else if (session.user.isDriverAppRole) {
-          context.go(AppRoutes.driverHome);
-        }
-      });
-    }
 
     return Scaffold(
       body: DecoratedBox(

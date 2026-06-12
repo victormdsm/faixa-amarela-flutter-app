@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/app_router.dart';
 import '../../../../app/theme/app_theme.dart';
+import '../../../../core/models/paginated_result.dart';
 import '../../../../core/presentation/widgets/faixa_portal_home.dart';
 import '../../../auth/presentation/state/app_session_controller.dart';
 import '../../../driver_portal/presentation/pages/ad_banner_widget.dart';
@@ -26,58 +27,45 @@ class ParentDashboardPage extends ConsumerWidget {
       ref.invalidate(adBannersProvider);
     }
 
-    final childCount = childrenAsync.when(
-      loading: () => '...',
-      error: (_, _) => '--',
-      data: (page) => '${page.items.length}',
+    final childCount = _Counter.fromPage(childrenAsync, (p) => p.items.length);
+    final routeCount = _Counter.fromPage(routesAsync, (p) => p.items.length);
+    final boardingCount = _Counter.fromPage(
+      boardingsAsync,
+      (p) => p.items.length,
     );
-    final routeCount = routesAsync.when(
-      loading: () => '...',
-      error: (_, _) => '--',
-      data: (page) => '${page.items.length}',
-    );
-    final boardingCount = boardingsAsync.when(
-      loading: () => '...',
-      error: (_, _) => '--',
-      data: (page) => '${page.items.length}',
-    );
-    final activeRouteCount = routesAsync.when(
-      loading: () => '...',
-      error: (_, _) => '--',
-      data: (page) => '${page.items.where(_isActiveRoute).length}',
+    final activeRouteCount = _Counter.fromPage(
+      routesAsync,
+      (p) => p.items.where(_isActiveRoute).length,
     );
 
     return FaixaPortalHome(
       userName: session?.user.name ?? 'Responsavel',
       roleLabel: 'Bem-vindo',
-      statusLabel: activeRouteCount == '0'
+      statusLabel: activeRouteCount.isZero
           ? 'Nenhuma rota ativa'
-          : '$activeRouteCount rota(s) ativa(s)',
-      statusActive:
-          activeRouteCount != '0' &&
-          activeRouteCount != '...' &&
-          activeRouteCount != '--',
+          : '${activeRouteCount.label} rota(s) ativa(s)',
+      statusActive: activeRouteCount.hasValue && !activeRouteCount.isZero,
       onRefresh: refresh,
       onLogout: () => ref.read(appSessionControllerProvider.notifier).clear(),
       metrics: [
         PortalHomeMetric(
           label: 'Dependentes',
-          value: childCount,
+          value: childCount.label,
           icon: Icons.child_care_outlined,
         ),
         PortalHomeMetric(
           label: 'Rotas',
-          value: routeCount,
+          value: routeCount.label,
           icon: Icons.route_outlined,
         ),
         PortalHomeMetric(
           label: 'Embarques',
-          value: boardingCount,
+          value: boardingCount.label,
           icon: Icons.fact_check_outlined,
         ),
         PortalHomeMetric(
           label: 'Ativas',
-          value: activeRouteCount,
+          value: activeRouteCount.label,
           icon: Icons.near_me_outlined,
           color: AppColors.success,
         ),
@@ -127,6 +115,35 @@ class ParentDashboardPage extends ConsumerWidget {
   }
 
   static void _goBranch(BuildContext context, int index) {
-    StatefulNavigationShell.of(context).goBranch(index);
+    try {
+      StatefulNavigationShell.of(context).goBranch(index);
+    } catch (_) {
+      // Fora de um shell (ex.: deep link) — fallback para a home do responsavel.
+      context.go(AppRoutes.parentHome);
+    }
+  }
+}
+
+class _Counter {
+  const _Counter({required this.label, required this.value});
+
+  final String label;
+  final int? value;
+
+  bool get hasValue => value != null;
+  bool get isZero => value == 0;
+
+  static _Counter fromPage<T>(
+    AsyncValue<PaginatedResult<T>> asyncValue,
+    int Function(PaginatedResult<T> page) mapper,
+  ) {
+    return asyncValue.when(
+      loading: () => const _Counter(label: '...', value: null),
+      error: (error, stackTrace) => const _Counter(label: '--', value: null),
+      data: (page) {
+        final count = mapper(page);
+        return _Counter(label: '$count', value: count);
+      },
+    );
   }
 }

@@ -75,7 +75,7 @@ class ParentEnrollmentsPage extends ConsumerWidget {
   }
 }
 
-class _EnrollmentCard extends StatelessWidget {
+class _EnrollmentCard extends StatefulWidget {
   const _EnrollmentCard({
     required this.enrollment,
     this.onAccept,
@@ -87,8 +87,16 @@ class _EnrollmentCard extends StatelessWidget {
   final VoidCallback? onReject;
 
   @override
+  State<_EnrollmentCard> createState() => _EnrollmentCardState();
+}
+
+class _EnrollmentCardState extends State<_EnrollmentCard> {
+  bool _isProcessing = false;
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final enrollment = widget.enrollment;
 
     return Card(
       child: Padding(
@@ -100,7 +108,9 @@ class _EnrollmentCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    enrollment.childName,
+                    enrollment.childName.isNotEmpty
+                        ? enrollment.childName
+                        : 'Dependente',
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
@@ -111,7 +121,9 @@ class _EnrollmentCard extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
-              enrollment.schoolName,
+              enrollment.schoolName.isNotEmpty
+                  ? enrollment.schoolName
+                  : 'Escola nao informada',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: AppColors.slate,
               ),
@@ -145,16 +157,32 @@ class _EnrollmentCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: FilledButton.icon(
-                    onPressed: onAccept,
-                    icon: const Icon(Icons.check_rounded, size: 18),
+                    onPressed: _isProcessing || widget.onAccept == null
+                        ? null
+                        : () => _run(widget.onAccept!),
+                    icon: _isProcessing
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.check_rounded, size: 18),
                     label: const Text('Aceitar'),
                   ),
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: onReject,
-                    icon: const Icon(Icons.close_rounded, size: 18),
+                    onPressed: _isProcessing || widget.onReject == null
+                        ? null
+                        : () => _run(widget.onReject!),
+                    icon: _isProcessing
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.close_rounded, size: 18),
                     label: const Text('Recusar'),
                   ),
                 ),
@@ -164,6 +192,15 @@ class _EnrollmentCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _run(VoidCallback action) async {
+    setState(() => _isProcessing = true);
+    try {
+      action();
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
+    }
   }
 }
 

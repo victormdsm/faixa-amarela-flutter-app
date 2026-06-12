@@ -34,7 +34,9 @@ class AuthSession {
       tokenType: (json['token_type'] ?? json['tokenType'] ?? 'Bearer')
           .toString(),
       expiresAt: resolveExpiresAt(),
-      user: AuthUser.fromJson(Map<String, dynamic>.from(json['user'] as Map)),
+      user: AuthUser.fromJson(
+        Map<String, dynamic>.from(json['user'] as Map? ?? const {}),
+      ),
     );
   }
 }

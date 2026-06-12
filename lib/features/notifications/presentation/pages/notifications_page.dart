@@ -97,11 +97,19 @@ class NotificationsPage extends ConsumerWidget {
         ?.authorizationHeader;
     if (auth == null) return;
 
-    await ref
-        .read(notificationRepositoryProvider)
-        .markAsRead(auth, notification.id);
-    ref.invalidate(notificationsProvider);
-    ref.invalidate(unreadNotificationsCountProvider);
+    try {
+      await ref
+          .read(notificationRepositoryProvider)
+          .markAsRead(auth, notification.id);
+      ref.invalidate(notificationsProvider);
+      ref.invalidate(unreadNotificationsCountProvider);
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Nao foi possivel marcar como lida: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _markAllAsRead(BuildContext context, WidgetRef ref) async {

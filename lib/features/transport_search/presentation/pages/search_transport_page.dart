@@ -568,20 +568,23 @@ class _DriverCard extends StatelessWidget {
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(
-                    onPressed: () async {
-                      final result = await WhatsAppLauncher.openChat(
-                        phone: driver.cellPhone,
-                        contactName: driver.name,
-                      );
-                      if (!context.mounted || result.success) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            result.errorMessage ?? 'Falha ao abrir o WhatsApp.',
-                          ),
-                        ),
-                      );
-                    },
+                    onPressed: (driver.cellPhone ?? '').trim().isEmpty
+                        ? null
+                        : () async {
+                            final result = await WhatsAppLauncher.openChat(
+                              phone: driver.cellPhone,
+                              contactName: driver.name,
+                            );
+                            if (!context.mounted || result.success) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  result.errorMessage ??
+                                      'Falha ao abrir o WhatsApp.',
+                                ),
+                              ),
+                            );
+                          },
                     icon: const Icon(Icons.forum_rounded),
                     label: const Text('Falar no WhatsApp'),
                   ),

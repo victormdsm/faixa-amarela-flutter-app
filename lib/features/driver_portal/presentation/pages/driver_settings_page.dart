@@ -383,6 +383,9 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                           labelText: 'Marca / Modelo',
                           prefixIcon: Icon(Icons.directions_bus_outlined),
                         ),
+                        validator: (v) => (v ?? '').trim().isEmpty
+                            ? 'Informe a marca/modelo.'
+                            : null,
                       ),
                       const SizedBox(height: 12),
                       Row(
@@ -409,6 +412,17 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                                 labelText: 'Ano',
                                 prefixIcon: Icon(Icons.calendar_today_outlined),
                               ),
+                              validator: (v) {
+                                final year = int.tryParse(v ?? '');
+                                final currentYear =
+                                    DateTime.now().year + 1;
+                                if (year == null ||
+                                    year < 1900 ||
+                                    year > currentYear) {
+                                  return 'Ano invalido.';
+                                }
+                                return null;
+                              },
                             ),
                           ),
                         ],
@@ -423,6 +437,11 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                           labelText: 'Placa',
                           prefixIcon: Icon(Icons.pin_outlined),
                         ),
+                        validator: (v) {
+                          final plate = (v ?? '').trim();
+                          if (plate.length < 3) return 'Placa invalida.';
+                          return null;
+                        },
                       ),
                     ],
                   ),
@@ -672,7 +691,8 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
   }
 
   Future<void> _save(BuildContext context) async {
-    if (!_formKey.currentState!.validate()) return;
+    final formState = _formKey.currentState;
+    if (formState == null || !formState.validate()) return;
     final messenger = ScaffoldMessenger.of(context);
 
     final session = ref.read(appSessionControllerProvider).session;

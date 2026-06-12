@@ -104,6 +104,22 @@ class ParentChildrenPage extends ConsumerWidget {
     );
 
     if (confirmed != true || !context.mounted) return;
-    await ref.read(childrenControllerProvider.notifier).delete(child.id);
+    try {
+      await ref.read(childrenControllerProvider.notifier).delete(child.id);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${child.name} removido(a).')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao excluir: ${e.toString()}'),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+    }
   }
 }

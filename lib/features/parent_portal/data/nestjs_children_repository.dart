@@ -86,7 +86,16 @@ class NestjsChildrenRepository implements ChildrenRepository {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
         '/parent/children',
-        data: {'name': name.trim(), 'cpf': cpf.trim(), 'shiftId': shiftId},
+        data: <String, dynamic>{
+          'name': name.trim(),
+          'cpf': cpf.trim(),
+          'birth_date': birthDate.toIso8601String(),
+          'school_name': schoolName.trim(),
+          'shift_id': shiftId,
+          'address': address.toJson(),
+          if (photoUrl != null && photoUrl.trim().isNotEmpty)
+            'photo_url': photoUrl.trim(),
+        },
       );
       final data = response.data;
       if (data == null) {
@@ -116,7 +125,15 @@ class NestjsChildrenRepository implements ChildrenRepository {
       final payload = <String, dynamic>{};
       if (name != null) payload['name'] = name.trim();
       if (cpf != null) payload['cpf'] = cpf.trim();
-      if (shiftId != null) payload['shiftId'] = shiftId;
+      if (birthDate != null) {
+        payload['birth_date'] = birthDate.toIso8601String();
+      }
+      if (schoolName != null) payload['school_name'] = schoolName.trim();
+      if (shiftId != null) payload['shift_id'] = shiftId;
+      if (address != null) payload['address'] = address.toJson();
+      if (photoUrl != null && photoUrl.trim().isNotEmpty) {
+        payload['photo_url'] = photoUrl.trim();
+      }
 
       final response = await _dio.put<Map<String, dynamic>>(
         '/parent/children/$id',

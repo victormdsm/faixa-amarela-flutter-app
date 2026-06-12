@@ -18,25 +18,48 @@ class ParentRoutesPage extends ConsumerStatefulWidget {
   ConsumerState<ParentRoutesPage> createState() => _ParentRoutesPageState();
 }
 
-class _ParentRoutesPageState extends ConsumerState<ParentRoutesPage> {
+class _ParentRoutesPageState extends ConsumerState<ParentRoutesPage>
+    with WidgetsBindingObserver {
   Timer? _refreshTimer;
   int _selectedRouteIndex = 0;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _startRefreshTimer();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _startRefreshTimer();
+    } else {
+      _stopRefreshTimer();
+    }
+  }
+
+  void _startRefreshTimer() {
+    _stopRefreshTimer();
     _refreshTimer = Timer.periodic(const Duration(seconds: 15), (_) {
-      if (mounted) {
+      if (mounted &&
+          WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
         ref.invalidate(parentRoutesProvider);
         ref.invalidate(parentChildrenProvider);
       }
     });
   }
 
-  @override
-  void dispose() {
+  void _stopRefreshTimer() {
     _refreshTimer?.cancel();
-    super.dispose();
+    _refreshTimer = null;
   }
 
   @override
