@@ -27,9 +27,18 @@ class NestjsRoutesRepository implements RoutesRepository {
   @override
   Future<List<Map<String, dynamic>>> listDriverRoutes() async {
     try {
-      final response = await _dio.get<Map<String, dynamic>>('/driver/routes');
-      final data = _unwrapData(response.data);
-      final list = data is List ? data as List<dynamic> : const <dynamic>[];
+      // Usamos <dynamic> porque o interceptor desembrulha { data: [...] }
+      // e o Dio nao consegue fazer cast de List para Map<String, dynamic>.
+      final response = await _dio.get<dynamic>('/driver/routes');
+      final raw = response.data;
+      final List<dynamic> list;
+      if (raw is List) {
+        list = raw;
+      } else if (raw is Map<String, dynamic> && raw['data'] is List) {
+        list = raw['data'] as List<dynamic>;
+      } else {
+        list = const <dynamic>[];
+      }
       return list
           .whereType<Map<dynamic, dynamic>>()
           .map((e) => Map<String, dynamic>.from(e))

@@ -48,6 +48,12 @@ class DriverProfileDto {
   final List<Map<String, dynamic>> coverageChangeRequestsRecent;
 
   factory DriverProfileDto.fromJson(Map<String, dynamic> json) {
+    int _toInt(dynamic value) {
+      if (value is num) return value.toInt();
+      if (value is String) return int.tryParse(value) ?? 0;
+      return 0;
+    }
+
     final van = _map(_value(json, 'van', 'van'));
 
     // Novo contrato NestJS: coverage { schools: number[], districts: number[], shifts: number[] }
@@ -79,8 +85,8 @@ class DriverProfileDto {
             .toList();
 
     return DriverProfileDto(
-      id: (json['id'] as num?)?.toInt() ?? 0,
-      userId: (_value(json, 'user_id', 'userId') as num?)?.toInt() ?? 0,
+      id: _toInt(json['id']),
+      userId: _toInt(_value(json, 'user_id', 'userId')),
       name: (json['name'] ?? '').toString(),
       cpf: (json['cpf'] ?? '').toString(),
       licenseNumber: (_value(json, 'cnh', 'cnh') ??
@@ -88,10 +94,8 @@ class DriverProfileDto {
               '')
           .toString(),
       vanId: van.isNotEmpty
-          ? (van['id'] as num?)?.toInt() ??
-              (_value(json, 'van_id', 'vanId') as num?)?.toInt() ??
-              0
-          : (_value(json, 'van_id', 'vanId') as num?)?.toInt() ?? 0,
+          ? _toInt(van['id'])
+          : _toInt(_value(json, 'van_id', 'vanId')),
       vanPlate: van.isNotEmpty
           ? (van['plate'] ?? _value(json, 'van_plate', 'vanPlate') ?? '')
               .toString()
