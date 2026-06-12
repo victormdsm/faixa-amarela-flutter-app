@@ -139,7 +139,22 @@ class _RouteBody extends ConsumerWidget {
     WidgetRef ref,
     RouteManifest route,
   ) {
-    final schoolName = route.stops.first.schoolName;
+    final firstStopWithSchool = route.stops
+        .where((s) => s.schoolId != null && s.schoolId! > 0)
+        .firstOrNull;
+    final schoolName = firstStopWithSchool?.schoolName ??
+        route.stops.firstOrNull?.schoolName ??
+        'escola';
+    final schoolId = firstStopWithSchool?.schoolId ?? 0;
+
+    if (schoolId <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Nao foi possivel identificar a escola desta rota.'),
+        ),
+      );
+      return;
+    }
 
     showDialog<void>(
       context: context,
@@ -158,7 +173,7 @@ class _RouteBody extends ConsumerWidget {
               Navigator.of(dialogContext).pop();
               ref
                   .read(driverRouteControllerProvider.notifier)
-                  .bulkDisembarkAtSchool(0);
+                  .bulkDisembarkAtSchool(schoolId);
             },
             child: const Text('Confirmar'),
           ),

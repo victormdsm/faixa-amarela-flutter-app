@@ -1645,7 +1645,7 @@ class _SavedRouteCard extends ConsumerWidget {
     final routeId = (route['id'] as num?)?.toInt() ?? 0;
     final name = (route['name'] ?? 'Rota #$routeId').toString();
     final status = (route['status'] ?? 'N/A').toString();
-    final boardingsCount = (route['boardings_count'] ?? 0).toString();
+    final boardingsCount = _resolveBoardingsCount(route).toString();
     final tracking = ref.watch(driverTrackingControllerProvider);
     final isThisRoute = tracking.routeActive && tracking.routeId == routeId;
 
@@ -1705,6 +1705,23 @@ class _SavedRouteCard extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  int _resolveBoardingsCount(Map<String, dynamic> route) {
+    if (route['boardings_count'] is num) {
+      return (route['boardings_count'] as num).toInt();
+    }
+    final manifest = route['manifest'];
+    if (manifest is Map) {
+      final document = manifest['document'];
+      if (document is Map) {
+        final children = document['children'];
+        if (children is List) return children.length;
+      }
+      final stops = manifest['stops'];
+      if (stops is List) return stops.length;
+    }
+    return 0;
   }
 
   Future<void> _handleAction(

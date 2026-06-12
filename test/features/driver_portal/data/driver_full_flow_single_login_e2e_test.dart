@@ -64,7 +64,7 @@ void main() {
       }
     });
 
-    test('fluxo completo de motorista', () async {
+    test('fluxo completo de motorista', timeout: const Timeout(Duration(seconds: 120)), () async {
       // 1. Catalogos publicos
       final schools = await catalogRepo.listSchools();
       final districts = await catalogRepo.listDistricts();

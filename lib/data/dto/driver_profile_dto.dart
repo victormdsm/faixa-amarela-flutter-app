@@ -15,6 +15,8 @@ class DriverProfileDto {
     required this.vanImageUrl,
     required this.coverageArea,
     this.isActive = true,
+    this.status,
+    this.cnhCategory,
     this.cellPhone,
     this.information,
     this.email,
@@ -38,6 +40,8 @@ class DriverProfileDto {
   final String? vanImageUrl;
   final String coverageArea;
   final bool isActive;
+  final String? status;
+  final String? cnhCategory;
   final String? cellPhone;
   final String? information;
   final String? email;
@@ -119,6 +123,8 @@ class DriverProfileDto {
       isActive:
           _value(json, 'is_active', 'isActive') == true ||
           _value(json, 'is_active', 'isActive') == 1,
+      status: _value(json, 'status', 'status')?.toString(),
+      cnhCategory: _value(json, 'cnh_category', 'cnhCategory')?.toString(),
       cellPhone: _value(json, 'cell_phone', 'cellPhone')?.toString(),
       information: _value(json, 'information', 'information')?.toString(),
       email: _value(json, 'email', 'email')?.toString(),
@@ -163,6 +169,8 @@ class DriverProfileDto {
       'van_image_url': vanImageUrl,
       'coverage_area': coverageArea,
       'is_active': isActive,
+      'status': status,
+      'cnh_category': cnhCategory,
       'schools': schools,
       'districts': districts,
       'coverage_change_request': coverageChangeRequest,
@@ -185,6 +193,8 @@ class DriverProfileDto {
       vanImageUrl: vanImageUrl,
       coverageArea: coverageArea,
       isActive: isActive,
+      status: status,
+      cnhCategory: cnhCategory,
       cellPhone: cellPhone,
       information: information,
       email: email,
@@ -211,6 +221,8 @@ class DriverProfileDto {
       vanImageUrl: profile.vanImageUrl,
       coverageArea: profile.coverageArea,
       isActive: profile.isActive,
+      status: profile.status,
+      cnhCategory: profile.cnhCategory,
       cellPhone: profile.cellPhone,
       information: profile.information,
       email: profile.email,

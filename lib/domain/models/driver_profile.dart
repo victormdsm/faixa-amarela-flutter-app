@@ -13,6 +13,8 @@ class DriverProfile {
     this.vanImageUrl,
     required this.coverageArea,
     this.isActive = true,
+    this.status,
+    this.cnhCategory,
     this.cellPhone,
     this.information,
     this.email,
@@ -36,6 +38,8 @@ class DriverProfile {
   final String? vanImageUrl;
   final String coverageArea;
   final bool isActive;
+  final String? status;
+  final String? cnhCategory;
   final String? cellPhone;
   final String? information;
   final String? email;
@@ -76,6 +80,8 @@ class DriverProfile {
           : json['van_image_url']?.toString(),
       coverageArea: (json['coverage_area'] ?? '').toString(),
       isActive: json['is_active'] == true || json['is_active'] == 1,
+      status: json['status']?.toString(),
+      cnhCategory: json['cnh_category']?.toString(),
       cellPhone: json['cell_phone']?.toString(),
       information: json['information']?.toString(),
       email: json['email']?.toString(),
@@ -120,6 +126,8 @@ class DriverProfile {
       'vehicle': vehicle,
       'coverage_area': coverageArea,
       'is_active': isActive,
+      'status': status,
+      'cnh_category': cnhCategory,
       'schools': schools,
       'districts': districts,
       'coverage_change_request': coverageChangeRequest,

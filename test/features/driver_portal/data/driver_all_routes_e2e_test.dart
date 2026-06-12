@@ -1,4 +1,3 @@
-import 'package:app_faixa_amarela/core/network/api_exception.dart';
 import 'package:app_faixa_amarela/core/network/nestjs_response_unwrap_interceptor.dart';
 import 'package:app_faixa_amarela/core/storage/secure_token_storage.dart';
 import 'package:app_faixa_amarela/features/auth/data/repositories/nestjs_auth_repository.dart';
@@ -13,8 +12,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Valida TODAS as rotas do motorista contra a API real de producao.
-/// Algumas acoes (boarding, notify-parent etc.) precisam de uma rota com
-/// criancas matriculadas; sao puladas quando nao ha dados.
+/// Usa login unico (setUpAll) para evitar rate-limit do throttle de auth.
 void main() {
   group('Todas as rotas do motorista E2E (producao)', () {
     late Dio dio;
@@ -26,13 +24,13 @@ void main() {
     late CatalogRepository catalogRepo;
     late NotificationRepository notificationsRepo;
 
-    setUp(() {
+    setUpAll(() async {
       FlutterSecureStorage.setMockInitialValues({});
       dio = Dio(
         BaseOptions(
           baseUrl: 'https://api.faixaamarela.com.br/api/v1',
-          connectTimeout: const Duration(seconds: 15),
-          receiveTimeout: const Duration(seconds: 15),
+          connectTimeout: const Duration(seconds: 30),
+          receiveTimeout: const Duration(seconds: 30),
         ),
       );
       dio.interceptors.add(NestjsResponseUnwrapInterceptor());
@@ -43,9 +41,7 @@ void main() {
       enrollmentsRepo = NestjsDriverEnrollmentsRepository(dio);
       catalogRepo = CatalogRepository(dio);
       notificationsRepo = NotificationRepository(dio);
-    });
 
-    Future<void> login() async {
       final session = await authRepo.signIn(
         email: 'aoextremogames@gmail.com',
         password: 'Escolabetta1234',
@@ -54,9 +50,26 @@ void main() {
       expect(session.accessToken, isNotEmpty);
       expect(session.user.isDriver, isTrue);
       dio.options.headers['Authorization'] = 'Bearer ${session.accessToken}';
-    }
+    });
 
-    test('01 - login como motorista funciona', login);
+    tearDownAll(() async {
+      // Garante que nao fica rota ativa pendente.
+      try {
+        final active = await routesRepo.getActiveRoute();
+        if (active != null) {
+          await routesRepo.finishRoute(active.id);
+        }
+      } catch (_) {
+        // ignora
+      }
+    });
+
+    test('01 - token de motorista obtido no setUpAll eh valido', () {
+      final authHeader = dio.options.headers['Authorization'];
+      expect(authHeader, isNotNull);
+      expect(authHeader, startsWith('Bearer '));
+      print('Token OK: ${authHeader.toString().substring(0, 40)}...');
+    });
 
     test('02 - catalogos publicos carregam', () async {
       final schools = await catalogRepo.listSchools();
@@ -69,7 +82,6 @@ void main() {
     });
 
     test('03 - GET /drivers/me retorna perfil completo', () async {
-      await login();
       final profile = await driverRepo.getDriverProfile();
       expect(profile, isNotNull);
       expect(profile!.id, greaterThan(0));
@@ -82,7 +94,6 @@ void main() {
     });
 
     test('04 - PUT /drivers/me atualiza CNH/informacoes', () async {
-      await login();
       final updated = await driverRepo.updateBasicProfile(
         name: 'Victor - teste',
         cellPhone: '45984169058',
@@ -95,15 +106,12 @@ void main() {
     });
 
     test('05 - GET /driver/routes lista rotas historicas', () async {
-      await login();
       final routes = await routesRepo.listDriverRoutes();
       expect(routes, isNotEmpty);
       print('Listagem rotas OK: ${routes.length} rotas');
     });
 
     test('06 - GET /driver/routes/active retorna nulo quando nao ha rota ativa', () async {
-      await login();
-      // Garante que nao ha rota ativa
       final active = await routesRepo.getActiveRoute();
       if (active != null) {
         await routesRepo.finishRoute(active.id);
@@ -114,7 +122,6 @@ void main() {
     });
 
     test('07 - POST /driver/routes/start cria e GET /active retorna a rota', () async {
-      await login();
       final before = await routesRepo.getActiveRoute();
       if (before != null) await routesRepo.finishRoute(before.id);
 
@@ -133,29 +140,23 @@ void main() {
     });
 
     test('08 - GET /driver/enrollments retorna lista (mesmo que vazia)', () async {
-      await login();
       final enrollments = await enrollmentsRepo.getMyEnrollments();
       expect(enrollments, isA<List>());
       print('Enrollments OK: ${enrollments.length} matriculas');
     });
 
     test('09 - GET /notifications e unread-count funcionam', () async {
-      await login();
-      final notifications = await notificationsRepo.notifications(
-        dio.options.headers['Authorization']!.toString(),
-      );
+      final authHeader = dio.options.headers['Authorization']!.toString();
+      final notifications = await notificationsRepo.notifications(authHeader);
       expect(notifications.items, isA<List>());
       print('Notifications OK: ${notifications.items.length} notificacoes');
 
-      final count = await notificationsRepo.unreadCount(
-        dio.options.headers['Authorization']!.toString(),
-      );
+      final count = await notificationsRepo.unreadCount(authHeader);
       expect(count, greaterThanOrEqualTo(0));
       print('Unread count OK: $count');
     });
 
     test('10 - acoes de rota com criancas sao puladas se nao houver matriculas', () async {
-      await login();
       final enrollments = await enrollmentsRepo.getMyEnrollments();
       if (enrollments.isEmpty) {
         print('SKIP: nao ha matriculas para testar boarding/notify-parent');

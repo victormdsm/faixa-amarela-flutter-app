@@ -50,6 +50,7 @@ class RouteStop {
     required this.childId,
     required this.childName,
     required this.schoolName,
+    this.schoolId,
     required this.address,
     required this.sequence,
     required this.status,
@@ -63,6 +64,7 @@ class RouteStop {
   final int childId;
   final String childName;
   final String schoolName;
+  final int? schoolId;
   final String address;
   final int sequence;
   final StopStatus status;
@@ -77,6 +79,7 @@ class RouteStop {
       childId: ((json['child_id'] ?? json['childId']) as num?)?.toInt() ?? 0,
       childName: (json['child_name'] ?? json['childName'] ?? '').toString(),
       schoolName: (json['school_name'] ?? json['schoolName'] ?? '').toString(),
+      schoolId: ((json['school_id'] ?? json['schoolId']) as num?)?.toInt(),
       address: (json['address'] ?? '').toString(),
       sequence: ((json['sequence'] ?? json['order']) as num?)?.toInt() ?? 0,
       status: StopStatus.fromJson((json['status'] ?? 'pending').toString()),

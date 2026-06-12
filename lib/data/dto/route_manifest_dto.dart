@@ -39,7 +39,13 @@ class RouteManifestDto {
     }
 
     int resolveId() {
-      return _toInt(json['routeId']) ?? _toInt(json['id']);
+      if (json['routeId'] is num) return (json['routeId'] as num).toInt();
+      if (json['routeId'] is String) {
+        return int.tryParse(json['routeId']) ?? 0;
+      }
+      if (json['id'] is num) return (json['id'] as num).toInt();
+      if (json['id'] is String) return int.tryParse(json['id']) ?? 0;
+      return 0;
     }
 
     String? resolveManifestId() {
@@ -136,6 +142,7 @@ class RouteStopDto {
     required this.childId,
     required this.childName,
     required this.schoolName,
+    this.schoolId,
     required this.address,
     required this.sequence,
     required this.status,
@@ -149,6 +156,7 @@ class RouteStopDto {
   final int childId;
   final String childName;
   final String schoolName;
+  final int? schoolId;
   final String address;
   final int sequence;
   final StopStatus status;
@@ -176,6 +184,16 @@ class RouteStopDto {
     final childId = _toInt(_value(json, 'child_id', 'childId'));
     final childData = childLookup?[childId] ?? const <String, dynamic>{};
 
+    int? resolveSchoolId() {
+      final raw = _value(json, 'school_id', 'schoolId') ??
+          childData['schoolId'] ??
+          childData['school_id'];
+      if (raw == null) return null;
+      if (raw is num) return raw.toInt();
+      if (raw is String) return int.tryParse(raw);
+      return null;
+    }
+
     String resolveAddress() {
       // 1. Formato antigo: address como string.
       final rawAddress = json['address'];
@@ -199,8 +217,11 @@ class RouteStopDto {
           (_value(json, 'child_name', 'childName') ?? childData['name'] ?? '')
               .toString(),
       schoolName: (_value(json, 'school_name', 'schoolName') ?? '').toString(),
+      schoolId: resolveSchoolId(),
       address: resolveAddress(),
-      sequence: _toInt(json['sequence']) ?? _toInt(json['order']),
+      sequence: json['sequence'] != null
+          ? _toInt(json['sequence'])
+          : _toInt(json['order']),
       status: StopStatus.fromJson((json['status'] ?? 'pending').toString()),
       latitude: _toDouble(json['latitude']) ??
           (childData['address'] is Map
@@ -229,6 +250,7 @@ class RouteStopDto {
       'child_id': childId,
       'child_name': childName,
       'school_name': schoolName,
+      if (schoolId != null) 'school_id': schoolId,
       'address': address,
       'sequence': sequence,
       'status': status.toJson(),
@@ -246,6 +268,7 @@ class RouteStopDto {
       childId: childId,
       childName: childName,
       schoolName: schoolName,
+      schoolId: schoolId,
       address: address,
       sequence: sequence,
       status: status,
@@ -262,6 +285,7 @@ class RouteStopDto {
       childId: stop.childId,
       childName: stop.childName,
       schoolName: stop.schoolName,
+      schoolId: stop.schoolId,
       address: stop.address,
       sequence: stop.sequence,
       status: stop.status,
