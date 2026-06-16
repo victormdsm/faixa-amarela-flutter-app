@@ -45,7 +45,7 @@ class ApiException implements Exception {
       String? apiMessage;
       if (responseData is Map) {
         final map = Map<String, dynamic>.from(responseData);
-        apiMessage = (map['message'] ?? map['msg'])?.toString();
+        apiMessage = (map['message'] ?? map['msg'] ?? map['error'])?.toString();
         if (apiMessage == null || apiMessage.trim().isEmpty) {
           if (map['errors'] is Map) {
             final errors = map['errors'] as Map;
