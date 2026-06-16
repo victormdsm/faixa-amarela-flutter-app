@@ -1,4 +1,7 @@
+import 'dart:developer' as developer;
+
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_exception.dart';
@@ -44,8 +47,25 @@ class PushRegistrationService {
   Future<void> registerCurrentDevice(String authHeader) async {
     try {
       final messaging = FirebaseMessaging.instance;
-      await messaging.requestPermission(alert: true, badge: true, sound: true);
+
+      // iOS/macOS: requestPermission is required to get a valid APNs token.
+      // Android: rely on the native notification permission flow elsewhere
+      // (e.g. route tracking) to avoid duplicating the Android 13+ permission
+      // prompt with FirebaseMessaging.requestPermission.
+      if (defaultTargetPlatform == TargetPlatform.iOS ||
+          defaultTargetPlatform == TargetPlatform.macOS) {
+        await messaging.requestPermission(alert: true, badge: true, sound: true);
+      }
+
       final token = await messaging.getToken();
+      if (token == null || token.isEmpty) {
+        developer.log(
+          'FCM did not return a device token; skipping backend registration.',
+          name: 'push_registration',
+        );
+        return;
+      }
+
       await _ref
           .read(notificationRepositoryProvider)
           .saveDeviceToken(authHeader, token);
@@ -53,13 +73,22 @@ class PushRegistrationService {
       if (!_listeningForRefresh) {
         _listeningForRefresh = true;
         messaging.onTokenRefresh.listen((nextToken) {
+          if (nextToken.isEmpty) return;
+          final session = _ref.read(appSessionControllerProvider).session;
+          if (session == null) return;
           _ref
               .read(notificationRepositoryProvider)
-              .saveDeviceToken(authHeader, nextToken);
+              .saveDeviceToken(session.authorizationHeader, nextToken);
         });
       }
-    } catch (_) {
+    } catch (error, stackTrace) {
       // Login must not fail because push permission or Firebase is unavailable.
+      developer.log(
+        'Push registration failed: $error',
+        name: 'push_registration',
+        error: error,
+        stackTrace: stackTrace,
+      );
     }
   }
 }

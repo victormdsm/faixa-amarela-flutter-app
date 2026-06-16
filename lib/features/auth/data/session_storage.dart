@@ -36,20 +36,28 @@ class SessionStorage {
   Future<AuthSession?> load() async {
     try {
       final token = await _secureStorage.readAccessToken();
+      final refreshToken = await _secureStorage.readRefreshToken();
       final tokenType = (_box.get(_kTokenType) as String?) ?? 'Bearer';
-      final userId = _box.get(_kUserId);
+      final rawUserId = _box.get(_kUserId);
       final userName = _box.get(_kUserName) as String?;
       final userRole = _box.get(_kUserRole) as String?;
 
       if (token == null ||
           token.isEmpty ||
-          userId == null ||
+          rawUserId == null ||
           userRole == null) {
         return null;
       }
 
+      final userId = rawUserId is num
+          ? rawUserId.toInt()
+          : int.tryParse(rawUserId.toString());
+      if (userId == null) {
+        return null;
+      }
+
       final user = AuthUser(
-        id: (userId as num).toInt(),
+        id: userId,
         name: userName ?? '',
         email: _box.get(_kUserEmail) as String?,
         role: userRole,
@@ -61,6 +69,7 @@ class SessionStorage {
 
       return AuthSession(
         accessToken: token,
+        refreshToken: refreshToken,
         tokenType: tokenType,
         user: user,
         expiresAt: _box.get(_kExpiresAt) as String?,
@@ -72,6 +81,9 @@ class SessionStorage {
 
   Future<void> save(AuthSession session) async {
     await _secureStorage.writeAccessToken(session.accessToken);
+    if (session.hasRefreshToken) {
+      await _secureStorage.writeRefreshToken(session.refreshToken!);
+    }
     await _box.putAll(<String, dynamic>{
       _kUserId: session.user.id,
       _kUserName: session.user.name,
