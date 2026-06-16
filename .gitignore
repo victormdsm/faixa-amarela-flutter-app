@@ -57,3 +57,40 @@ app.*.map.json
 /ios/Flutter/Generated.xcconfig
 /ios/Flutter/Flutter.framework
 /ios/Flutter/Flutter.podspec
+
+# Dumps e backups de banco
+*.dump
+*.sql
+*.backup
+
+# Credenciais e secrets
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
+!tsconfig.*.json
+!nest-cli.json
+!docker-compose*.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+*.plist
+GoogleService-Info.plist
+google-services.json
+*credenciais*/
+credenciais/
+
+# Env files
+.env.*
+!.env.example
+
+# Node / build
+node_modules/
+dist/
+build/
+
+# Logs
+logs/
+
+# Playwright / MCP temp
+.playwright-mcp/
+*.png
