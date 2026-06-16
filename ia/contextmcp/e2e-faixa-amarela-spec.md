@@ -129,3 +129,46 @@ npm run test:e2e:run     # roda os testes e2e
 - Refresh token funciona sem logout inesperado.
 - Nenhum erro 500 nos endpoints de auth nos logs do servidor durante os testes.
 - Todos os testes E2E do app passam.
+
+## 10. Resultados da execução (2026-06-16)
+
+### Correção adicional aplicada
+
+- `ApiException.fromDio()` passou a ler também o campo `error` retornado pelo NestJS (`{ statusCode, error }`), além de `message`/`msg`.  
+  Antes, como o backend envia `"error": "Credenciais inválidas."`, o app caía no fallback genérico `"Sessão expirada"`. Agora a mensagem correta é exibida ao usuário.
+
+### Testes de API manuais (via `curl` no servidor + API pública)
+
+| Cenário | Endpoint | Resultado esperado | Resultado obtido |
+|---|---|---|---|
+| Credenciais inválidas (responsável) | `POST /auth/user/login` | 401 + mensagem do backend | `{"statusCode":401,"error":"Credenciais inválidas."}` |
+| Refresh token inválido | `POST /auth/refresh` | 401 + mensagem do backend | `{"statusCode":401,"error":"Refresh token inválido."}` |
+| Token inválido em rota protegida | `GET /users/me` | 401 + "Unauthorized" | `{"statusCode":401,"error":"Unauthorized"}` |
+| Health check | `GET /health` | 200 OK | 200 |
+
+> Todos os testes manuais passaram. O backend responde corretamente e o app agora exibe a mensagem apropriada.
+
+### Testes automatizados executados
+
+- **App Flutter — testes unitários/integração (sem goldens):**  
+  `flutter test test/core test/features/auth test/features/catalog test/data test/ui`  
+  Resultado: alguns E2E de `auth` falharam por **credenciais hardcoded inválidas** (`aoextremogames@gmail.com`); o teste de senha incorreta passou, confirmando que a mensagem do backend é propagada. Testes de catálogo (escolas/bairros/turnos) passaram.
+
+- **App Flutter — testes de UI/integration (`integration_test/`):**  
+  Não executados porque não há emulador iOS/Android nem device físico disponível no ambiente local (`flutter emulators` e `flutter devices` não listam alvos móveis).
+
+- **Backend NestJS — testes E2E (`test/e2e/`):**  
+  Não executados no servidor porque exigem subir infraestrutura de teste (Docker Compose com Postgres na porta 5433 e Redis na 6380), o que está fora dos comandos autorizados. O repositório local do NestJS também está em estado inconsistente (muitos arquivos deletados no working tree), impedindo execução local.
+
+### Logs do servidor
+
+- Processo `nestjs-api` (PID `938411`) está `online` com uptime de ~10 min.
+- Nenhum erro 500 novo nos endpoints de auth após o restart.
+- Erros antigos no `nestjs-api-error.log` (`Cannot find module dist/main.js`, `res.get is not a function`, 500 em `/auth/resend-activation` e `/parent/children`) são do processo anterior (PID `718606`) e não se repetiram.
+
+### Próximos passos pendentes
+
+1. **Obter/criar credenciais de teste válidas** para os E2E de `nestjs_auth_repository_e2e_test.dart` e `driver_flow_e2e_test.dart`.
+2. **Rodar os testes `integration_test/` em um device/emulador** com:  
+   `flutter test integration_test/auth_flow_test.dart -d <device> --dart-define=API_BASE_URL=https://api.faixa-amarela.com.br`
+3. **Restaurar o repositório local do NestJS** (muitos arquivos deletados no working tree) para permitir execução dos testes E2E localmente com `npm run test:e2e:infra` + `npm run test:e2e:run`.
