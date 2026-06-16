@@ -26,7 +26,9 @@ Dio dio(Ref ref) {
   );
 
   dio.interceptors.add(NestjsResponseUnwrapInterceptor());
-  dio.interceptors.add(AuthInterceptor(secureStorage: SecureTokenStorage()));
+  dio.interceptors.add(
+    AuthInterceptor(dio: dio, secureStorage: SecureTokenStorage()),
+  );
   dio.interceptors.add(SafeLogInterceptor());
 
   return dio;
