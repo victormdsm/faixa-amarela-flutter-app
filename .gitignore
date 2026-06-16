@@ -1,69 +1,15 @@
-# Miscellaneous
-*.class
-*.log
-*.pyc
-*.swp
+# Sistema
 .DS_Store
-.atom/
-.build/
-.buildlog/
-.history
-.svn/
-.swiftpm/
-migrate_working_dir/
+*.log
+
+# Secrets e ambientes
 .env
+.env.*
+!.env.example
 
-# IntelliJ related
-*.iml
-*.ipr
-*.iws
-.idea/
-
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
-
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
-.dart_tool/
-
-.flutter-plugins
-.flutter-plugins-dependencies
-.packages
-.pub-cache/
-.pub/
-/build/
-/coverage/
-
-# Symbolication related
-app.*.symbols
-
-# Obfuscation related
-app.*.map.json
-
-# Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
-
-# Android/Gradle local files
-/android/.gradle/
-/android/local.properties
-
-# iOS/Flutter local files
-/ios/Pods/
-/ios/Flutter/Generated.xcconfig
-/ios/Flutter/Flutter.framework
-/ios/Flutter/Flutter.podspec
-
-# Dumps e backups de banco
-*.dump
-*.sql
-*.backup
-
-# Credenciais e secrets
+# Credenciais
+credenciais/
+*credenciais*/
 *.json
 !package.json
 !package-lock.json
@@ -73,24 +19,35 @@ app.*.map.json
 !docker-compose*.json
 !pnpm-lock.yaml
 !pnpm-workspace.yaml
-*.plist
-GoogleService-Info.plist
-google-services.json
-*credenciais*/
-credenciais/
 
-# Env files
-.env.*
-!.env.example
-
-# Node / build
+# Build / dependências
 node_modules/
 dist/
 build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+/coverage/
 
-# Logs
-logs/
+# Dumps e backups
+*.dump
+*.sql
+*.backup
 
-# Playwright / MCP temp
-.playwright-mcp/
+# Imagens temporárias na raiz
 *.png
+*.jpg
+*.jpeg
+
+# IDEs
+.idea/
+.vscode/
+*.iml
+
+# Temp
+.playwright-mcp/
+.venv_tmp/
+.claude/
