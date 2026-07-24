@@ -2,25 +2,27 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 
-import '../../../../core/network/api_exception.dart';
+import '../../../core/network/api_exception.dart';
+import '../../../domain/models/driver_profile_change_request.dart';
 
 class NestjsDriverProfileChangeRequestRepository {
   NestjsDriverProfileChangeRequestRepository(this._dio);
   final Dio _dio;
 
-  Future<String> uploadImage(String filePath) async {
+  Future<String> uploadImage(String filePath, {required String type}) async {
     try {
       final form = FormData.fromMap({});
       form.files.add(MapEntry('image', await MultipartFile.fromFile(filePath)));
       final response = await _dio.post<Map<String, dynamic>>(
         '/driver/profile-change-requests/upload-image',
+        queryParameters: {'type': type},
         data: form,
       );
       final data = response.data;
       if (data == null) {
         throw ApiException(message: 'Resposta vazia do servidor.');
       }
-      final url = data['imageUrl'] ?? data['image_url'];
+      final url = data['imageUrl'];
       if (url == null) {
         throw ApiException(message: 'URL da imagem nao retornada.');
       }
@@ -45,7 +47,7 @@ class NestjsDriverProfileChangeRequestRepository {
           'requestedSchoolIds': jsonEncode(schoolIds),
           'requestedDistrictShiftMap': jsonEncode(
             districtShiftMap.entries
-                .map((e) => {'district_id': e.key, 'shift_ids': e.value})
+                .map((e) => {'districtId': e.key, 'shiftIds': e.value})
                 .toList(growable: false),
           ),
           'requestedAvatarPath': avatarImagePath,
@@ -55,6 +57,22 @@ class NestjsDriverProfileChangeRequestRepository {
         },
       );
       return response.data ?? const <String, dynamic>{};
+    } catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
+  Future<List<DriverProfileChangeRequest>> listMyRequests() async {
+    try {
+      final response = await _dio.get<List<dynamic>>(
+        '/driver/profile-change-requests',
+      );
+      final data = response.data;
+      if (data == null) return const [];
+      return data
+          .whereType<Map<String, dynamic>>()
+          .map(DriverProfileChangeRequest.fromJson)
+          .toList(growable: false);
     } catch (error) {
       throw ApiException.fromDio(error);
     }

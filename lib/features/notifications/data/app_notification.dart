@@ -23,11 +23,11 @@ class AppNotification {
     return AppNotification(
       id: (json['id'] ?? '').toString(),
       type: (json['type'] ?? '').toString(),
-      title: (json['title'] ?? 'Notificacao').toString(),
+      title: (json['title'] ?? 'Notificação').toString(),
       body: (json['body'] ?? '').toString(),
       data: Map<String, dynamic>.from((json['data'] as Map?) ?? const {}),
-      createdAt: DateTime.tryParse((json['created_at'] ?? '').toString()),
-      readAt: DateTime.tryParse((json['read_at'] ?? '').toString()),
+      createdAt: DateTime.tryParse((json['createdAt'] ?? '').toString()),
+      readAt: DateTime.tryParse((json['readAt'] ?? '').toString()),
     );
   }
 }

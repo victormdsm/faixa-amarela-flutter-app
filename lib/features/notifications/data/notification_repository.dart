@@ -21,24 +21,17 @@ class NotificationRepository {
         options: Options(headers: {'Authorization': authHeader}),
       );
 
-      final json = response.data ?? const <String, dynamic>{};
+      final json = response.data;
 
-      // NestJS returns: { data: [...], meta: { total, page, limit, totalPages } }
-      // Laravel returns: { data: [...], current_page, last_page, total }
-      final rawList = (json['data'] as List?) ?? const [];
-      final meta = json['meta'] as Map<String, dynamic>?;
-      final currentPage =
-          (meta?['page'] as num?)?.toInt() ??
-          (json['current_page'] as num?)?.toInt() ??
-          1;
-      final lastPage =
-          (meta?['totalPages'] as num?)?.toInt() ??
-          (json['last_page'] as num?)?.toInt() ??
-          1;
-      final total =
-          (meta?['total'] as num?)?.toInt() ??
-          (json['total'] as num?)?.toInt() ??
-          rawList.length;
+      // O interceptor preserva o envelope { data: [...], meta: {...} } para
+      // endpoints paginados. Portanto lemos a lista em data['data'] e os
+      // metadados em data['meta'].
+      final envelope = json is Map<String, dynamic> ? json : null;
+      final rawList = envelope?['data'] as List<dynamic>? ?? <dynamic>[];
+      final meta = envelope?['meta'] as Map<String, dynamic>?;
+      final currentPage = (meta?['page'] as num?)?.toInt() ?? 1;
+      final lastPage = (meta?['totalPages'] as num?)?.toInt() ?? 1;
+      final total = (meta?['total'] as num?)?.toInt() ?? rawList.length;
 
       return PaginatedResult<AppNotification>(
         items: rawList
@@ -62,9 +55,7 @@ class NotificationRepository {
       );
       final data = response.data;
       if (data == null) return 0;
-      return (data['count'] as num?)?.toInt() ??
-          (data['unread_count'] as num?)?.toInt() ??
-          0;
+      return (data['count'] as num?)?.toInt() ?? 0;
     } catch (error) {
       throw ApiException.fromDio(error);
     }

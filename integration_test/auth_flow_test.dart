@@ -6,6 +6,7 @@ import 'package:app_faixa_amarela/core/storage/secure_token_storage.dart';
 import 'package:app_faixa_amarela/features/auth/data/session_storage.dart';
 import 'package:app_faixa_amarela/features/auth/domain/entities/auth_session.dart';
 import 'package:app_faixa_amarela/features/auth/domain/entities/auth_user.dart';
+import 'package:app_faixa_amarela/features/auth/domain/entities/user_role.dart';
 import 'package:app_faixa_amarela/features/auth/presentation/providers/auth_providers.dart';
 import 'package:app_faixa_amarela/features/auth/presentation/state/app_session_controller.dart';
 import 'package:flutter/material.dart';
@@ -42,11 +43,11 @@ void main() {
         id: 1,
         name: 'User',
         email: 'u@e.com',
-        role: 'user',
+        roles: ['user'],
         isActivated: true,
       ),
     );
-    container.read(appSessionControllerProvider.notifier).setSession(session);
+    container.read(appSessionControllerProvider.notifier).setSession(session, loginRole: UserRole.parent);
     await tester.pumpAndSettle();
 
     final router = container.read(appRouterProvider);

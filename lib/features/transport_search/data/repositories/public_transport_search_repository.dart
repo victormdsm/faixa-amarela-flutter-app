@@ -24,8 +24,14 @@ class PublicTransportSearchRepository {
         },
       );
 
-      final root = response.data ?? const <String, dynamic>{};
-      final raw = (root['data'] as List?) ?? const [];
+      // O interceptor preserva o envelope { data: [...], meta: {...} } para
+      // este endpoint paginado. Lemos a lista em data['data'].
+      final envelope = response.data is Map<String, dynamic>
+          ? response.data as Map<String, dynamic>
+          : null;
+      final raw = envelope?['data'] is List
+          ? envelope!['data'] as List
+          : const [];
       return raw
           .whereType<Map>()
           .map(

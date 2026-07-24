@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'app_router_guard.dart';
+import '../../app/theme/app_theme.dart';
+import '../../core/presentation/widgets/faixa_app_bar.dart';
 import '../../domain/models/child.dart';
 import '../../features/auth/presentation/pages/activation_page.dart';
 import '../../features/auth/presentation/pages/finalize_registration_page.dart';
@@ -17,13 +19,16 @@ import '../../features/driver_portal/presentation/pages/driver_enrollments_page.
 import '../../features/driver_portal/presentation/pages/driver_lookup_child_page.dart';
 import '../../features/driver_portal/presentation/pages/driver_route_execution_page.dart';
 import '../../features/driver_portal/presentation/pages/driver_routes_page.dart';
+import '../../features/driver_portal/presentation/pages/driver_change_requests_page.dart';
 import '../../features/driver_portal/presentation/pages/driver_settings_page.dart';
 import '../../features/driver_portal/presentation/pages/driver_shell_page.dart';
 import '../../features/parent_portal/presentation/pages/add_child_page.dart';
+import '../../features/parent_portal/presentation/pages/child_detail_page.dart';
 import '../../features/parent_portal/presentation/pages/parent_boardings_page.dart';
 import '../../features/parent_portal/presentation/pages/parent_children_page.dart';
 import '../../features/parent_portal/presentation/pages/parent_dashboard_page.dart';
 import '../../features/parent_portal/presentation/pages/parent_enrollments_page.dart';
+import '../../features/parent_portal/presentation/pages/parent_profile_page.dart';
 import '../../features/parent_portal/presentation/pages/parent_routes_page.dart';
 import '../../features/parent_portal/presentation/pages/parent_shell_page.dart';
 import '../../features/notifications/presentation/pages/notifications_page.dart';
@@ -49,22 +54,23 @@ class AppRoutes {
   static const driverClients = '/motorista/clientes';
   static const driverAddClient = '/motorista/clientes/adicionar';
   static const driverRoutes = '/motorista/rotas';
-  static const driverProfile = '/motorista/perfil';
   static const driverNotifications = '/motorista/notificacoes';
-  static const driverLookup = '/motorista/lookup';
   static const driverRouteExecution = '/motorista/rota';
   static const driverEnrollments = '/motorista/enrollments';
 
   // Driver push routes (open on top of shell)
   static const driverSettings = '/motorista/settings';
+  static const driverChangeRequests = '/motorista/solicitacoes';
 
   // Parent portal
   static const parentHome = '/pais';
   static const parentChildren = '/pais/dependentes';
   static const parentChildrenAdd = '/pais/dependentes/adicionar';
+  static const parentChildDetail = '/pais/dependentes/detalhes';
   static const parentRoutes = '/pais/rotas';
   static const parentBoardings = '/pais/embarques';
   static const parentEnrollments = '/pais/enrollments';
+  static const parentProfile = '/pais/perfil';
   static const parentNotifications = '/pais/notificacoes';
 }
 
@@ -82,10 +88,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   });
 
   String? redirectLogic(BuildContext context, GoRouterState state) {
+    // uri.path é mais confiável que matchedLocation durante inicialização.
+    final location = state.uri.path.isEmpty ? '/' : state.uri.path;
+    final sessionState = ref.read(appSessionControllerProvider);
     return AppRouterGuard.redirect(
-      session: ref.read(appSessionControllerProvider).session,
-      isLoading: ref.read(appSessionControllerProvider).isLoading,
-      location: state.matchedLocation,
+      session: sessionState.session,
+      isLoading: sessionState.isLoading,
+      location: location,
+      loginRole: sessionState.loginRole,
     );
   }
 
@@ -142,8 +152,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: AppRoutes.driverEnrollments,
-                builder: (context, state) => const DriverEnrollmentsPage(),
+                path: AppRoutes.driverClients,
+                builder: (context, state) => const DriverLookupChildPage(),
               ),
             ],
           ),
@@ -158,8 +168,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: AppRoutes.driverProfile,
-                builder: (context, state) => const DriverSettingsPage(),
+                path: AppRoutes.driverEnrollments,
+                builder: (context, state) => const DriverEnrollmentsPage(),
               ),
             ],
           ),
@@ -182,13 +192,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
-        path: AppRoutes.driverAddClient,
-        builder: (context, state) => const DriverAddClientPage(),
+        path: AppRoutes.driverChangeRequests,
+        builder: (context, state) => const DriverChangeRequestsPage(),
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
-        path: AppRoutes.driverLookup,
-        builder: (context, state) => const DriverLookupChildPage(),
+        path: AppRoutes.driverAddClient,
+        builder: (context, state) => const DriverAddClientPage(),
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
@@ -202,6 +212,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.parentChildrenAdd,
         builder: (context, state) =>
             AddChildPage(childToEdit: state.extra as Child?),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: AppRoutes.parentChildDetail,
+        builder: (context, state) =>
+            ChildDetailPage(child: state.extra as Child),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: AppRoutes.parentProfile,
+        builder: (context, state) => const ParentProfilePage(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: AppRoutes.parentEnrollments,
+        builder: (context, state) => const ParentEnrollmentsPage(),
       ),
 
       // ── Parent portal (bottom navigation shell) ────────────────────
@@ -245,14 +271,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: AppRoutes.parentEnrollments,
-                builder: (context, state) => const ParentEnrollmentsPage(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
                 path: AppRoutes.parentNotifications,
                 builder: (context, state) => const NotificationsPage(),
               ),
@@ -264,14 +282,40 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
     // ── Error page ──────────────────────────────────────────────────
     errorBuilder: (context, state) {
+      final theme = Theme.of(context);
       return Scaffold(
-        appBar: AppBar(title: const Text('Rota nao encontrada')),
+        backgroundColor: AppColors.surfaceSoft,
+        appBar: FaixaAppBar.screen(title: 'Página não encontrada'),
         body: Center(
           child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text(
-              'Nao foi possivel abrir "${state.uri}".',
-              textAlign: TextAlign.center,
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.error_outline_rounded,
+                  size: 48,
+                  color: AppColors.warning,
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                Text(
+                  'Não foi possível abrir "${state.uri}".',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: AppColors.ink,
+                  ),
+                ),
+                if (state.error != null) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    'Detalhe: ${state.error}',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppColors.muted,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
         ),

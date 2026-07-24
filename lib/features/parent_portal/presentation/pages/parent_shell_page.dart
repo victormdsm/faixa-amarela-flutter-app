@@ -19,29 +19,24 @@ class ParentShellPage extends ConsumerWidget {
       bottomNavigationBar: FaixaBottomNav(
         items: [
           const FaixaNavItem(
-            icon: Icons.home_outlined,
+            icon: Icons.home_rounded,
             activeIcon: Icons.home_rounded,
-            label: 'Inicio',
+            label: 'Início',
           ),
           const FaixaNavItem(
-            icon: Icons.child_care_outlined,
+            icon: Icons.child_care_rounded,
             activeIcon: Icons.child_care_rounded,
-            label: 'Dependentes',
+            label: 'Filhos',
           ),
           const FaixaNavItem(
-            icon: Icons.route_outlined,
+            icon: Icons.route_rounded,
             activeIcon: Icons.route_rounded,
             label: 'Rotas',
           ),
           const FaixaNavItem(
-            icon: Icons.fact_check_outlined,
+            icon: Icons.fact_check_rounded,
             activeIcon: Icons.fact_check_rounded,
             label: 'Embarques',
-          ),
-          const FaixaNavItem(
-            icon: Icons.school_outlined,
-            activeIcon: Icons.school_rounded,
-            label: 'Matriculas',
           ),
           FaixaNavItem(
             icon: Icons.notifications_none_rounded,

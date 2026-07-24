@@ -2,6 +2,18 @@ import 'package:flutter/material.dart';
 
 import '../../../app/theme/app_theme.dart';
 
+/// Alias semântico para [AppErrorState].
+///
+/// Mantém a mesma API e comportamento, padronizando o prefixo Faixa
+/// nos componentes compartilhados.
+typedef FaixaErrorState = AppErrorState;
+
+/// Alias semântico para [AppEmptyState].
+///
+/// Mantém a mesma API e comportamento, padronizando o prefixo Faixa
+/// nos componentes compartilhados.
+typedef FaixaEmptyState = AppEmptyState;
+
 class AppErrorState extends StatelessWidget {
   const AppErrorState({super.key, required this.message, this.onRetry});
 
@@ -58,11 +70,18 @@ class AppEmptyState extends StatelessWidget {
     required this.message,
     required this.icon,
     this.subtitle,
+    this.actionLabel,
+    this.onAction,
   });
 
   final String message;
+
+  /// Mantido por compatibilidade de API — o visual é sempre a
+  /// [FaixaEmptyIllustration] da marca, independente do ícone informado.
   final IconData icon;
   final String? subtitle;
+  final String? actionLabel;
+  final VoidCallback? onAction;
 
   @override
   Widget build(BuildContext context) {
@@ -72,15 +91,7 @@ class AppEmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: AppColors.surfaceSoft,
-                borderRadius: BorderRadius.circular(AppRadius.xl),
-              ),
-              child: Icon(icon, size: 30, color: AppColors.muted),
-            ),
+            const FaixaEmptyIllustration(),
             const SizedBox(height: AppSpacing.md),
             Text(
               message,
@@ -97,6 +108,14 @@ class AppEmptyState extends StatelessWidget {
                   context,
                 ).textTheme.bodySmall?.copyWith(color: AppColors.slate),
                 textAlign: TextAlign.center,
+              ),
+            ],
+            if (actionLabel != null && onAction != null) ...[
+              const SizedBox(height: AppSpacing.lg),
+              FilledButton.icon(
+                onPressed: onAction,
+                icon: const Icon(Icons.refresh_rounded),
+                label: Text(actionLabel!),
               ),
             ],
           ],
@@ -129,15 +148,7 @@ class AppMetricCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: AppColors.yellowLight,
-              borderRadius: BorderRadius.circular(AppRadius.md),
-            ),
-            child: Icon(icon, size: 18, color: AppColors.ink),
-          ),
+          Icon(icon, size: 20, color: AppColors.ink),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Column(
@@ -159,6 +170,50 @@ class AppMetricCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Chip métrico compacto para exibir um valor numérico e seu rótulo.
+///
+/// Usado em dashboards e execução de rotas para indicadores como
+/// "Pendentes", "Embarcados", "Paradas" etc.
+class AppMetricChip extends StatelessWidget {
+  const AppMetricChip({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+        child: Column(
+          children: [
+            Text(
+              value,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: color,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: Theme.of(
+                context,
+              ).textTheme.labelSmall?.copyWith(color: AppColors.slate),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -202,6 +257,218 @@ class AppInfoPill extends StatelessWidget {
   }
 }
 
+/// Ponto pulsante animado, usado para indicar status "ao vivo".
+class AppPulsingDot extends StatefulWidget {
+  const AppPulsingDot({super.key, required this.color});
+
+  final Color color;
+
+  @override
+  State<AppPulsingDot> createState() => _AppPulsingDotState();
+}
+
+class _AppPulsingDotState extends State<AppPulsingDot>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+    _anim = Tween<double>(
+      begin: 0.5,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _anim,
+      builder: (_, _) => Container(
+        width: 8,
+        height: 8,
+        decoration: BoxDecoration(
+          color: widget.color.withValues(alpha: _anim.value),
+          shape: BoxShape.circle,
+        ),
+      ),
+    );
+  }
+}
+
+/// Linha de informação com ícone e texto, usada em cards e detalhes.
+class AppIconTextRow extends StatelessWidget {
+  const AppIconTextRow({
+    super.key,
+    required this.icon,
+    required this.text,
+    this.italic = false,
+  });
+
+  final IconData icon;
+  final String text;
+  final bool italic;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 1),
+          child: Icon(icon, size: 15, color: AppColors.slate),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: AppColors.slate,
+              fontStyle: italic ? FontStyle.italic : FontStyle.normal,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Avatar com imagem de rede e fallback para a inicial do nome.
+class AppNetworkAvatar extends StatelessWidget {
+  const AppNetworkAvatar({
+    super.key,
+    required this.name,
+    this.imageUrl,
+    this.radius = 20,
+  });
+
+  final String name;
+  final String? imageUrl;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasImage = (imageUrl ?? '').trim().isNotEmpty;
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: AppColors.yellowLight,
+      backgroundImage: hasImage ? NetworkImage(imageUrl!) : null,
+      onBackgroundImageError: hasImage ? (error, stackTrace) {} : null,
+      child: hasImage
+          ? null
+          : Text(
+              name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
+              style: const TextStyle(
+                color: AppColors.ink,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+    );
+  }
+}
+
+/// Ilustração de marca para estados vazios: círculo amarelo `#FF9E1B` com a
+/// faixa ink em diagonal (sinalização escolar) e o glyph do ônibus em ink —
+/// o mesmo vocabulário do marcador da van no mapa.
+class FaixaEmptyIllustration extends StatelessWidget {
+  const FaixaEmptyIllustration({super.key, this.size = 64});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: const BoxDecoration(
+        color: AppColors.yellow,
+        shape: BoxShape.circle,
+      ),
+      child: ClipOval(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Faixa ink levemente diagonal, como na sinalização escolar.
+            Align(
+              alignment: const Alignment(0, 0.78),
+              child: Transform.rotate(
+                angle: -0.14,
+                child: Container(
+                  width: size * 1.25,
+                  height: size * 0.2,
+                  color: AppColors.ink,
+                ),
+              ),
+            ),
+            Center(
+              child: Padding(
+                padding: EdgeInsets.only(bottom: size * 0.14),
+                child: Icon(
+                  Icons.directions_bus_rounded,
+                  color: AppColors.ink,
+                  size: size * 0.44,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Banner de status com ícone, cor e mensagem.
+class AppStatusRow extends StatelessWidget {
+  const AppStatusRow({
+    super.key,
+    required this.icon,
+    required this.color,
+    required this.message,
+  });
+
+  final IconData icon;
+  final Color color;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              message,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: color,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class AppInfoBanner extends StatelessWidget {
   const AppInfoBanner({
     super.key,
@@ -219,9 +486,9 @@ class AppInfoBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: color.withValues(alpha: 0.22)),
+        border: Border.all(color: AppColors.border),
       ),
       child: Row(
         children: [

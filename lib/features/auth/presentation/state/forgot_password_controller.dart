@@ -53,7 +53,7 @@ class ForgotPasswordController extends _$ForgotPasswordController {
     } catch (_) {
       state = state.copyWith(
         isLoading: false,
-        errorMessage: 'Falha ao solicitar recuperacao de senha.',
+        errorMessage: 'Falha ao solicitar recuperação de senha.',
         successMessage: null,
       );
       return false;

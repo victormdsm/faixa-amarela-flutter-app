@@ -14,7 +14,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$ResetPasswordState {
 
- String get token; String get password; String get passwordConfirmation; bool get isLoading; String? get errorMessage; String? get successMessage;
+ String get token; String get password; String get passwordConfirmation; bool get isLoading; bool get obscurePassword; bool get obscurePasswordConfirmation; String? get errorMessage; String? get successMessage;
 /// Create a copy of ResetPasswordState
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -25,16 +25,16 @@ $ResetPasswordStateCopyWith<ResetPasswordState> get copyWith => _$ResetPasswordS
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is ResetPasswordState&&(identical(other.token, token) || other.token == token)&&(identical(other.password, password) || other.password == password)&&(identical(other.passwordConfirmation, passwordConfirmation) || other.passwordConfirmation == passwordConfirmation)&&(identical(other.isLoading, isLoading) || other.isLoading == isLoading)&&(identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage)&&(identical(other.successMessage, successMessage) || other.successMessage == successMessage));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ResetPasswordState&&(identical(other.token, token) || other.token == token)&&(identical(other.password, password) || other.password == password)&&(identical(other.passwordConfirmation, passwordConfirmation) || other.passwordConfirmation == passwordConfirmation)&&(identical(other.isLoading, isLoading) || other.isLoading == isLoading)&&(identical(other.obscurePassword, obscurePassword) || other.obscurePassword == obscurePassword)&&(identical(other.obscurePasswordConfirmation, obscurePasswordConfirmation) || other.obscurePasswordConfirmation == obscurePasswordConfirmation)&&(identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage)&&(identical(other.successMessage, successMessage) || other.successMessage == successMessage));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,token,password,passwordConfirmation,isLoading,errorMessage,successMessage);
+int get hashCode => Object.hash(runtimeType,token,password,passwordConfirmation,isLoading,obscurePassword,obscurePasswordConfirmation,errorMessage,successMessage);
 
 @override
 String toString() {
-  return 'ResetPasswordState(token: $token, password: $password, passwordConfirmation: $passwordConfirmation, isLoading: $isLoading, errorMessage: $errorMessage, successMessage: $successMessage)';
+  return 'ResetPasswordState(token: $token, password: $password, passwordConfirmation: $passwordConfirmation, isLoading: $isLoading, obscurePassword: $obscurePassword, obscurePasswordConfirmation: $obscurePasswordConfirmation, errorMessage: $errorMessage, successMessage: $successMessage)';
 }
 
 
@@ -45,7 +45,7 @@ abstract mixin class $ResetPasswordStateCopyWith<$Res>  {
   factory $ResetPasswordStateCopyWith(ResetPasswordState value, $Res Function(ResetPasswordState) _then) = _$ResetPasswordStateCopyWithImpl;
 @useResult
 $Res call({
- String token, String password, String passwordConfirmation, bool isLoading, String? errorMessage, String? successMessage
+ String token, String password, String passwordConfirmation, bool isLoading, bool obscurePassword, bool obscurePasswordConfirmation, String? errorMessage, String? successMessage
 });
 
 
@@ -62,12 +62,14 @@ class _$ResetPasswordStateCopyWithImpl<$Res>
 
 /// Create a copy of ResetPasswordState
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? token = null,Object? password = null,Object? passwordConfirmation = null,Object? isLoading = null,Object? errorMessage = freezed,Object? successMessage = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? token = null,Object? password = null,Object? passwordConfirmation = null,Object? isLoading = null,Object? obscurePassword = null,Object? obscurePasswordConfirmation = null,Object? errorMessage = freezed,Object? successMessage = freezed,}) {
   return _then(_self.copyWith(
 token: null == token ? _self.token : token // ignore: cast_nullable_to_non_nullable
 as String,password: null == password ? _self.password : password // ignore: cast_nullable_to_non_nullable
 as String,passwordConfirmation: null == passwordConfirmation ? _self.passwordConfirmation : passwordConfirmation // ignore: cast_nullable_to_non_nullable
 as String,isLoading: null == isLoading ? _self.isLoading : isLoading // ignore: cast_nullable_to_non_nullable
+as bool,obscurePassword: null == obscurePassword ? _self.obscurePassword : obscurePassword // ignore: cast_nullable_to_non_nullable
+as bool,obscurePasswordConfirmation: null == obscurePasswordConfirmation ? _self.obscurePasswordConfirmation : obscurePasswordConfirmation // ignore: cast_nullable_to_non_nullable
 as bool,errorMessage: freezed == errorMessage ? _self.errorMessage : errorMessage // ignore: cast_nullable_to_non_nullable
 as String?,successMessage: freezed == successMessage ? _self.successMessage : successMessage // ignore: cast_nullable_to_non_nullable
 as String?,
@@ -155,10 +157,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String token,  String password,  String passwordConfirmation,  bool isLoading,  String? errorMessage,  String? successMessage)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String token,  String password,  String passwordConfirmation,  bool isLoading,  bool obscurePassword,  bool obscurePasswordConfirmation,  String? errorMessage,  String? successMessage)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _ResetPasswordState() when $default != null:
-return $default(_that.token,_that.password,_that.passwordConfirmation,_that.isLoading,_that.errorMessage,_that.successMessage);case _:
+return $default(_that.token,_that.password,_that.passwordConfirmation,_that.isLoading,_that.obscurePassword,_that.obscurePasswordConfirmation,_that.errorMessage,_that.successMessage);case _:
   return orElse();
 
 }
@@ -176,10 +178,10 @@ return $default(_that.token,_that.password,_that.passwordConfirmation,_that.isLo
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String token,  String password,  String passwordConfirmation,  bool isLoading,  String? errorMessage,  String? successMessage)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String token,  String password,  String passwordConfirmation,  bool isLoading,  bool obscurePassword,  bool obscurePasswordConfirmation,  String? errorMessage,  String? successMessage)  $default,) {final _that = this;
 switch (_that) {
 case _ResetPasswordState():
-return $default(_that.token,_that.password,_that.passwordConfirmation,_that.isLoading,_that.errorMessage,_that.successMessage);case _:
+return $default(_that.token,_that.password,_that.passwordConfirmation,_that.isLoading,_that.obscurePassword,_that.obscurePasswordConfirmation,_that.errorMessage,_that.successMessage);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -196,10 +198,10 @@ return $default(_that.token,_that.password,_that.passwordConfirmation,_that.isLo
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String token,  String password,  String passwordConfirmation,  bool isLoading,  String? errorMessage,  String? successMessage)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String token,  String password,  String passwordConfirmation,  bool isLoading,  bool obscurePassword,  bool obscurePasswordConfirmation,  String? errorMessage,  String? successMessage)?  $default,) {final _that = this;
 switch (_that) {
 case _ResetPasswordState() when $default != null:
-return $default(_that.token,_that.password,_that.passwordConfirmation,_that.isLoading,_that.errorMessage,_that.successMessage);case _:
+return $default(_that.token,_that.password,_that.passwordConfirmation,_that.isLoading,_that.obscurePassword,_that.obscurePasswordConfirmation,_that.errorMessage,_that.successMessage);case _:
   return null;
 
 }
@@ -211,13 +213,15 @@ return $default(_that.token,_that.password,_that.passwordConfirmation,_that.isLo
 
 
 class _ResetPasswordState extends ResetPasswordState {
-  const _ResetPasswordState({required this.token, required this.password, required this.passwordConfirmation, required this.isLoading, this.errorMessage, this.successMessage}): super._();
+  const _ResetPasswordState({required this.token, required this.password, required this.passwordConfirmation, required this.isLoading, required this.obscurePassword, required this.obscurePasswordConfirmation, this.errorMessage, this.successMessage}): super._();
   
 
 @override final  String token;
 @override final  String password;
 @override final  String passwordConfirmation;
 @override final  bool isLoading;
+@override final  bool obscurePassword;
+@override final  bool obscurePasswordConfirmation;
 @override final  String? errorMessage;
 @override final  String? successMessage;
 
@@ -231,16 +235,16 @@ _$ResetPasswordStateCopyWith<_ResetPasswordState> get copyWith => __$ResetPasswo
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ResetPasswordState&&(identical(other.token, token) || other.token == token)&&(identical(other.password, password) || other.password == password)&&(identical(other.passwordConfirmation, passwordConfirmation) || other.passwordConfirmation == passwordConfirmation)&&(identical(other.isLoading, isLoading) || other.isLoading == isLoading)&&(identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage)&&(identical(other.successMessage, successMessage) || other.successMessage == successMessage));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ResetPasswordState&&(identical(other.token, token) || other.token == token)&&(identical(other.password, password) || other.password == password)&&(identical(other.passwordConfirmation, passwordConfirmation) || other.passwordConfirmation == passwordConfirmation)&&(identical(other.isLoading, isLoading) || other.isLoading == isLoading)&&(identical(other.obscurePassword, obscurePassword) || other.obscurePassword == obscurePassword)&&(identical(other.obscurePasswordConfirmation, obscurePasswordConfirmation) || other.obscurePasswordConfirmation == obscurePasswordConfirmation)&&(identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage)&&(identical(other.successMessage, successMessage) || other.successMessage == successMessage));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,token,password,passwordConfirmation,isLoading,errorMessage,successMessage);
+int get hashCode => Object.hash(runtimeType,token,password,passwordConfirmation,isLoading,obscurePassword,obscurePasswordConfirmation,errorMessage,successMessage);
 
 @override
 String toString() {
-  return 'ResetPasswordState(token: $token, password: $password, passwordConfirmation: $passwordConfirmation, isLoading: $isLoading, errorMessage: $errorMessage, successMessage: $successMessage)';
+  return 'ResetPasswordState(token: $token, password: $password, passwordConfirmation: $passwordConfirmation, isLoading: $isLoading, obscurePassword: $obscurePassword, obscurePasswordConfirmation: $obscurePasswordConfirmation, errorMessage: $errorMessage, successMessage: $successMessage)';
 }
 
 
@@ -251,7 +255,7 @@ abstract mixin class _$ResetPasswordStateCopyWith<$Res> implements $ResetPasswor
   factory _$ResetPasswordStateCopyWith(_ResetPasswordState value, $Res Function(_ResetPasswordState) _then) = __$ResetPasswordStateCopyWithImpl;
 @override @useResult
 $Res call({
- String token, String password, String passwordConfirmation, bool isLoading, String? errorMessage, String? successMessage
+ String token, String password, String passwordConfirmation, bool isLoading, bool obscurePassword, bool obscurePasswordConfirmation, String? errorMessage, String? successMessage
 });
 
 
@@ -268,12 +272,14 @@ class __$ResetPasswordStateCopyWithImpl<$Res>
 
 /// Create a copy of ResetPasswordState
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? token = null,Object? password = null,Object? passwordConfirmation = null,Object? isLoading = null,Object? errorMessage = freezed,Object? successMessage = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? token = null,Object? password = null,Object? passwordConfirmation = null,Object? isLoading = null,Object? obscurePassword = null,Object? obscurePasswordConfirmation = null,Object? errorMessage = freezed,Object? successMessage = freezed,}) {
   return _then(_ResetPasswordState(
 token: null == token ? _self.token : token // ignore: cast_nullable_to_non_nullable
 as String,password: null == password ? _self.password : password // ignore: cast_nullable_to_non_nullable
 as String,passwordConfirmation: null == passwordConfirmation ? _self.passwordConfirmation : passwordConfirmation // ignore: cast_nullable_to_non_nullable
 as String,isLoading: null == isLoading ? _self.isLoading : isLoading // ignore: cast_nullable_to_non_nullable
+as bool,obscurePassword: null == obscurePassword ? _self.obscurePassword : obscurePassword // ignore: cast_nullable_to_non_nullable
+as bool,obscurePasswordConfirmation: null == obscurePasswordConfirmation ? _self.obscurePasswordConfirmation : obscurePasswordConfirmation // ignore: cast_nullable_to_non_nullable
 as bool,errorMessage: freezed == errorMessage ? _self.errorMessage : errorMessage // ignore: cast_nullable_to_non_nullable
 as String?,successMessage: freezed == successMessage ? _self.successMessage : successMessage // ignore: cast_nullable_to_non_nullable
 as String?,

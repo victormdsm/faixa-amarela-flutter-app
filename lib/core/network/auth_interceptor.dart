@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 
 import '../storage/secure_token_storage.dart';
 import 'backend_config.dart';
+import 'nestjs_response_unwrap_interceptor.dart';
 
 /// Global stream used to notify the app layer when the session is terminated.
 /// The interceptor lives in core and cannot depend on auth feature state.
@@ -134,7 +135,7 @@ class AuthInterceptor extends Interceptor {
           'Content-Type': 'application/json',
         },
       ),
-    );
+    )..interceptors.add(NestjsResponseUnwrapInterceptor());
 
     try {
       final response = await refreshDio.post<Map<String, dynamic>>(
@@ -142,12 +143,11 @@ class AuthInterceptor extends Interceptor {
         data: {'refreshToken': refreshToken},
       );
 
-      final data = response.data;
-      if (data == null) return false;
-      final payload = data['data'] as Map<String, dynamic>? ?? data;
+      final payload = response.data;
+      if (payload is! Map<String, dynamic>) return false;
 
-      final accessToken = (payload['access_token'] ?? payload['accessToken'])?.toString();
-      final newRefreshToken = (payload['refresh_token'] ?? payload['refreshToken'])?.toString();
+      final accessToken = payload['accessToken']?.toString();
+      final newRefreshToken = payload['refreshToken']?.toString();
 
       if (accessToken == null || accessToken.isEmpty) return false;
 

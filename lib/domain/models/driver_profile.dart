@@ -56,82 +56,75 @@ class DriverProfile {
 
     return DriverProfile(
       id: (json['id'] as num?)?.toInt() ?? 0,
-      userId: (json['user_id'] as num?)?.toInt() ?? 0,
+      userId: (json['userId'] as num?)?.toInt() ?? 0,
       name: (json['name'] ?? '').toString(),
       cpf: (json['cpf'] ?? '').toString(),
-      licenseNumber: (json['license_number'] ?? json['cnh'] ?? '').toString(),
+      licenseNumber: (json['licenseNumber'] ?? '').toString(),
       vanId: van.isNotEmpty
-          ? (van['id'] as num?)?.toInt() ?? (json['van_id'] as num?)?.toInt() ?? 0
-          : (json['van_id'] as num?)?.toInt() ?? 0,
+          ? (van['id'] as num?)?.toInt() ?? (json['vanId'] as num?)?.toInt() ?? 0
+          : (json['vanId'] as num?)?.toInt() ?? 0,
       vanPlate: van.isNotEmpty
-          ? (van['plate'] ?? json['van_plate'] ?? '').toString()
-          : (json['van_plate'] ?? '').toString(),
+          ? (van['plate'] ?? json['vanPlate'] ?? '').toString()
+          : (json['vanPlate'] ?? '').toString(),
       vanModel: van.isNotEmpty
-          ? (van['model'] ?? json['van_model'] ?? '').toString()
-          : (json['van_model'] ?? '').toString(),
+          ? (van['model'] ?? json['vanModel'] ?? '').toString()
+          : (json['vanModel'] ?? '').toString(),
       vanColor: van.isNotEmpty
           ? van['color']?.toString()
-          : json['van_color']?.toString(),
+          : json['vanColor']?.toString(),
       vanYear: van.isNotEmpty
-          ? (van['year'] ?? json['van_year'] ?? '').toString()
-          : (json['van_year'] ?? '').toString(),
+          ? (van['year'] ?? json['vanYear'] ?? '').toString()
+          : (json['vanYear'] ?? '').toString(),
       vanImageUrl: van.isNotEmpty
-          ? van['imageUrl']?.toString() ?? van['image_url']?.toString()
-          : json['van_image_url']?.toString(),
-      coverageArea: (json['coverage_area'] ?? '').toString(),
-      isActive: json['is_active'] == true || json['is_active'] == 1,
+          ? van['imageUrl']?.toString()
+          : json['vanImageUrl']?.toString(),
+      coverageArea: (json['coverageArea'] ?? '').toString(),
+      isActive: json['isActive'] == true || json['isActive'] == 1,
       status: json['status']?.toString(),
-      cnhCategory: json['cnh_category']?.toString(),
-      cellPhone: json['cell_phone']?.toString(),
+      cnhCategory: json['cnhCategory']?.toString(),
+      cellPhone: json['cellPhone']?.toString(),
       information: json['information']?.toString(),
       email: json['email']?.toString(),
-      avatarUrl: json['avatar_url']?.toString(),
+      avatarUrl: json['avatarUrl']?.toString(),
       schools: _listOfMaps(json['schools']),
       districts: _listOfMaps(json['districts']),
-      coverageChangeRequest: json['coverage_change_request'] is Map
-          ? Map<String, dynamic>.from(json['coverage_change_request'] as Map)
+      coverageChangeRequest: json['coverageChangeRequest'] is Map
+          ? Map<String, dynamic>.from(json['coverageChangeRequest'] as Map)
           : null,
       coverageChangeRequestsRecent: _listOfMaps(
-        json['coverage_change_requests_recent'],
+        json['coverageChangeRequestsRecent'],
       ),
     );
   }
 
   Map<String, dynamic> toJson() {
-    final vehicle = <String, dynamic>{
-      'brand': vanModel,
-      'color': vanColor ?? '',
-      'year': vanYear,
-      'license_plate': vanPlate,
-      'image_url': vanImageUrl,
-    };
-
     return {
       'id': id,
-      'user_id': userId,
+      'userId': userId,
       'name': name,
       'cpf': cpf,
-      'license_number': licenseNumber,
+      'licenseNumber': licenseNumber,
       'cnh': licenseNumber,
-      'cell_phone': cellPhone,
+      'cellPhone': cellPhone,
       'information': information,
       'email': email,
-      'avatar_url': avatarUrl,
-      'van_id': vanId,
-      'van_plate': vanPlate,
-      'van_model': vanModel,
-      'van_color': vanColor,
-      'van_year': vanYear,
-      'van_image_url': vanImageUrl,
-      'vehicle': vehicle,
-      'coverage_area': coverageArea,
-      'is_active': isActive,
+      'avatarUrl': avatarUrl,
+      'van': <String, dynamic>{
+        'id': vanId,
+        'plate': vanPlate,
+        'model': vanModel,
+        'color': vanColor,
+        'year': vanYear,
+        'imageUrl': vanImageUrl,
+      },
+      'coverageArea': coverageArea,
+      'isActive': isActive,
       'status': status,
-      'cnh_category': cnhCategory,
+      'cnhCategory': cnhCategory,
       'schools': schools,
       'districts': districts,
-      'coverage_change_request': coverageChangeRequest,
-      'coverage_change_requests_recent': coverageChangeRequestsRecent,
+      'coverageChangeRequest': coverageChangeRequest,
+      'coverageChangeRequestsRecent': coverageChangeRequestsRecent,
     };
   }
 

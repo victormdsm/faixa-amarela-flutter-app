@@ -3,13 +3,13 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, kIsWeb;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pusher_channels_flutter/pusher_channels_flutter.dart';
 
 import '../../../../core/network/backend_config.dart';
 import '../../../../core/network/network_providers.dart';
@@ -32,7 +32,6 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
       _bufferCountSubscription?.cancel();
       _flushSuccessSubscription?.cancel();
       _errorSubscription?.cancel();
-      _disconnectRealtimeSocket();
     });
     return const DriverTrackingState();
   }
@@ -48,10 +47,6 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
   StreamSubscription<Map<String, dynamic>?>? _bufferCountSubscription;
   StreamSubscription<Map<String, dynamic>?>? _flushSuccessSubscription;
   StreamSubscription<Map<String, dynamic>?>? _errorSubscription;
-
-  PusherChannelsFlutter? _pusher;
-  PusherChannel? _privateTelemetryChannel;
-  String? _subscribedPrivateChannelName;
 
   String? _authHeader;
   bool _initialized = false;
@@ -181,7 +176,6 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
       }
     }
 
-    await _connectRealtimeSocket(session, routeManifestId, vanId);
     await _captureInitialPositionAndPrimeRoute();
     await _switchToForegroundMode();
     return true;
@@ -189,7 +183,6 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
 
   Future<void> stopRouteTracking({bool silent = false}) async {
     await _stopForegroundStream();
-    await _disconnectRealtimeSocket();
 
     if (_supportsBackgroundService) {
       try {
@@ -265,7 +258,7 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
   void markClientBoardedLocal(int childId) {
     _applyClientStopStatusLocal(
       childId: childId,
-      targetTypes: const {'pickup_home', 'pickup_school'},
+      targetTypes: _pickupTypes,
       nextStatus: 'picked_up',
     );
   }
@@ -273,7 +266,7 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
   void markClientDisembarkedLocal(int childId) {
     _applyClientStopStatusLocal(
       childId: childId,
-      targetTypes: const {'dropoff_home', 'dropoff_school'},
+      targetTypes: _dropoffTypes,
       nextStatus: 'delivered',
     );
   }
@@ -287,7 +280,9 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
     final remaining = planned
         .where((s) {
           final status = s.status.toLowerCase();
-          return status != 'delivered' && status != 'done';
+          return status != 'picked_up' &&
+              status != 'delivered' &&
+              status != 'done';
         })
         .toList(growable: false);
 
@@ -430,7 +425,6 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
     if (!state.routeActive) return;
 
     await _stopForegroundStream();
-    await _disconnectRealtimeSocket();
 
     if (_supportsBackgroundService) {
       try {
@@ -455,14 +449,6 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
             ? 'route.${state.routeId}'
             : null);
     if (routeManifestId == null || routeManifestId.isEmpty) return;
-
-    if (_authHeader != null && _authHeader!.isNotEmpty) {
-      await _connectRealtimeSocketIfNeeded(
-        authorizationHeader: _authHeader!,
-        routeManifestId: routeManifestId,
-        vanId: state.vanId,
-      );
-    }
 
     _foregroundPositionSubscription =
         Geolocator.getPositionStream(
@@ -511,7 +497,6 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
     );
 
     _appendForegroundPointToTelemetryBuffer(point);
-    _publishRealtimeLocationWhisper(point);
     unawaited(_performGeofenceCheck(position));
     unawaited(_checkOffRouteAndMaybeRecalculate(position));
     unawaited(_performRoutePreviewRefresh(position));
@@ -615,8 +600,8 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
 
       state = state.copyWith(
         nearbyCount: (data['count'] as num?)?.toInt() ?? matches.length,
-        nearestChildName: nearest?['child_name']?.toString(),
-        nearestDistanceMeters: (nearest?['distance_meters'] as num?)
+        nearestChildName: nearest?['childName']?.toString(),
+        nearestDistanceMeters: (nearest?['distanceMeters'] as num?)
             ?.toDouble(),
       );
     } catch (_) {
@@ -678,10 +663,10 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
       );
 
       final data = response.data ?? const <String, dynamic>{};
-      final distance = (data['distance_meters'] as num?)?.toDouble();
-      final duration = (data['duration_seconds'] as num?)?.toInt();
+      final distance = (data['distanceMeters'] as num?)?.toDouble();
+      final duration = (data['durationSeconds'] as num?)?.toInt();
 
-      final remainingStops = (data['remaining_stops'] as List?) ?? const [];
+      final remainingStops = (data['remainingStops'] as List?) ?? const [];
       final stops = _parseStops(remainingStops);
 
       final polyline = _extractPolylinePoints(data['geometry']);
@@ -828,266 +813,9 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
     return _ensureLocationPermissions();
   }
 
-  Future<void> _connectRealtimeSocket(
-    AuthSession session,
-    String routeManifestId,
-    int? vanId,
-  ) async {
-    await _connectRealtimeSocketIfNeeded(
-      authorizationHeader: session.authorizationHeader,
-      routeManifestId: routeManifestId,
-      vanId: vanId,
-    );
-  }
-
-  Future<void> _connectRealtimeSocketIfNeeded({
-    required String authorizationHeader,
-    required String routeManifestId,
-    int? vanId,
-  }) async {
-    if (!_supportsBackgroundService ||
-        !(defaultTargetPlatform == TargetPlatform.android ||
-            defaultTargetPlatform == TargetPlatform.iOS)) {
-      return;
-    }
-
-    if (BackendConfig.pusherAppKey.isEmpty) {
-      state = state.copyWith(
-        socketConnected: false,
-        warning:
-            'Socket Reverb/Pusher desabilitado (PUSHER_APP_KEY nao configurado no app).',
-      );
-      return;
-    }
-
-    final privateChannelName = _buildTelemetryChannelName(
-      routeManifestId: routeManifestId,
-      vanId: vanId,
-    );
-    final pusherChannelName = 'private-$privateChannelName';
-
-    if (state.socketConnected &&
-        _privateTelemetryChannel != null &&
-        _subscribedPrivateChannelName == privateChannelName) {
-      return;
-    }
-
-    try {
-      await _disconnectRealtimeSocket();
-
-      final pusher = PusherChannelsFlutter.getInstance();
-      await pusher.init(
-        apiKey: BackendConfig.pusherAppKey,
-        cluster: BackendConfig.pusherCluster.isEmpty
-            ? null
-            : BackendConfig.pusherCluster,
-        host: BackendConfig.pusherHost,
-        wsPort: BackendConfig.pusherPort,
-        wssPort: BackendConfig.pusherPort,
-        useTLS: BackendConfig.pusherEncrypted,
-        onConnectionStateChange: (currentState, previousState) {
-          _handlePusherConnectionStateChange(
-            currentState: currentState,
-            previousState: previousState,
-          );
-        },
-        onSubscriptionSucceeded: (channelName, _) {
-          if (channelName == pusherChannelName) {
-            state = state.copyWith(socketConnected: true, clearWarning: true);
-          }
-        },
-        onSubscriptionError: (message, error) {
-          state = state.copyWith(
-            socketConnected: false,
-            warning:
-                'Falha ao assinar canal realtime: ${_normalizeRealtimeError(message, error)}',
-          );
-        },
-        onError: (message, code, error) {
-          final suffix = code == null ? '' : ' (codigo $code)';
-          state = state.copyWith(
-            socketConnected: false,
-            warning:
-                'Falha no socket Reverb/Pusher$suffix: ${_normalizeRealtimeError(message, error)}',
-          );
-        },
-        onAuthorizer: (channelName, socketId, options) {
-          return _authorizePusherChannel(
-            authorizationHeader: authorizationHeader,
-            channelName: channelName,
-            socketId: socketId,
-          );
-        },
-      );
-
-      _privateTelemetryChannel = await pusher.subscribe(
-        channelName: pusherChannelName,
-      );
-      _pusher = pusher;
-      await pusher.connect();
-      _subscribedPrivateChannelName = privateChannelName;
-      state = state.copyWith(clearWarning: true);
-    } catch (e) {
-      state = state.copyWith(
-        socketConnected: false,
-        warning: 'Nao foi possivel conectar ao Reverb/Pusher: $e',
-      );
-    }
-  }
-
-  void _publishRealtimeLocationWhisper(Map<String, dynamic> point) {
-    final channel = _privateTelemetryChannel;
-    if (channel == null) return;
-
-    final routeManifestId = state.routeManifestId ??
-        (state.routeId != null && state.routeId! > 0
-            ? 'route.${state.routeId}'
-            : null);
-
-    try {
-      final payload = <String, dynamic>{
-        'lat': point['lat'],
-        'lng': point['lng'],
-        'speed': point['speed'],
-        'heading': point['heading'],
-        'timestamp': point['timestamp'],
-        'route_manifest_id': routeManifestId,
-        'van_id': state.vanId,
-      };
-      unawaited(
-        channel.trigger(
-          PusherEvent(
-            channelName: channel.channelName,
-            eventName: 'client-location',
-            data: jsonEncode(payload),
-          ),
-        ),
-      );
-    } catch (e) {
-      state = state.copyWith(
-        socketConnected: false,
-        warning: 'Falha ao enviar coordenada por socket: $e',
-      );
-    }
-  }
-
-  Future<void> _disconnectRealtimeSocket() async {
-    try {
-      final pusher = _pusher;
-      if (pusher != null && _subscribedPrivateChannelName != null) {
-        await pusher.unsubscribe(
-          channelName: 'private-${_subscribedPrivateChannelName!}',
-        );
-      }
-      await pusher?.disconnect();
-    } catch (_) {
-      // noop
-    } finally {
-      _privateTelemetryChannel = null;
-      _subscribedPrivateChannelName = null;
-      _pusher = null;
-      if (ref.mounted) {
-        state = state.copyWith(socketConnected: false);
-      }
-    }
-  }
-
-  String _buildTelemetryChannelName({
-    required String routeManifestId,
-    required int? vanId,
-  }) {
-    if (vanId != null && vanId > 0) {
-      return 'van.$vanId';
-    }
-    return 'telemetry.route.$routeManifestId';
-  }
-
-  Future<Map<String, String>> _authorizePusherChannel({
-    required String authorizationHeader,
-    required String channelName,
-    required String socketId,
-  }) async {
-    final response = await _dio.post<dynamic>(
-      BackendConfig.pusherAuthEndpoint,
-      data: <String, dynamic>{
-        'socket_id': socketId,
-        'channel_name': channelName,
-      },
-      options: Options(
-        headers: <String, dynamic>{
-          'Authorization': authorizationHeader,
-          'Accept': 'application/json',
-        },
-      ),
-    );
-
-    final payload = _decodePusherAuthResponse(response.data);
-    final auth = payload['auth']?.toString().trim();
-    if (auth == null || auth.isEmpty) {
-      throw const FormatException('Resposta de auth do Pusher sem campo auth.');
-    }
-
-    final result = <String, String>{'auth': auth};
-    final channelData = payload['channel_data']?.toString();
-    if (channelData != null && channelData.isNotEmpty) {
-      result['channel_data'] = channelData;
-    }
-    final sharedSecret = payload['shared_secret']?.toString();
-    if (sharedSecret != null && sharedSecret.isNotEmpty) {
-      result['shared_secret'] = sharedSecret;
-    }
-    return result;
-  }
-
-  Map<String, dynamic> _decodePusherAuthResponse(dynamic data) {
-    if (data is Map) {
-      return Map<String, dynamic>.from(data);
-    }
-    if (data is String && data.trim().isNotEmpty) {
-      final decoded = jsonDecode(data);
-      if (decoded is Map) {
-        return Map<String, dynamic>.from(decoded);
-      }
-    }
-    throw const FormatException('Resposta invalida da autenticacao Pusher.');
-  }
-
-  void _handlePusherConnectionStateChange({
-    required String currentState,
-    required String previousState,
-  }) {
-    final normalizedCurrent = currentState.toUpperCase();
-    final normalizedPrevious = previousState.toUpperCase();
-
-    if (normalizedCurrent == 'CONNECTED') {
-      state = state.copyWith(socketConnected: true, clearError: true);
-      return;
-    }
-
-    if (normalizedCurrent == 'DISCONNECTED') {
-      state = state.copyWith(socketConnected: false);
-      return;
-    }
-
-    if (normalizedCurrent == 'FAILED') {
-      state = state.copyWith(
-        socketConnected: false,
-        warning:
-            'Conexao realtime falhou (estado: $normalizedPrevious -> $normalizedCurrent).',
-      );
-      return;
-    }
-
-    state = state.copyWith(socketConnected: false);
-  }
-
-  String _normalizeRealtimeError(dynamic message, dynamic error) {
-    final messageText = message?.toString().trim() ?? '';
-    if (messageText.isNotEmpty) return messageText;
-    final errorText = error?.toString().trim() ?? '';
-    if (errorText.isNotEmpty) return errorText;
-    return 'erro desconhecido';
-  }
+  // Realtime via WebSocket foi desabilitado após remoção do pusher_channels_flutter.
+  // O app continua enviando coordenadas via background service e API REST;
+  // o socket só seria usado para whispers de localização em tempo real.
 
   String? _extractRouteRecalcErrorMessage(Object error) {
     if (error is DioException) {
@@ -1341,16 +1069,20 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
         .whereType<Map>()
         .map((e) => Map<String, dynamic>.from(e))
         .map((map) {
-          final lat = (map['lat'] as num?)?.toDouble();
-          final lng = (map['lng'] as num?)?.toDouble();
+          final lat = (map['latitude'] as num?)?.toDouble() ??
+              (map['lat'] as num?)?.toDouble();
+          final lng = (map['longitude'] as num?)?.toDouble() ??
+              (map['lng'] as num?)?.toDouble();
           if (lat == null || lng == null) return null;
           return (
             id: map['id']?.toString(),
-            clientId: (map['client_id'] as num?)?.toInt(),
-            childId: (map['child_id'] as num?)?.toInt(),
+            clientId: (map['clientId'] as num?)?.toInt(),
+            childId: (map['childId'] as num?)?.toInt(),
             type: map['type']?.toString(),
             status: (map['status'] ?? 'pending').toString(),
-            sequence: (map['sequence'] as num?)?.toInt(),
+            sequence:
+                (map['sequence'] as num?)?.toInt() ??
+                (map['order'] as num?)?.toInt(),
             lat: lat,
             lng: lng,
             name: map['name']?.toString(),
@@ -1380,11 +1112,7 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
         merged.add(latest);
       } else {
         final currentStatus = stop.status.toLowerCase();
-        final completedStatus = switch (stop.type) {
-          'pickup_home' || 'pickup_school' => 'picked_up',
-          'dropoff_home' || 'dropoff_school' => 'delivered',
-          _ => 'done',
-        };
+        final completedStatus = _resolveCompletedStatus(stop.type);
         merged.add((
           id: stop.id,
           clientId: stop.clientId,
@@ -1425,7 +1153,7 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
     for (var i = 0; i < planned.length; i++) {
       final stop = planned[i];
       if ((stop.childId ?? 0) != childId) continue;
-      if (!targetTypes.contains((stop.type ?? '').toLowerCase())) continue;
+      if (!targetTypes.contains(_normalizedStopType(stop.type))) continue;
       final current = stop.status.toLowerCase();
       if (current == 'delivered' || current == 'done') continue;
       planned[i] = (
@@ -1447,7 +1175,9 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
     final remaining = planned
         .where((s) {
           final status = s.status.toLowerCase();
-          return status != 'delivered' && status != 'done';
+          return status != 'picked_up' &&
+              status != 'delivered' &&
+              status != 'done';
         })
         .toList(growable: false);
 
@@ -1456,6 +1186,33 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
       routeRemainingStops: remaining,
       routeNextStopName: remaining.isNotEmpty ? remaining.first.name : null,
     );
+  }
+
+  static final _pickupTypes = <String>{
+    'pickup',
+    'pickup_home',
+    'pickup_school',
+  };
+
+  static final _dropoffTypes = <String>{
+    'dropoff',
+    'dropoff_home',
+    'dropoff_school',
+  };
+
+  static bool _isPickupType(String? type) =>
+      _pickupTypes.contains(_normalizedStopType(type));
+
+  static bool _isDropoffType(String? type) =>
+      _dropoffTypes.contains(_normalizedStopType(type));
+
+  static String _normalizedStopType(String? type) =>
+      (type ?? '').toLowerCase().trim();
+
+  static String _resolveCompletedStatus(String? type) {
+    if (_isPickupType(type)) return 'picked_up';
+    if (_isDropoffType(type)) return 'delivered';
+    return 'done';
   }
 
   String _stopFallbackKey(DriverTrackingStopPoint stop) {

@@ -21,7 +21,7 @@ void main() {
     final session = AuthSession(
       accessToken: 'token',
       tokenType: 'Bearer',
-      user: AuthUser(id: 1, name: 'User', email: 'u@e.com', role: 'user'),
+      user: AuthUser(id: 1, name: 'User', email: 'u@e.com', roles: ['user']),
     );
 
     when(

@@ -3,7 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/theme/app_theme.dart';
+import '../../../../core/error/app_error_reporter.dart';
 import '../../../../core/network/api_exception.dart';
+import '../../../../core/presentation/widgets/app_feedback.dart';
+import '../../../../core/presentation/widgets/app_shared_widgets.dart';
+import '../../../../core/presentation/widgets/e2e_keys.dart';
+import '../../../../core/presentation/widgets/faixa_app_bar.dart';
 import '../../../../domain/repositories/enrollments_repository.dart';
 import '../providers/driver_portal_providers.dart';
 
@@ -29,18 +34,32 @@ class _DriverLookupChildPageState extends ConsumerState<DriverLookupChildPage> {
     return '${cpf.substring(0, 3)}.***.***-${cpf.substring(9)}';
   }
 
+  /// O controller converte `found == false` em erro genérico; distinguimos o
+  /// caso "criança não encontrada" para exibir empty state em vez de erro.
+  bool _isNotFoundError(Object error) {
+    final message = error.toString().toLowerCase();
+    return message.contains('não encontrada') ||
+        message.contains('nao encontrada') ||
+        message.contains('not found');
+  }
+
   @override
   Widget build(BuildContext context) {
     final lookupAsync = ref.watch(driverLookupControllerProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Buscar crianca')),
+      backgroundColor: AppColors.surfaceSoft,
+      appBar: FaixaAppBar.screen(
+        title: 'Buscar criança',
+        showBack: Navigator.of(context).canPop(),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(AppSpacing.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             TextField(
+              key: E2EKeys.driverCpfInput,
               controller: _cpfController,
               keyboardType: TextInputType.number,
               inputFormatters: [
@@ -48,7 +67,7 @@ class _DriverLookupChildPageState extends ConsumerState<DriverLookupChildPage> {
                 LengthLimitingTextInputFormatter(11),
               ],
               decoration: InputDecoration(
-                hintText: 'Digite o CPF da crianca',
+                hintText: 'Digite o CPF da criança',
                 prefixIcon: const Icon(Icons.search_rounded),
                 suffixIcon: _cpfController.text.isNotEmpty
                     ? IconButton(
@@ -68,6 +87,7 @@ class _DriverLookupChildPageState extends ConsumerState<DriverLookupChildPage> {
             SizedBox(
               height: 52,
               child: FilledButton.icon(
+                key: E2EKeys.driverSearchChildButton,
                 onPressed: lookupAsync.isLoading
                     ? null
                     : () => ref
@@ -94,18 +114,29 @@ class _DriverLookupChildPageState extends ConsumerState<DriverLookupChildPage> {
   Widget _buildResult(AsyncValue<ChildLookupResult?> lookupAsync) {
     return lookupAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, _) => _ErrorState(
-        message: error.toString(),
-        onRetry: () => ref
-            .read(driverLookupControllerProvider.notifier)
-            .search(_cpfController.text),
-      ),
+      error: (error, _) {
+        if (_isNotFoundError(error)) {
+          return const _ChildNotFoundState();
+        }
+        return FaixaErrorState(
+          message: AppErrorReporter.messageFor(error),
+          onRetry: () => ref
+              .read(driverLookupControllerProvider.notifier)
+              .search(_cpfController.text),
+        );
+      },
       data: (result) {
         if (result == null) {
-          return const _EmptyState(
-            message: 'Digite o CPF da crianca para buscar.',
-            icon: Icons.child_care_outlined,
+          return const FaixaEmptyState(
+            message: 'Digite o CPF da criança para buscar.',
+            icon: Icons.child_care_rounded,
+            subtitle:
+                'Você poderá solicitar a matrícula após localizar a criança.',
           );
+        }
+
+        if (!result.found || result.childId == null) {
+          return const _ChildNotFoundState();
         }
 
         return _ChildResultCard(
@@ -117,10 +148,10 @@ class _DriverLookupChildPageState extends ConsumerState<DriverLookupChildPage> {
                   .read(driverLookupControllerProvider.notifier)
                   .requestEnrollment(result.childId!);
               if (!mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Matricula solicitada com sucesso!'),
-                ),
+              showAppSnackBar(
+                context,
+                message: 'Matrícula solicitada com sucesso!',
+                type: AppFeedbackType.success,
               );
               _cpfController.clear();
               ref.read(driverLookupControllerProvider.notifier).clear();
@@ -128,15 +159,33 @@ class _DriverLookupChildPageState extends ConsumerState<DriverLookupChildPage> {
               if (!mounted) return;
               final message = e is ApiException
                   ? e.message
-                  : 'Nao foi possivel solicitar a matricula. Tente novamente.';
-              ScaffoldMessenger.of(
+                  : 'Não foi possível solicitar a matrícula. Tente novamente.';
+              showAppSnackBar(
                 context,
-              ).showSnackBar(SnackBar(content: Text(message)));
+                message: message,
+                type: AppFeedbackType.error,
+              );
             }
           },
           maskCpf: _maskCpf,
         );
       },
+    );
+  }
+}
+
+/// Estado exibido quando o backend responde `found == false` (ou nulo):
+/// nenhuma criança localizada para o CPF informado.
+class _ChildNotFoundState extends StatelessWidget {
+  const _ChildNotFoundState();
+
+  @override
+  Widget build(BuildContext context) {
+    return const FaixaEmptyState(
+      message: 'Nenhuma criança encontrada para este CPF.',
+      icon: Icons.person_search_rounded,
+      subtitle:
+          'Verifique se o CPF informado é o da criança e se o responsável já cadastrou o dependente.',
     );
   }
 }
@@ -155,7 +204,19 @@ class _ChildResultCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      child: Card(
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+          boxShadow: const [
+            BoxShadow(
+              color: AppColors.shadowSubtle,
+              blurRadius: 8,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.lg),
           child: Column(
@@ -171,7 +232,7 @@ class _ChildResultCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(AppRadius.lg),
                     ),
                     child: const Icon(
-                      Icons.child_care_outlined,
+                      Icons.child_care_rounded,
                       color: AppColors.ink,
                     ),
                   ),
@@ -181,7 +242,7 @@ class _ChildResultCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          result.childName ?? 'Nome nao informado',
+                          result.childName ?? 'Nome não informado',
                           style: Theme.of(context).textTheme.titleSmall
                               ?.copyWith(fontWeight: FontWeight.w800),
                         ),
@@ -201,14 +262,21 @@ class _ChildResultCard extends StatelessWidget {
               if (result.parentName != null && result.parentName!.isNotEmpty)
                 _InfoRow(
                   icon: Icons.person_outline_rounded,
-                  label: 'Responsavel',
+                  label: 'Responsável',
                   value: result.parentName!,
                 ),
               if (result.address != null && result.address!.isNotEmpty)
                 _InfoRow(
-                  icon: Icons.location_on_outlined,
-                  label: 'Endereco',
+                  icon: Icons.location_on_rounded,
+                  label: 'Endereço',
                   value: result.address!,
+                ),
+              if (result.districtName != null &&
+                  result.districtName!.isNotEmpty)
+                _InfoRow(
+                  icon: Icons.location_city_rounded,
+                  label: 'Bairro',
+                  value: result.districtName!,
                 ),
               if (result.shiftName != null && result.shiftName!.isNotEmpty)
                 _InfoRow(
@@ -218,57 +286,32 @@ class _ChildResultCard extends StatelessWidget {
                 ),
               const SizedBox(height: AppSpacing.lg),
               if (result.isInDebt) ...[
-                Container(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFF4D6),
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                    border: Border.all(color: const Color(0xFFE3B23C)),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.warning_amber_rounded, size: 18),
-                      SizedBox(width: AppSpacing.sm),
-                      Expanded(
-                        child: Text(
-                          'Crianca com inadimplencia. Verifique antes de solicitar matricula.',
-                        ),
-                      ),
-                    ],
-                  ),
+                AppInfoBanner(
+                  message:
+                      'Criança com inadimplência. Verifique antes de solicitar matrícula.',
+                  icon: Icons.warning_amber_rounded,
+                  color: AppColors.yellowDark,
                 ),
                 const SizedBox(height: AppSpacing.lg),
               ],
               if (result.hasPendingEnrollment) ...[
-                Container(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEAF2FF),
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                    border: Border.all(color: const Color(0xFF8FB4FF)),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.hourglass_top_rounded, size: 18),
-                      SizedBox(width: AppSpacing.sm),
-                      Expanded(
-                        child: Text(
-                          'Ja existe uma solicitacao de matricula pendente para esta crianca.',
-                        ),
-                      ),
-                    ],
-                  ),
+                AppInfoBanner(
+                  message:
+                      'Já existe uma solicitação de matrícula pendente para esta criança.',
+                  icon: Icons.hourglass_top_rounded,
+                  color: AppColors.info,
                 ),
                 const SizedBox(height: AppSpacing.lg),
               ],
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
+                  key: E2EKeys.driverRequestEnrollmentButton,
                   onPressed: result.hasPendingEnrollment
                       ? null
                       : onRequestEnrollment,
                   icon: const Icon(Icons.person_add_alt_1_rounded),
-                  label: const Text('Solicitar matricula'),
+                  label: const Text('Solicitar matrícula'),
                 ),
               ),
             ],
@@ -318,72 +361,6 @@ class _InfoRow extends StatelessWidget {
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.message, required this.icon});
-
-  final String message;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 48, color: AppColors.muted),
-          const SizedBox(height: AppSpacing.lg),
-          Text(
-            message,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: AppColors.slate),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.message, this.onRetry});
-
-  final String message;
-  final VoidCallback? onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(
-            Icons.error_outline_rounded,
-            size: 48,
-            color: AppColors.danger,
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          Text(
-            message,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: AppColors.slate),
-            textAlign: TextAlign.center,
-          ),
-          if (onRetry != null) ...[
-            const SizedBox(height: AppSpacing.lg),
-            FilledButton.icon(
-              onPressed: onRetry,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Tentar novamente'),
-            ),
-          ],
         ],
       ),
     );

@@ -4,25 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('ChildSummaryCard displays name and school', (tester) async {
+  testWidgets('ChildSummaryCard displays child name', (tester) async {
     final child = Child(
       id: 1,
       name: 'Ana Silva',
       cpf: '12345678901',
-      birthDate: null,
-      schoolName: 'Escola Primavera',
+      schoolId: 1,
       shiftId: 1,
-      shiftName: 'Manhã',
-      parentId: 10,
-      parentName: 'Maria Silva',
-      address: ChildAddress(
-        street: 'Rua A',
-        number: '1',
-        neighborhood: 'Bairro',
-        city: 'Cidade',
-        state: 'ST',
-        zipCode: '00000',
-      ),
       isInDebt: false,
     );
 
@@ -33,7 +21,7 @@ void main() {
     );
 
     expect(find.text('Ana Silva'), findsOneWidget);
-    expect(find.text('Escola Primavera • Manhã'), findsOneWidget);
+    expect(find.text('Dependente'), findsNothing);
   });
 
   testWidgets('ChildSummaryCard does not show CPF', (tester) async {
@@ -41,20 +29,8 @@ void main() {
       id: 1,
       name: 'Ana Silva',
       cpf: '12345678901',
-      birthDate: null,
-      schoolName: 'Escola Primavera',
+      schoolId: 1,
       shiftId: 1,
-      shiftName: 'Manhã',
-      parentId: 10,
-      parentName: 'Maria Silva',
-      address: ChildAddress(
-        street: 'Rua A',
-        number: '1',
-        neighborhood: 'Bairro',
-        city: 'Cidade',
-        state: 'ST',
-        zipCode: '00000',
-      ),
       isInDebt: false,
     );
 
@@ -73,20 +49,8 @@ void main() {
       id: 1,
       name: 'Ana Silva',
       cpf: '12345678901',
-      birthDate: null,
-      schoolName: 'Escola Primavera',
+      schoolId: 1,
       shiftId: 1,
-      shiftName: 'Manhã',
-      parentId: 10,
-      parentName: 'Maria Silva',
-      address: ChildAddress(
-        street: 'Rua A',
-        number: '1',
-        neighborhood: 'Bairro',
-        city: 'Cidade',
-        state: 'ST',
-        zipCode: '00000',
-      ),
       isInDebt: true,
     );
 

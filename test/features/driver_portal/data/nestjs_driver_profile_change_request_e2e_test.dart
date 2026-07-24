@@ -1,3 +1,8 @@
+@Tags(['prod'])
+library;
+
+// ignore_for_file: avoid_print
+
 import 'package:app_faixa_amarela/core/network/nestjs_response_unwrap_interceptor.dart';
 import 'package:app_faixa_amarela/features/driver_portal/data/nestjs_driver_profile_change_request_repository.dart';
 import 'package:dio/dio.dart';

@@ -1,3 +1,4 @@
+import 'package:app_faixa_amarela/core/presentation/widgets/faixa_section_card.dart';
 import 'package:app_faixa_amarela/domain/models/child.dart';
 import 'package:app_faixa_amarela/features/auth/presentation/pages/activation_page.dart';
 import 'package:app_faixa_amarela/features/auth/presentation/pages/login_page.dart';
@@ -17,20 +18,8 @@ void main() {
               id: 1,
               name: 'Ana Silva',
               cpf: '12345678901',
-              birthDate: null,
-              schoolName: 'Escola Primavera',
+              schoolId: 1,
               shiftId: 1,
-              shiftName: 'Manhã',
-              parentId: 10,
-              parentName: 'Maria Silva',
-              address: ChildAddress(
-                street: 'Rua A',
-                number: '1',
-                neighborhood: 'Bairro',
-                city: 'Cidade',
-                state: 'ST',
-                zipCode: '00000',
-              ),
               isInDebt: false,
             ),
           ),
@@ -76,6 +65,28 @@ void main() {
     await expectLater(
       find.byType(ActivationPage),
       matchesGoldenFile('goldens/activation_page.png'),
+    );
+  });
+
+  testWidgets('FaixaSectionCard golden', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: Padding(
+            padding: EdgeInsets.all(16),
+            child: FaixaSectionCard(
+              icon: Icons.person_outline,
+              title: 'Dados pessoais',
+              subtitle: 'Preencha as informacoes abaixo.',
+              child: Text('Conteudo do card'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await expectLater(
+      find.byType(FaixaSectionCard),
+      matchesGoldenFile('goldens/faixa_section_card.png'),
     );
   });
 }

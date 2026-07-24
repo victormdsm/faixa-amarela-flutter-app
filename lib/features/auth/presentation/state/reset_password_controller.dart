@@ -13,7 +13,7 @@ class ResetPasswordController extends _$ResetPasswordController {
 
   void setToken(String value) {
     state = state.copyWith(
-      token: value,
+      token: value.trim().toUpperCase(),
       errorMessage: null,
       successMessage: null,
     );
@@ -35,17 +35,44 @@ class ResetPasswordController extends _$ResetPasswordController {
     );
   }
 
+  void togglePasswordVisibility() {
+    state = state.copyWith(obscurePassword: !state.obscurePassword);
+  }
+
+  void togglePasswordConfirmationVisibility() {
+    state = state.copyWith(
+      obscurePasswordConfirmation: !state.obscurePasswordConfirmation,
+    );
+  }
+
   Future<bool> submit() async {
-    if (state.token.trim().isEmpty) {
-      state = state.copyWith(errorMessage: 'Informe o token de recuperacao.');
+    final token = state.token.trim();
+    if (token.isEmpty) {
+      state = state.copyWith(
+        errorMessage: 'Informe o código de recuperação enviado por e-mail.',
+      );
       return false;
     }
-    if (state.password.isEmpty) {
-      state = state.copyWith(errorMessage: 'Informe a nova senha.');
+    if (state.password.length < 6) {
+      state = state.copyWith(
+        errorMessage: 'A senha deve ter pelo menos 6 caracteres.',
+      );
+      return false;
+    }
+    if (!state.password.contains(RegExp(r'[A-Za-z]'))) {
+      state = state.copyWith(
+        errorMessage: 'A senha deve conter pelo menos uma letra.',
+      );
+      return false;
+    }
+    if (!state.password.contains(RegExp(r'[0-9]'))) {
+      state = state.copyWith(
+        errorMessage: 'A senha deve conter pelo menos um número.',
+      );
       return false;
     }
     if (state.password != state.passwordConfirmation) {
-      state = state.copyWith(errorMessage: 'As senhas nao coincidem.');
+      state = state.copyWith(errorMessage: 'As senhas não coincidem.');
       return false;
     }
 
@@ -59,7 +86,7 @@ class ResetPasswordController extends _$ResetPasswordController {
       await ref
           .read(resetPasswordUseCaseProvider)
           .call(
-            token: state.token.trim(),
+            token: token,
             password: state.password,
             passwordConfirmation: state.passwordConfirmation,
           );
@@ -78,7 +105,7 @@ class ResetPasswordController extends _$ResetPasswordController {
     } catch (_) {
       state = state.copyWith(
         isLoading: false,
-        errorMessage: 'Falha ao redefinir a senha.',
+        errorMessage: 'Falha ao redefinir a senha. Tente novamente.',
         successMessage: null,
       );
       return false;

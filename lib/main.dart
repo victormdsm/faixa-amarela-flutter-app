@@ -6,12 +6,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 import 'app/app.dart';
 import 'core/error/app_error_reporter.dart';
 import 'core/notifications/push_notifications.dart';
 import 'features/auth/data/session_storage.dart';
 import 'features/catalog/data/catalog_repository.dart';
+import 'features/driver_portal/data/driver_profile_storage.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -21,10 +23,13 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  await initializeDateFormatting('pt_BR', null);
+
   await Hive.initFlutter();
   await Future.wait([
     SessionStorage.openBox(),
     CatalogRepository.openCacheBox(),
+    DriverProfileStorage.openBox(),
   ]);
 
   FlutterError.onError = (details) {

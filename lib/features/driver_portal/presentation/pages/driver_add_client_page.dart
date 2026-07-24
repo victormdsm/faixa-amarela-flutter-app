@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/network/api_exception.dart';
+import '../../../../core/presentation/widgets/app_shared_widgets.dart';
+import '../../../../core/presentation/widgets/faixa_app_bar.dart';
+import '../../../../core/presentation/widgets/faixa_section_card.dart';
 import '../../../../domain/repositories/enrollments_repository.dart';
 import '../providers/driver_portal_providers.dart';
 
@@ -37,179 +40,159 @@ class _DriverAddClientPageState extends ConsumerState<DriverAddClientPage> {
     final canLink = result != null && result.found && result.childId != null;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Vincular crianca')),
+      backgroundColor: AppColors.surfaceSoft,
+      appBar: FaixaAppBar.screen(title: 'Vincular crianca'),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(AppSpacing.lg),
           children: [
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      'Busque a crianca pelo CPF para solicitar o vinculo ao seu veiculo.',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: AppColors.slate,
+            FaixaSectionCard(
+              title: 'Vinculo por CPF',
+              subtitle:
+                  'Busque a crianca pelo CPF para solicitar o vinculo ao seu veiculo.',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    controller: _cpfController,
+                    keyboardType: TextInputType.number,
+                    enabled: !_submitting,
+                    onChanged: (_) => _resetLookup(),
+                    decoration: const InputDecoration(
+                      labelText: 'CPF da crianca',
+                      hintText: '000.000.000-00',
+                      prefixIcon: Icon(Icons.badge_outlined),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+
+                  // Lookup button
+                  OutlinedButton.icon(
+                    onPressed: (_lookingUpCpf || _submitting)
+                        ? null
+                        : _lookupByCpf,
+                    icon: _lookingUpCpf
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.person_search_rounded),
+                    label: const Text('Buscar crianca pelo CPF'),
+                  ),
+
+                  // Child info banner
+                  if (result != null) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    Container(
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceSoft,
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                        border: Border.all(color: AppColors.border),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // CPF field
-                    TextField(
-                      controller: _cpfController,
-                      keyboardType: TextInputType.number,
-                      enabled: !_submitting,
-                      onChanged: (_) => _resetLookup(),
-                      decoration: const InputDecoration(
-                        labelText: 'CPF da crianca',
-                        hintText: '000.000.000-00',
-                        prefixIcon: Icon(Icons.badge_outlined),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Lookup button
-                    OutlinedButton.icon(
-                      onPressed: (_lookingUpCpf || _submitting)
-                          ? null
-                          : _lookupByCpf,
-                      icon: _lookingUpCpf
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.person_search_rounded),
-                      label: const Text('Buscar crianca pelo CPF'),
-                    ),
-
-                    // Child info banner
-                    if (result != null) ...[
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppColors.surfaceSoft,
-                          borderRadius: BorderRadius.circular(AppRadius.md),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            result.found
+                                ? (result.childName ?? 'Crianca encontrada')
+                                : (result.childName ??
+                                      'Nenhuma crianca encontrada para este CPF.'),
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          if (result.schoolName != null &&
+                              result.schoolName!.isNotEmpty) ...[
+                            const SizedBox(height: AppSpacing.xs),
+                            AppIconTextRow(
+                              icon: Icons.school_outlined,
+                              text: 'Escola: ${result.schoolName}',
+                            ),
+                          ],
+                          if (result.shiftName != null &&
+                              result.shiftName!.isNotEmpty) ...[
+                            const SizedBox(height: AppSpacing.xs),
+                            AppIconTextRow(
+                              icon: Icons.access_time_rounded,
+                              text: 'Turno: ${result.shiftName}',
+                            ),
+                          ],
+                          if (result.districtName != null &&
+                              result.districtName!.isNotEmpty) ...[
+                            const SizedBox(height: AppSpacing.xs),
+                            AppIconTextRow(
+                              icon: Icons.location_city_rounded,
+                              text: 'Bairro: ${result.districtName}',
+                            ),
+                          ],
+                          if (result.parentName != null &&
+                              result.parentName!.isNotEmpty) ...[
+                            const SizedBox(height: AppSpacing.xs),
+                            AppIconTextRow(
+                              icon: Icons.person_outline_rounded,
+                              text: 'Responsavel: ${result.parentName}',
+                            ),
+                          ],
+                          if (result.address != null &&
+                              result.address!.isNotEmpty) ...[
+                            const SizedBox(height: AppSpacing.xs),
+                            AppIconTextRow(
+                              icon: Icons.location_on_outlined,
+                              text: 'Endereco: ${result.address}',
+                            ),
+                          ],
+                          if (result.hasPendingEnrollment) ...[
+                            const SizedBox(height: AppSpacing.xs),
                             Text(
-                              result.found
-                                  ? (result.childName ?? 'Crianca encontrada')
-                                  : (result.childName ??
-                                        'Nenhuma crianca encontrada para este CPF.'),
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            if (result.schoolName != null &&
-                                result.schoolName!.isNotEmpty) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                'Escola: ${result.schoolName}',
-                                style: theme.textTheme.bodySmall,
-                              ),
-                            ],
-                            if (result.shiftName != null &&
-                                result.shiftName!.isNotEmpty) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                'Turno: ${result.shiftName}',
-                                style: theme.textTheme.bodySmall,
-                              ),
-                            ],
-                            if (result.parentName != null &&
-                                result.parentName!.isNotEmpty) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                'Responsavel: ${result.parentName}',
-                                style: theme.textTheme.bodySmall,
-                              ),
-                            ],
-                            if (result.address != null &&
-                                result.address!.isNotEmpty) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                'Endereco: ${result.address}',
-                                style: theme.textTheme.bodySmall,
-                              ),
-                            ],
-                            if (result.hasPendingEnrollment) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                'Ja existe uma solicitacao de vinculo pendente.',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: AppColors.yellowDark,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ],
-
-                    // Inadimplency warning
-                    if (_inadimplencyWarning != null) ...[
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFF4D6),
-                          borderRadius: BorderRadius.circular(AppRadius.md),
-                          border: Border.all(color: const Color(0xFFE3B23C)),
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Icon(
-                              Icons.warning_amber_rounded,
-                              color: Color(0xFFE3B23C),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                _inadimplencyWarning!,
-                                style: theme.textTheme.bodySmall,
+                              'Ja existe uma solicitacao de vinculo pendente.',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: AppColors.yellowDark,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ],
-                        ),
+                        ],
                       ),
-                    ],
-
-                    // Error
-                    if (_error != null) ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        _error!,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: AppColors.danger,
-                        ),
-                      ),
-                    ],
-
-                    const SizedBox(height: 20),
-
-                    // Link button
-                    FilledButton.icon(
-                      onPressed: (canLink && !_submitting) ? _link : null,
-                      icon: _submitting
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.link_rounded),
-                      label: Text(_submitting ? 'Vinculando...' : 'Vincular'),
                     ),
                   ],
-                ),
+
+                  // Inadimplency warning
+                  if (_inadimplencyWarning != null) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    AppInfoBanner(
+                      message: _inadimplencyWarning!,
+                      icon: Icons.warning_amber_rounded,
+                      color: AppColors.yellowDark,
+                    ),
+                  ],
+
+                  // Error
+                  if (_error != null) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    AppInfoBanner(
+                      message: _error!,
+                      icon: Icons.error_outline_rounded,
+                      color: AppColors.danger,
+                    ),
+                  ],
+
+                  const SizedBox(height: AppSpacing.lg),
+
+                  // Link button
+                  FilledButton.icon(
+                    onPressed: (canLink && !_submitting) ? _link : null,
+                    icon: _submitting
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.link_rounded),
+                    label: Text(_submitting ? 'Vinculando...' : 'Vincular'),
+                  ),
+                ],
               ),
             ),
           ],

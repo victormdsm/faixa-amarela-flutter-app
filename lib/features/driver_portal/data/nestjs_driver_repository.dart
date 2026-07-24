@@ -1,9 +1,9 @@
 import 'package:dio/dio.dart';
 
-import '../../../../core/network/api_exception.dart';
-import '../../../../data/dto/driver_profile_dto.dart';
-import '../../../../domain/models/driver_profile.dart';
-import '../../../../domain/repositories/driver_repository.dart';
+import '../../../core/network/api_exception.dart';
+import '../../../data/dto/driver_profile_dto.dart';
+import '../../../domain/models/driver_profile.dart';
+import '../../../domain/repositories/driver_repository.dart';
 
 class NestjsDriverRepository implements DriverRepository {
   NestjsDriverRepository(this._dio);
@@ -17,15 +17,11 @@ class NestjsDriverRepository implements DriverRepository {
       final data = response.data;
       if (data == null) return null;
 
-      final profileData = data['data'] is Map<String, dynamic>
-          ? data['data'] as Map<String, dynamic>
-          : data;
-
-      if (profileData['id'] == null && profileData['user_id'] == null) {
+      if (data['id'] == null && data['userId'] == null) {
         return null;
       }
 
-      return DriverProfileDto.fromJson(profileData).toDomain();
+      return DriverProfileDto.fromJson(data).toDomain();
     } catch (error) {
       throw ApiException.fromDio(error);
     }
@@ -55,14 +51,12 @@ class NestjsDriverRepository implements DriverRepository {
           '/drivers/me',
           data: driverPayload,
         );
-        driverProfileData = driverResponse.data?['data'] is Map<String, dynamic>
-            ? driverResponse.data!['data'] as Map<String, dynamic>
-            : driverResponse.data ?? const <String, dynamic>{};
+        driverProfileData = driverResponse.data ?? const <String, dynamic>{};
       } else {
-        final driverResponse = await _dio.get<Map<String, dynamic>>('/drivers/me');
-        driverProfileData = driverResponse.data?['data'] is Map<String, dynamic>
-            ? driverResponse.data!['data'] as Map<String, dynamic>
-            : driverResponse.data ?? const <String, dynamic>{};
+        final driverResponse = await _dio.get<Map<String, dynamic>>(
+          '/drivers/me',
+        );
+        driverProfileData = driverResponse.data ?? const <String, dynamic>{};
       }
 
       // 2. Atualiza dados do usuario (nome e telefone).
@@ -78,9 +72,7 @@ class NestjsDriverRepository implements DriverRepository {
           '/users/me',
           data: userPayload,
         );
-        userData = userResponse.data?['data'] is Map<String, dynamic>
-            ? userResponse.data!['data'] as Map<String, dynamic>
-            : userResponse.data;
+        userData = userResponse.data;
       }
 
       // 3. Mescla os dados para retornar um DriverProfile atualizado.
@@ -91,7 +83,7 @@ class NestjsDriverRepository implements DriverRepository {
           merged['cellPhone'] = userData['cellPhone'];
         }
         if (userData['avatarUrl'] != null) {
-          merged['avatar_url'] = userData['avatarUrl'];
+          merged['avatarUrl'] = userData['avatarUrl'];
         }
       }
 

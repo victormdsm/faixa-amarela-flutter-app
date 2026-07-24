@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/theme/app_theme.dart';
+import '../../../../core/error/app_error_reporter.dart';
 import '../../../../core/presentation/widgets/app_shared_widgets.dart';
+import '../../../../core/presentation/widgets/faixa_app_bar.dart';
+import '../../../../core/utils/date_formatters.dart';
 import '../providers/parent_portal_providers.dart';
 
 class ParentBoardingsPage extends ConsumerWidget {
@@ -12,9 +15,14 @@ class ParentBoardingsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final data = ref.watch(parentBoardingsProvider);
 
+    Future<void> refresh() async {
+      ref.invalidate(parentBoardingsProvider);
+    }
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Embarques e Desembarques'),
+      backgroundColor: AppColors.surfaceSoft,
+      appBar: FaixaAppBar.screen(
+        title: 'Embarques e Desembarques',
         actions: [
           IconButton(
             tooltip: 'Atualizar',
@@ -23,33 +31,64 @@ class ParentBoardingsPage extends ConsumerWidget {
           ),
         ],
       ),
-      body: data.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => AppErrorState(
-          message: error.toString(),
-          onRetry: () => ref.invalidate(parentBoardingsProvider),
-        ),
-        data: (page) {
-          if (page.items.isEmpty) {
-            return const AppEmptyState(
-              message: 'Nenhum registro encontrado.',
-              icon: Icons.fact_check_outlined,
-              subtitle: 'Embarques e desembarques aparecerão aqui.',
-            );
-          }
-          return ListView.separated(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              AppSpacing.md,
-              AppSpacing.lg,
-              AppSpacing.lg,
+      body: RefreshIndicator(
+        onRefresh: refresh,
+        child: data.when(
+          loading: () => const _ScrollableStatus(
+            child: Center(child: CircularProgressIndicator()),
+          ),
+          error: (error, _) => _ScrollableStatus(
+            child: FaixaErrorState(
+              message: AppErrorReporter.messageFor(error),
+              onRetry: () => ref.invalidate(parentBoardingsProvider),
             ),
-            itemCount: page.items.length,
-            separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
-            itemBuilder: (context, index) =>
-                _BoardingCard(item: page.items[index]),
-          );
-        },
+          ),
+          data: (page) {
+            if (page.items.isEmpty) {
+              return const _ScrollableStatus(
+                child: FaixaEmptyState(
+                  message: 'Nenhum registro encontrado.',
+                  icon: Icons.fact_check_rounded,
+                  subtitle: 'Embarques e desembarques aparecerão aqui.',
+                ),
+              );
+            }
+            return ListView.separated(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.md,
+                AppSpacing.lg,
+                AppSpacing.lg,
+              ),
+              itemCount: page.items.length,
+              separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.md),
+              itemBuilder: (context, index) =>
+                  _BoardingCard(item: page.items[index]),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+/// Envolve estados de loading/erro/vazio em uma área rolável para que o
+/// pull-to-refresh funcione mesmo sem lista de registros.
+class _ScrollableStatus extends StatelessWidget {
+  const _ScrollableStatus({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: child,
+        ),
       ),
     );
   }
@@ -68,7 +107,9 @@ class _BoardingCard extends StatelessWidget {
     final status = (item['status'] ?? 'N/A').toString();
     final childName = (child['name'] ?? '').toString();
     final routeName = (route['name'] ?? '').toString();
-    final hour = (boarding['hour_boarding'] ?? '').toString();
+    final boardedAt = DateTime.tryParse(
+      (boarding['hourBoarding'] ?? '').toString(),
+    );
     final theme = Theme.of(context);
 
     final isDisembarked =
@@ -78,10 +119,7 @@ class _BoardingCard extends StatelessWidget {
         status.toLowerCase() == 'boarded' ||
         status.toLowerCase() == 'embarcado';
     final (statusColor, statusBg) = switch (status.toLowerCase()) {
-      'boarded' || 'embarcado' => (
-        const Color(0xFF0A7E52),
-        const Color(0xFF0A7E52).withValues(alpha: 0.10),
-      ),
+      'boarded' || 'embarcado' => (AppColors.success, AppColors.successSurface),
       'disembarked' ||
       'desembarcado' => (AppColors.slate, AppColors.surfaceSoft),
       _ => (AppColors.ink, AppColors.surfaceSoft),
@@ -98,19 +136,26 @@ class _BoardingCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+        boxShadow: const [
+          BoxShadow(
+            color: AppColors.shadowSubtle,
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 40,
-            height: 40,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
               color: statusBg,
               borderRadius: BorderRadius.circular(AppRadius.md),
             ),
-            child: Icon(tileIcon, color: statusColor, size: 20),
+            child: Icon(tileIcon, color: statusColor, size: 22),
           ),
           const SizedBox(width: AppSpacing.md),
           Expanded(
@@ -128,6 +173,7 @@ class _BoardingCard extends StatelessWidget {
                             : 'Embarque',
                         style: theme.textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.w700,
+                          color: AppColors.ink,
                         ),
                       ),
                     ),
@@ -157,7 +203,7 @@ class _BoardingCard extends StatelessWidget {
                 Text(
                   [
                     if (routeName.isNotEmpty) 'Rota: $routeName',
-                    if (hour.isNotEmpty) 'Hora: $hour',
+                    if (boardedAt != null) 'Hora: ${formatDateTime(boardedAt)}',
                   ].join(' · '),
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: AppColors.slate,

@@ -7,6 +7,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import '../core/error/app_error_reporter.dart';
 import '../core/network/auth_interceptor.dart';
 import '../core/notifications/push_notifications.dart';
+import '../core/permissions/app_permission_service.dart';
 import '../features/auth/presentation/state/app_session_controller.dart';
 import '../features/driver_portal/presentation/providers/driver_portal_providers.dart';
 import '../features/notifications/presentation/providers/notification_providers.dart';
@@ -48,6 +49,21 @@ class _FaixaAmarelaAppState extends ConsumerState<FaixaAmarelaApp> {
     Future<void>.microtask(
       () => ref.read(driverTrackingControllerProvider.notifier).initialize(),
     );
+    // Request location and notification permissions natively on first launch.
+    // This is intentionally fire-and-forget: the app must not block on the
+    // user's response and should continue to the login/dashboard normally.
+    Future<void>.microtask(() async {
+      try {
+        await ref.read(appPermissionServiceProvider).requestAll();
+      } catch (error, stack) {
+        AppErrorReporter.report(
+          error,
+          stack,
+          source: 'permission_request',
+          showSnack: false,
+        );
+      }
+    });
     WidgetsBinding.instance.addObserver(_lifecycleObserver);
     FirebaseMessaging.onMessage.listen((message) {
       try {

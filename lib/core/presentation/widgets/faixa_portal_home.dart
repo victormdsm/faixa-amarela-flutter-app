@@ -1,33 +1,24 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/theme/app_theme.dart';
+import 'dashboard/dashboard_action_grid.dart';
+import 'dashboard/dashboard_header.dart';
+import 'dashboard/dashboard_metric_grid.dart';
+import 'dashboard/dashboard_models.dart';
+import 'dashboard/dashboard_section_title.dart';
+import 'dashboard/dashboard_status_card.dart';
+import 'faixa_app_bar.dart';
 
-class PortalHomeMetric {
-  const PortalHomeMetric({
-    required this.label,
-    required this.value,
-    required this.icon,
-    this.color,
-  });
+export 'dashboard/dashboard_models.dart';
 
-  final String label;
-  final String value;
-  final IconData icon;
-  final Color? color;
-}
-
-class PortalHomeAction {
-  const PortalHomeAction({
-    required this.label,
-    required this.icon,
-    required this.onTap,
-  });
-
-  final String label;
-  final IconData icon;
-  final VoidCallback onTap;
-}
-
+/// Wrapper legado da home do portal.
+///
+/// Mantido para compatibilidade com consumidores antigos. Novas dashboards
+/// devem montar o layout diretamente com [DashboardHeader], [DashboardMetricGrid],
+/// [DashboardActionGrid] e [DashboardStatusCard].
+@Deprecated(
+  'Use os widgets de dashboard especificos por persona em vez deste wrapper.',
+)
 class FaixaPortalHome extends StatelessWidget {
   const FaixaPortalHome({
     super.key,
@@ -38,8 +29,12 @@ class FaixaPortalHome extends StatelessWidget {
     required this.metrics,
     required this.actions,
     this.onRefresh,
-    this.onLogout,
+    this.onProfileTap,
     this.bottomContent,
+    this.greeting,
+    this.greetingSubtitle,
+    this.statusCardSubtitle,
+    this.statusCard,
   });
 
   final String userName;
@@ -49,177 +44,70 @@ class FaixaPortalHome extends StatelessWidget {
   final List<PortalHomeMetric> metrics;
   final List<PortalHomeAction> actions;
   final VoidCallback? onRefresh;
-  final VoidCallback? onLogout;
+  final VoidCallback? onProfileTap;
   final Widget? bottomContent;
+
+  /// Saudacao customizada. Se nao informada, usa "Ola, {primeiroNome}!".
+  final String? greeting;
+
+  /// Subtitulo customizado abaixo da saudacao.
+  final String? greetingSubtitle;
+
+  /// Subtitulo customizado do card de status.
+  final String? statusCardSubtitle;
+
+  /// Widget customizado que substitui o card de status padrao.
+  final Widget? statusCard;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
-      appBar: AppBar(
-        title: Text(roleLabel),
+      backgroundColor: AppColors.surfaceSoft,
+      appBar: FaixaAppBar.portal(
         actions: [
-          if (onRefresh != null)
+          if (onProfileTap != null)
             IconButton(
-              onPressed: onRefresh,
-              icon: const Icon(Icons.refresh_rounded),
-            ),
-          if (onLogout != null)
-            IconButton(
-              onPressed: onLogout,
-              icon: const Icon(Icons.logout_rounded),
+              tooltip: 'Perfil',
+              onPressed: onProfileTap,
+              icon: const Icon(Icons.account_circle_outlined),
             ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        children: [
-          Container(
-            padding: const EdgeInsets.all(AppSpacing.xl),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [AppColors.yellow, Color(0xFFFFD76A)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(AppRadius.xl),
+      body: RefreshIndicator(
+        onRefresh: () async => onRefresh?.call(),
+        child: ListView(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          children: [
+            DashboardHeader(
+              userName: userName,
+              greeting: greeting,
+              subtitle: greetingSubtitle,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  userName,
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.ink,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  statusLabel,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: AppColors.ink,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.md,
-                    vertical: AppSpacing.sm,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.7),
-                    borderRadius: BorderRadius.circular(AppRadius.full),
-                  ),
-                  child: Text(
-                    statusActive ? 'Status ativo' : 'Status inativo',
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: metrics.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              mainAxisSpacing: AppSpacing.md,
-              crossAxisSpacing: AppSpacing.md,
-              childAspectRatio: 1.5,
-            ),
-            itemBuilder: (context, index) {
-              final item = metrics[index];
-              final color = item.color ?? AppColors.ink;
-              return Container(
-                padding: const EdgeInsets.all(AppSpacing.lg),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(AppRadius.lg),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Icon(item.icon, color: color),
-                    Text(
-                      item.value,
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    Text(
-                      item.label,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: AppColors.slate,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          Text(
-            'Acoes rapidas',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: actions.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              mainAxisSpacing: AppSpacing.md,
-              crossAxisSpacing: AppSpacing.md,
-              childAspectRatio: 1.35,
-            ),
-            itemBuilder: (context, index) {
-              final item = actions[index];
-              return InkWell(
-                onTap: item.onTap,
-                borderRadius: BorderRadius.circular(AppRadius.lg),
-                child: Ink(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(AppRadius.lg),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.lg),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Icon(item.icon, color: AppColors.ink),
-                        Text(
-                          item.label,
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-          if (bottomContent != null) ...[
             const SizedBox(height: AppSpacing.lg),
-            bottomContent!,
+            statusCard ??
+                DashboardStatusCard(
+                  active: statusActive,
+                  title: statusLabel,
+                  subtitle: statusCardSubtitle ??
+                      (statusActive
+                          ? 'Acompanhe a localizacao em tempo real.'
+                          : 'Nenhuma rota ativa no momento.'),
+                ),
+            const SizedBox(height: AppSpacing.xl),
+            const DashboardSectionTitle('Resumo'),
+            const SizedBox(height: AppSpacing.md),
+            DashboardMetricGrid(metrics: metrics),
+            const SizedBox(height: AppSpacing.xl),
+            const DashboardSectionTitle('Acoes Rapidas'),
+            const SizedBox(height: AppSpacing.md),
+            DashboardActionGrid(actions: actions),
+            if (bottomContent != null) ...[
+              const SizedBox(height: AppSpacing.xl),
+              bottomContent!,
+            ],
+            const SizedBox(height: AppSpacing.xxl),
           ],
-        ],
+        ),
       ),
     );
   }

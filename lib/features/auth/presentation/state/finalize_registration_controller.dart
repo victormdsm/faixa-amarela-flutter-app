@@ -39,7 +39,7 @@ class FinalizeRegistrationController extends _$FinalizeRegistrationController {
       state = state.copyWith(
         isLoading: false,
         successMessage:
-            'Se o cadastro existir, enviamos um e-mail para finalizar o cadastro de $login.',
+            'Se o cadastro existir, enviamos um e-mail com o código de ativação para $login.',
       );
       return true;
     } on ApiException catch (e) {
@@ -52,7 +52,7 @@ class FinalizeRegistrationController extends _$FinalizeRegistrationController {
     } catch (_) {
       state = state.copyWith(
         isLoading: false,
-        errorMessage: 'Falha ao solicitar o e-mail de finalizacao de cadastro.',
+        errorMessage: 'Falha ao solicitar o e-mail de finalização de cadastro.',
         successMessage: null,
       );
       return false;

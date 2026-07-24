@@ -31,11 +31,11 @@ class AuthSession {
 
   factory AuthSession.fromJson(Map<String, dynamic> json) {
     String? resolveExpiresAt(String key) {
-      final direct = json['${key}_at']?.toString();
+      final direct = json['${key}At']?.toString();
       if (direct != null && direct.isNotEmpty) return direct;
       final durationKeys = key == 'expires'
-          ? ['expiresIn', 'expires_in']
-          : ['refreshExpiresIn', 'refresh_expires_in'];
+          ? ['expiresIn']
+          : ['refreshExpiresIn'];
       final expiresIn = durationKeys
           .map((k) => json[k])
           .firstWhere((v) => v is num, orElse: () => null);
@@ -48,11 +48,9 @@ class AuthSession {
     }
 
     return AuthSession(
-      accessToken: (json['access_token'] ?? json['accessToken'] ?? '')
-          .toString(),
-      refreshToken: (json['refresh_token'] ?? json['refreshToken'])?.toString(),
-      tokenType: (json['token_type'] ?? json['tokenType'] ?? 'Bearer')
-          .toString(),
+      accessToken: (json['accessToken'] ?? '').toString(),
+      refreshToken: json['refreshToken']?.toString(),
+      tokenType: (json['tokenType'] ?? 'Bearer').toString(),
       expiresAt: resolveExpiresAt('expires'),
       refreshExpiresAt: resolveExpiresAt('refreshExpires'),
       user: AuthUser.fromJson(

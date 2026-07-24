@@ -32,7 +32,7 @@ class RouteManifestDto {
     Map<int, Map<String, dynamic>>? childLookup,
   }) {
     // O NestJS retorna route.id como int e manifest.id como UUID.
-    int _toInt(dynamic value) {
+    int toInt(dynamic value) {
       if (value is num) return value.toInt();
       if (value is String) return int.tryParse(value) ?? 0;
       return 0;
@@ -56,8 +56,10 @@ class RouteManifestDto {
 
     int? resolveShiftId() {
       if (json['shiftId'] == null) return null;
-      return _toInt(json['shiftId']);
+      return toInt(json['shiftId']);
     }
+
+    final effectiveChildLookup = childLookup ?? _buildChildLookup(json);
 
     final rawStops = json['stops'];
     final stops = rawStops is List
@@ -66,7 +68,7 @@ class RouteManifestDto {
             .map(
               (e) => RouteStopDto.fromJson(
                 Map<String, dynamic>.from(e),
-                childLookup: childLookup,
+                childLookup: effectiveChildLookup,
               ),
             )
             .toList()
@@ -75,18 +77,14 @@ class RouteManifestDto {
     return RouteManifestDto(
       id: resolveId(),
       manifestId: resolveManifestId(),
-      driverId: _toInt(_value(json, 'driver_id', 'driverId')),
-      vanId: _toInt(_value(json, 'van_id', 'vanId')),
+      driverId: toInt(json['driverId']),
+      vanId: toInt(json['vanId']),
       shiftId: resolveShiftId(),
-      startedAt: _value(json, 'started_at', 'startedAt') != null
-          ? DateTime.tryParse(
-              _value(json, 'started_at', 'startedAt').toString(),
-            )
+      startedAt: json['startedAt'] != null
+          ? DateTime.tryParse(json['startedAt'].toString())
           : null,
-      finishedAt: _value(json, 'finished_at', 'finishedAt') != null
-          ? DateTime.tryParse(
-              _value(json, 'finished_at', 'finishedAt').toString(),
-            )
+      finishedAt: json['finishedAt'] != null
+          ? DateTime.tryParse(json['finishedAt'].toString())
           : null,
       status: RouteStatus.fromJson((json['status'] ?? 'planning').toString()),
       stops: stops,
@@ -96,12 +94,12 @@ class RouteManifestDto {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      if (manifestId != null) 'manifest_id': manifestId,
-      'driver_id': driverId,
-      'van_id': vanId,
-      if (shiftId != null) 'shift_id': shiftId,
-      if (startedAt != null) 'started_at': startedAt!.toIso8601String(),
-      if (finishedAt != null) 'finished_at': finishedAt!.toIso8601String(),
+      if (manifestId != null) 'manifestId': manifestId,
+      'driverId': driverId,
+      'vanId': vanId,
+      if (shiftId != null) 'shiftId': shiftId,
+      if (startedAt != null) 'startedAt': startedAt!.toIso8601String(),
+      if (finishedAt != null) 'finishedAt': finishedAt!.toIso8601String(),
       'status': status.toJson(),
       'stops': stops.map((s) => s.toJson()).toList(),
     };
@@ -119,6 +117,23 @@ class RouteManifestDto {
       status: status,
       stops: stops.map((s) => s.toDomain()).toList(),
     );
+  }
+
+  static Map<int, Map<String, dynamic>> _buildChildLookup(
+    Map<String, dynamic> json,
+  ) {
+    final document = json['document'];
+    if (document is! Map) return const {};
+    final children = document['children'];
+    if (children is! List) return const {};
+    return {
+      for (final child in children.whereType<Map>())
+        if (child['childId'] is num || child['childId'] is String)
+          (child['childId'] is num
+                  ? (child['childId'] as num).toInt()
+                  : int.tryParse(child['childId'].toString()) ?? 0):
+              Map<String, dynamic>.from(child),
+    };
   }
 
   factory RouteManifestDto.fromDomain(RouteManifest manifest) {
@@ -169,25 +184,23 @@ class RouteStopDto {
     Map<String, dynamic> json, {
     Map<int, Map<String, dynamic>>? childLookup,
   }) {
-    int _toInt(dynamic value) {
+    int toInt(dynamic value) {
       if (value is num) return value.toInt();
       if (value is String) return int.tryParse(value) ?? 0;
       return 0;
     }
 
-    double? _toDouble(dynamic value) {
+    double? toDouble(dynamic value) {
       if (value is num) return value.toDouble();
       if (value is String) return double.tryParse(value);
       return null;
     }
 
-    final childId = _toInt(_value(json, 'child_id', 'childId'));
+    final childId = toInt(json['childId']);
     final childData = childLookup?[childId] ?? const <String, dynamic>{};
 
     int? resolveSchoolId() {
-      final raw = _value(json, 'school_id', 'schoolId') ??
-          childData['schoolId'] ??
-          childData['school_id'];
+      final raw = json['schoolId'] ?? childData['schoolId'];
       if (raw == null) return null;
       if (raw is num) return raw.toInt();
       if (raw is String) return int.tryParse(raw);
@@ -195,7 +208,7 @@ class RouteStopDto {
     }
 
     String resolveAddress() {
-      // 1. Formato antigo: address como string.
+      // 1. Formato legado: address como string.
       final rawAddress = json['address'];
       if (rawAddress is String && rawAddress.isNotEmpty) return rawAddress;
 
@@ -211,35 +224,33 @@ class RouteStopDto {
     }
 
     return RouteStopDto(
-      id: _toInt(json['id']),
+      id: toInt(json['id']),
       childId: childId,
       childName:
-          (_value(json, 'child_name', 'childName') ?? childData['name'] ?? '')
-              .toString(),
-      schoolName: (_value(json, 'school_name', 'schoolName') ?? '').toString(),
+          (json['childName'] ?? childData['name'] ?? '').toString(),
+      schoolName: (json['schoolName'] ??
+              childData['schoolName'] ??
+              '')
+          .toString(),
       schoolId: resolveSchoolId(),
       address: resolveAddress(),
       sequence: json['sequence'] != null
-          ? _toInt(json['sequence'])
-          : _toInt(json['order']),
+          ? toInt(json['sequence'])
+          : toInt(json['order']),
       status: StopStatus.fromJson((json['status'] ?? 'pending').toString()),
-      latitude: _toDouble(json['latitude']) ??
+      latitude: toDouble(json['latitude']) ??
           (childData['address'] is Map
-              ? _toDouble((childData['address'] as Map)['latitude'])
+              ? toDouble((childData['address'] as Map)['latitude'])
               : null),
-      longitude: _toDouble(json['longitude']) ??
+      longitude: toDouble(json['longitude']) ??
           (childData['address'] is Map
-              ? _toDouble((childData['address'] as Map)['longitude'])
+              ? toDouble((childData['address'] as Map)['longitude'])
               : null),
-      boardedAt: _value(json, 'boarded_at', 'boardedAt') != null
-          ? DateTime.tryParse(
-              _value(json, 'boarded_at', 'boardedAt').toString(),
-            )
+      boardedAt: json['boardedAt'] != null
+          ? DateTime.tryParse(json['boardedAt'].toString())
           : null,
-      disembarkedAt: _value(json, 'disembarked_at', 'disembarkedAt') != null
-          ? DateTime.tryParse(
-              _value(json, 'disembarked_at', 'disembarkedAt').toString(),
-            )
+      disembarkedAt: json['disembarkedAt'] != null
+          ? DateTime.tryParse(json['disembarkedAt'].toString())
           : null,
     );
   }
@@ -247,18 +258,18 @@ class RouteStopDto {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'child_id': childId,
-      'child_name': childName,
-      'school_name': schoolName,
-      if (schoolId != null) 'school_id': schoolId,
+      'childId': childId,
+      'childName': childName,
+      'schoolName': schoolName,
+      if (schoolId != null) 'schoolId': schoolId,
       'address': address,
       'sequence': sequence,
       'status': status.toJson(),
       if (latitude != null) 'latitude': latitude,
       if (longitude != null) 'longitude': longitude,
-      if (boardedAt != null) 'boarded_at': boardedAt!.toIso8601String(),
+      if (boardedAt != null) 'boardedAt': boardedAt!.toIso8601String(),
       if (disembarkedAt != null)
-        'disembarked_at': disembarkedAt!.toIso8601String(),
+        'disembarkedAt': disembarkedAt!.toIso8601String(),
     };
   }
 
@@ -297,7 +308,3 @@ class RouteStopDto {
   }
 }
 
-Object? _value(Map<String, dynamic> json, String snakeCase, String camelCase) {
-  if (json.containsKey(snakeCase)) return json[snakeCase];
-  return json[camelCase];
-}

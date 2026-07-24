@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/models/catalog_option.dart';
+import '../../../../core/presentation/widgets/app_feedback.dart';
 import '../../../../core/presentation/widgets/app_shared_widgets.dart';
+import '../../../../core/presentation/widgets/e2e_keys.dart';
+import '../../../../core/presentation/widgets/faixa_app_bar.dart';
+import '../../../../core/presentation/widgets/faixa_image_picker.dart';
+import '../../../../core/presentation/widgets/faixa_section_card.dart';
 import '../../../../domain/models/child.dart';
 import '../../../../features/catalog/data/catalog_repository.dart';
 import '../providers/parent_portal_providers.dart';
@@ -23,18 +30,15 @@ class _AddChildPageState extends ConsumerState<AddChildPage> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameCtrl;
   late final TextEditingController _cpfCtrl;
-  late final TextEditingController _birthDateCtrl;
-  late final TextEditingController _schoolNameCtrl;
   late final TextEditingController _streetCtrl;
   late final TextEditingController _numberCtrl;
   late final TextEditingController _complementCtrl;
-  late final TextEditingController _neighborhoodCtrl;
-  late final TextEditingController _cityCtrl;
-  late final TextEditingController _stateCtrl;
   late final TextEditingController _zipCodeCtrl;
 
+  final _picker = ImagePicker();
   CatalogOption? _shift;
-  DateTime? _birthDate;
+  CatalogOption? _school;
+  String? _photoLocalPath;
 
   bool get _isEditing => widget.childToEdit != null;
 
@@ -44,56 +48,43 @@ class _AddChildPageState extends ConsumerState<AddChildPage> {
     final c = widget.childToEdit;
     _nameCtrl = TextEditingController(text: c?.name ?? '');
     _cpfCtrl = TextEditingController(text: c?.cpf ?? '');
-    _schoolNameCtrl = TextEditingController(text: c?.schoolName ?? '');
-    _streetCtrl = TextEditingController(text: c?.address.street ?? '');
-    _numberCtrl = TextEditingController(text: c?.address.number ?? '');
-    _complementCtrl = TextEditingController(text: c?.address.complement ?? '');
-    _neighborhoodCtrl = TextEditingController(
-      text: c?.address.neighborhood ?? '',
-    );
-    _cityCtrl = TextEditingController(text: c?.address.city ?? '');
-    _stateCtrl = TextEditingController(text: c?.address.state ?? '');
-    _zipCodeCtrl = TextEditingController(text: c?.address.zipCode ?? '');
-    _birthDate = c?.birthDate;
-    _birthDateCtrl = TextEditingController(
-      text: c?.birthDate != null ? _formatDate(c!.birthDate!) : '',
-    );
+    _streetCtrl = TextEditingController();
+    _numberCtrl = TextEditingController();
+    _complementCtrl = TextEditingController();
+    _zipCodeCtrl = TextEditingController();
+
+    if (_isEditing) {
+      Future.microtask(() => _loadAddress());
+    }
+  }
+
+  Future<void> _loadAddress() async {
+    final c = widget.childToEdit;
+    if (c == null) return;
+    try {
+      final repo = ref.read(childrenRepositoryProvider);
+      final addresses = await repo.getChildAddresses(c.id);
+      if (addresses.isNotEmpty && mounted) {
+        final addr = addresses.first;
+        _streetCtrl.text = (addr['street'] ?? '').toString();
+        _numberCtrl.text = (addr['number'] ?? '').toString();
+        _complementCtrl.text = (addr['reference'] ?? '').toString();
+        _zipCodeCtrl.text = (addr['zipcode'] ?? '').toString();
+      }
+    } catch (_) {
+      // Endereco nao e bloqueante para edicao dos dados pessoais.
+    }
   }
 
   @override
   void dispose() {
     _nameCtrl.dispose();
     _cpfCtrl.dispose();
-    _birthDateCtrl.dispose();
-    _schoolNameCtrl.dispose();
     _streetCtrl.dispose();
     _numberCtrl.dispose();
     _complementCtrl.dispose();
-    _neighborhoodCtrl.dispose();
-    _cityCtrl.dispose();
-    _stateCtrl.dispose();
     _zipCodeCtrl.dispose();
     super.dispose();
-  }
-
-  String _formatDate(DateTime date) {
-    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
-  }
-
-  Future<void> _pickBirthDate() async {
-    final now = DateTime.now();
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _birthDate ?? DateTime(now.year - 5, now.month, now.day),
-      firstDate: DateTime(1990),
-      lastDate: now,
-    );
-    if (picked != null) {
-      setState(() {
-        _birthDate = picked;
-        _birthDateCtrl.text = _formatDate(picked);
-      });
-    }
   }
 
   String? _validateCpf(String? value) {
@@ -107,39 +98,64 @@ class _AddChildPageState extends ConsumerState<AddChildPage> {
     return null;
   }
 
-  void _submit() {
-    if (!_formKey.currentState!.validate()) return;
-    if (_birthDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Selecione a data de nascimento.')),
+  static const _maxPhotoBytes = 5 * 1024 * 1024; // 5 MB
+
+  Future<void> _pickPhoto() async {
+    final file = await _picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 900,
+      maxHeight: 900,
+      imageQuality: 75,
+    );
+    if (file == null || !mounted) return;
+
+    final bytes = await file.length();
+    if (!mounted) return;
+    if (bytes > _maxPhotoBytes) {
+      showAppSnackBar(
+        context,
+        message: 'A foto deve ter no maximo 5 MB. Escolha outra imagem.',
+        type: AppFeedbackType.warning,
       );
       return;
     }
+
+    setState(() => _photoLocalPath = file.path);
+  }
+
+  void _submit() {
+    if (!_formKey.currentState!.validate()) return;
     if (_shift == null && !_isEditing) {
-      ScaffoldMessenger.of(
+      showAppSnackBar(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Selecione o turno.')));
+        message: 'Selecione o turno.',
+        type: AppFeedbackType.warning,
+      );
+      return;
+    }
+    if (_school == null && !_isEditing) {
+      showAppSnackBar(
+        context,
+        message: 'Selecione a escola.',
+        type: AppFeedbackType.warning,
+      );
       return;
     }
 
     final formData = AddChildFormData(
       name: _nameCtrl.text.trim(),
       cpf: _cpfCtrl.text.trim(),
-      birthDate: _birthDate!,
-      schoolName: _schoolNameCtrl.text.trim(),
-      shiftId: _shift?.id ?? widget.childToEdit?.shiftId ?? 0,
-      shiftName: _shift?.name ?? widget.childToEdit?.shiftName ?? '',
+      schoolId: _school?.id ?? widget.childToEdit?.schoolId,
+      shiftId: _shift?.id ?? widget.childToEdit?.shiftId,
       address: ChildAddress(
         street: _streetCtrl.text.trim(),
         number: _numberCtrl.text.trim(),
         complement: _complementCtrl.text.trim().isEmpty
             ? null
             : _complementCtrl.text.trim(),
-        neighborhood: _neighborhoodCtrl.text.trim(),
-        city: _cityCtrl.text.trim(),
-        state: _stateCtrl.text.trim(),
         zipCode: _zipCodeCtrl.text.trim(),
       ),
+      photoLocalPath: _photoLocalPath,
     );
 
     final controller = ref.read(addChildControllerProvider.notifier);
@@ -147,11 +163,12 @@ class _AddChildPageState extends ConsumerState<AddChildPage> {
         ? controller.updateChild(widget.childToEdit!.id, formData)
         : controller.submit(formData);
 
-    future.then((_) {
+    future.then((_) async {
       if (!mounted) return;
       final state = ref.read(addChildControllerProvider);
       if (!state.hasError) {
-        ref.read(childrenControllerProvider.notifier).refresh();
+        await ref.read(childrenControllerProvider.notifier).refresh();
+        if (!mounted) return;
         context.pop(true);
       }
     });
@@ -160,9 +177,10 @@ class _AddChildPageState extends ConsumerState<AddChildPage> {
   @override
   Widget build(BuildContext context) {
     final shiftsAsync = ref.watch(shiftsCatalogProvider);
+    final schoolsAsync = ref.watch(schoolsCatalogProvider);
     final addState = ref.watch(addChildControllerProvider);
 
-    // Auto-select shift when editing and catalog loads
+    // Auto-select shift/school when editing and catalog loads
     if (_isEditing && _shift == null && shiftsAsync.hasValue) {
       final shifts = shiftsAsync.value ?? const [];
       final editShiftId = widget.childToEdit!.shiftId;
@@ -173,129 +191,153 @@ class _AddChildPageState extends ConsumerState<AddChildPage> {
         }
       }
     }
+    if (_isEditing && _school == null && schoolsAsync.hasValue) {
+      final schools = schoolsAsync.value ?? const [];
+      final editSchoolId = widget.childToEdit!.schoolId;
+      for (final s in schools) {
+        if (s.id == editSchoolId) {
+          _school = s;
+          break;
+        }
+      }
+    }
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_isEditing ? 'Editar dependente' : 'Novo dependente'),
+      backgroundColor: AppColors.surfaceSoft,
+      appBar: FaixaAppBar.screen(
+        title: _isEditing ? 'Editar dependente' : 'Novo dependente',
       ),
       body: Form(
         key: _formKey,
         child: ListView(
           padding: const EdgeInsets.all(AppSpacing.lg),
           children: [
-            Text(
-              'Dados pessoais',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            TextFormField(
-              controller: _nameCtrl,
-              decoration: const InputDecoration(labelText: 'Nome completo'),
-              textInputAction: TextInputAction.next,
-              validator: (v) =>
-                  v == null || v.trim().isEmpty ? 'Nome e obrigatorio.' : null,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            TextFormField(
-              controller: _cpfCtrl,
-              decoration: const InputDecoration(
-                labelText: 'CPF',
-                hintText: 'Apenas numeros',
+            FaixaSectionCard(
+              title: 'Dados pessoais',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: FaixaImagePicker.child(
+                      imageUrl: widget.childToEdit?.photoUrl,
+                      localPath: _photoLocalPath,
+                      onTap: _pickPhoto,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  TextFormField(
+                    key: E2EKeys.childNameInput,
+                    controller: _nameCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Nome completo',
+                      prefixIcon: Icon(Icons.person_outline_rounded),
+                    ),
+                    textInputAction: TextInputAction.next,
+                    validator: (v) => v == null || v.trim().isEmpty
+                        ? 'Nome e obrigatorio.'
+                        : null,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  TextFormField(
+                    key: E2EKeys.childCpfInput,
+                    controller: _cpfCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'CPF',
+                      hintText: 'Apenas numeros',
+                      prefixIcon: Icon(Icons.badge_outlined),
+                    ),
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(11),
+                    ],
+                    textInputAction: TextInputAction.next,
+                    validator: _validateCpf,
+                    enabled: !_isEditing,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  _CatalogDropdown(
+                    key: E2EKeys.childSchoolDropdown,
+                    label: 'Escola',
+                    asyncValue: schoolsAsync,
+                    value: _school,
+                    onChanged: (v) => setState(() => _school = v),
+                    validator: (v) =>
+                        v == null ? 'Selecione uma escola.' : null,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  _CatalogDropdown(
+                    key: E2EKeys.childShiftDropdown,
+                    label: 'Turno',
+                    asyncValue: shiftsAsync,
+                    value: _shift,
+                    onChanged: (v) => setState(() => _shift = v),
+                    validator: (v) => v == null ? 'Selecione um turno.' : null,
+                  ),
+                ],
               ),
-              keyboardType: TextInputType.number,
-              textInputAction: TextInputAction.next,
-              validator: _validateCpf,
-              enabled: !_isEditing,
             ),
-            const SizedBox(height: AppSpacing.md),
-            TextFormField(
-              controller: _birthDateCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Data de nascimento',
-                suffixIcon: Icon(Icons.calendar_today_outlined),
+            const SizedBox(height: AppSpacing.lg),
+            FaixaSectionCard(
+              title: 'Endereco',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextFormField(
+                    key: E2EKeys.addressStreetInput,
+                    controller: _streetCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Rua',
+                      prefixIcon: Icon(Icons.signpost_outlined),
+                    ),
+                    textInputAction: TextInputAction.next,
+                    validator: (v) => v == null || v.trim().isEmpty
+                        ? 'Rua e obrigatoria.'
+                        : null,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  TextFormField(
+                    key: E2EKeys.addressNumberInput,
+                    controller: _numberCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Numero',
+                      prefixIcon: Icon(Icons.numbers_outlined),
+                    ),
+                    textInputAction: TextInputAction.next,
+                    validator: (v) => v == null || v.trim().isEmpty
+                        ? 'Numero e obrigatorio.'
+                        : null,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  TextFormField(
+                    key: E2EKeys.addressComplementInput,
+                    controller: _complementCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Complemento (opcional)',
+                      prefixIcon: Icon(Icons.apartment_outlined),
+                    ),
+                    textInputAction: TextInputAction.next,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  TextFormField(
+                    key: E2EKeys.addressZipCodeInput,
+                    controller: _zipCodeCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'CEP',
+                      prefixIcon: Icon(Icons.location_on_outlined),
+                    ),
+                    textInputAction: TextInputAction.done,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(8),
+                    ],
+                    validator: (v) => v == null || v.trim().isEmpty
+                        ? 'CEP e obrigatorio.'
+                        : null,
+                  ),
+                ],
               ),
-              readOnly: true,
-              onTap: _pickBirthDate,
-              validator: (v) => v == null || v.isEmpty
-                  ? 'Data de nascimento e obrigatoria.'
-                  : null,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            TextFormField(
-              controller: _schoolNameCtrl,
-              decoration: const InputDecoration(labelText: 'Escola'),
-              textInputAction: TextInputAction.next,
-              validator: (v) => v == null || v.trim().isEmpty
-                  ? 'Nome da escola e obrigatorio.'
-                  : null,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            _ShiftDropdown(
-              shiftsAsync: shiftsAsync,
-              value: _shift,
-              onChanged: (v) => setState(() => _shift = v),
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            Text('Endereco', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: AppSpacing.md),
-            TextFormField(
-              controller: _streetCtrl,
-              decoration: const InputDecoration(labelText: 'Rua'),
-              textInputAction: TextInputAction.next,
-              validator: (v) =>
-                  v == null || v.trim().isEmpty ? 'Rua e obrigatoria.' : null,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            TextFormField(
-              controller: _numberCtrl,
-              decoration: const InputDecoration(labelText: 'Numero'),
-              textInputAction: TextInputAction.next,
-              validator: (v) => v == null || v.trim().isEmpty
-                  ? 'Numero e obrigatorio.'
-                  : null,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            TextFormField(
-              controller: _complementCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Complemento (opcional)',
-              ),
-              textInputAction: TextInputAction.next,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            TextFormField(
-              controller: _neighborhoodCtrl,
-              decoration: const InputDecoration(labelText: 'Bairro'),
-              textInputAction: TextInputAction.next,
-              validator: (v) => v == null || v.trim().isEmpty
-                  ? 'Bairro e obrigatorio.'
-                  : null,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            TextFormField(
-              controller: _cityCtrl,
-              decoration: const InputDecoration(labelText: 'Cidade'),
-              textInputAction: TextInputAction.next,
-              validator: (v) => v == null || v.trim().isEmpty
-                  ? 'Cidade e obrigatoria.'
-                  : null,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            TextFormField(
-              controller: _stateCtrl,
-              decoration: const InputDecoration(labelText: 'Estado'),
-              textInputAction: TextInputAction.next,
-              validator: (v) => v == null || v.trim().isEmpty
-                  ? 'Estado e obrigatorio.'
-                  : null,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            TextFormField(
-              controller: _zipCodeCtrl,
-              decoration: const InputDecoration(labelText: 'CEP'),
-              textInputAction: TextInputAction.done,
-              validator: (v) =>
-                  v == null || v.trim().isEmpty ? 'CEP e obrigatorio.' : null,
             ),
             const SizedBox(height: AppSpacing.xl),
             if (addState.hasError)
@@ -308,6 +350,7 @@ class _AddChildPageState extends ConsumerState<AddChildPage> {
                 ),
               ),
             FilledButton(
+              key: E2EKeys.childSaveButton,
               onPressed: addState.isLoading ? null : _submit,
               child: Text(
                 addState.isLoading
@@ -325,41 +368,45 @@ class _AddChildPageState extends ConsumerState<AddChildPage> {
   }
 }
 
-class _ShiftDropdown extends StatelessWidget {
-  const _ShiftDropdown({
-    required this.shiftsAsync,
+class _CatalogDropdown extends StatelessWidget {
+  const _CatalogDropdown({
+    super.key,
+    required this.label,
+    required this.asyncValue,
     required this.value,
     required this.onChanged,
+    this.validator,
   });
 
-  final AsyncValue<List<CatalogOption>> shiftsAsync;
+  final String label;
+  final AsyncValue<List<CatalogOption>> asyncValue;
   final CatalogOption? value;
   final ValueChanged<CatalogOption?> onChanged;
+  final String? Function(CatalogOption?)? validator;
 
   @override
   Widget build(BuildContext context) {
-    return shiftsAsync.when(
+    return asyncValue.when(
       loading: () => const InputDecorator(
-        decoration: InputDecoration(labelText: 'Turno'),
+        decoration: InputDecoration(labelText: 'Carregando...'),
         child: SizedBox(height: 20, child: LinearProgressIndicator()),
       ),
       error: (_, _) => DropdownButtonFormField<CatalogOption>(
-        // ignore: deprecated_member_use
-        value: value,
+        initialValue: value,
         isExpanded: true,
-        decoration: const InputDecoration(
-          labelText: 'Turno',
-          errorText: 'Erro ao carregar turnos.',
+        decoration: InputDecoration(
+          labelText: label,
+          errorText: 'Erro ao carregar $label.',
         ),
         items: const [],
         onChanged: onChanged,
+        validator: validator,
       ),
-      data: (shifts) => DropdownButtonFormField<CatalogOption>(
-        // ignore: deprecated_member_use
-        value: value,
+      data: (items) => DropdownButtonFormField<CatalogOption>(
+        initialValue: value,
         isExpanded: true,
-        decoration: const InputDecoration(labelText: 'Turno'),
-        items: shifts
+        decoration: InputDecoration(labelText: label),
+        items: items
             .map(
               (s) => DropdownMenuItem(
                 value: s,
@@ -368,7 +415,7 @@ class _ShiftDropdown extends StatelessWidget {
             )
             .toList(growable: false),
         onChanged: onChanged,
-        validator: (v) => v == null ? 'Selecione um turno.' : null,
+        validator: validator,
       ),
     );
   }

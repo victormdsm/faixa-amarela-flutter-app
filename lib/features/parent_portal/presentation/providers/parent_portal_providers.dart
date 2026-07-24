@@ -6,9 +6,11 @@ import '../../../../domain/models/child.dart';
 import '../../../../domain/models/enrollment.dart';
 import '../../../../domain/repositories/children_repository.dart';
 import '../../../../domain/repositories/enrollments_repository.dart';
+import '../../../../domain/repositories/user_repository.dart';
 import '../../data/nestjs_children_repository.dart';
 import '../../data/nestjs_enrollments_repository.dart';
 import '../../data/nestjs_parent_routing_repository.dart';
+import '../../data/nestjs_user_repository.dart';
 import '../state/add_child_controller.dart';
 import '../state/children_controller.dart';
 import '../state/enrollments_controller.dart';
@@ -20,21 +22,11 @@ final parentRoutingRepositoryProvider = Provider<NestjsParentRoutingRepository>(
 final parentChildrenProvider = FutureProvider.autoDispose((ref) async {
   final repo = ref.watch(childrenRepositoryProvider);
   final children = await repo.getChildren();
-  final items = children
-      .map(
-        (c) => <String, dynamic>{
-          'id': c.id,
-          'name': c.name,
-          'shift_id': c.shiftId,
-          'is_inadimplent': c.isInDebt,
-        },
-      )
-      .toList(growable: false);
-  return PaginatedResult<Map<String, dynamic>>(
-    items: items,
+  return PaginatedResult<Child>(
+    items: children,
     currentPage: 1,
     lastPage: 1,
-    total: items.length,
+    total: children.length,
   );
 });
 
@@ -72,3 +64,12 @@ final enrollmentsControllerProvider =
 
 final addChildControllerProvider =
     AsyncNotifierProvider<AddChildController, void>(AddChildController.new);
+
+final userRepositoryProvider = Provider<UserRepository>(
+  (ref) => NestjsUserRepository(ref.watch(dioProvider)),
+);
+
+final parentUserProfileProvider = FutureProvider.autoDispose((ref) async {
+  final repo = ref.watch(userRepositoryProvider);
+  return repo.getMe();
+});

@@ -19,7 +19,7 @@ subprojects {
     project.evaluationDependsOn(":app")
     // Note: do not force a global Java/Kotlin jvmTarget here. Each plugin sets
     // its own (internally consistent) target; overriding only Kotlin caused
-    // "Inconsistent JVM-target" failures (maplibre 21, pusher 11, app 17).
+    // "Inconsistent JVM-target" failures (maplibre 21, app 17).
 }
 
 tasks.register<Delete>("clean") {

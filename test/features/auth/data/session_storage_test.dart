@@ -31,7 +31,7 @@ void main() {
           id: 1,
           name: 'Maria',
           email: 'maria@email.com',
-          role: 'user',
+          roles: ['user'],
           isActivated: true,
         ),
       );
@@ -64,26 +64,31 @@ void main() {
       when(
         () => secureStorage.readAccessToken(),
       ).thenAnswer((_) async => token);
+      when(
+        () => secureStorage.readRefreshToken(),
+      ).thenAnswer((_) async => null);
       when(() => box.get('user_id')).thenReturn(2);
       when(() => box.get('user_name')).thenReturn('Joao');
       when(() => box.get('user_email')).thenReturn('joao@email.com');
-      when(() => box.get('user_role')).thenReturn('driver');
-      when(() => box.get('user_is_activated')).thenReturn(true);
+      when(() => box.get('user_roles')).thenReturn(['driver']);
+      when(() => box.get('user_is_active')).thenReturn(true);
+      when(() => box.get('user_avatar_url')).thenReturn(null);
       when(() => box.get('token_type')).thenReturn('Bearer');
       when(() => box.get('expires_at')).thenReturn(null);
+      when(() => box.get('refresh_expires_at')).thenReturn(null);
 
       final session = await storage.load();
 
-      expect(session, isNotNull);
+      expect(session, isNotNull, reason: 'storage.load() returned null');
       expect(session!.accessToken, token);
       expect(session.user.id, 2);
-      expect(session.user.role, 'driver');
+      expect(session.user.roles, ['driver']);
     });
 
     test('load returns null when secure storage token is missing', () async {
       when(() => secureStorage.readAccessToken()).thenAnswer((_) async => null);
       when(() => box.get('user_id')).thenReturn(3);
-      when(() => box.get('user_role')).thenReturn('user');
+      when(() => box.get('user_roles')).thenReturn(['user']);
 
       final session = await storage.load();
 

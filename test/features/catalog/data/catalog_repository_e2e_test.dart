@@ -1,3 +1,8 @@
+@Tags(['prod'])
+library;
+
+// ignore_for_file: avoid_print
+
 import 'package:app_faixa_amarela/features/catalog/data/catalog_repository.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';

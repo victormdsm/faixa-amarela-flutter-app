@@ -1,8 +1,9 @@
 import 'package:hive_flutter/hive_flutter.dart';
 
-import '../../../../core/storage/secure_token_storage.dart';
+import '../../../core/storage/secure_token_storage.dart';
 import '../domain/entities/auth_session.dart';
 import '../domain/entities/auth_user.dart';
+import '../domain/entities/user_role.dart';
 
 /// Armazena metadados não sensíveis do usuário no Hive para startup rápido.
 /// Access token e refresh token ficam exclusivamente em [SecureTokenStorage].
@@ -19,13 +20,16 @@ class SessionStorage {
   static const _kUserId = 'user_id';
   static const _kUserName = 'user_name';
   static const _kUserEmail = 'user_email';
-  static const _kUserRole = 'user_role';
+  static const _kUserRoles = 'user_roles';
   static const _kUserCellPhone = 'user_cell_phone';
   static const _kUserAvatar = 'user_avatar';
   static const _kUserPrimaryDriverId = 'user_primary_driver_id';
   static const _kUserIsActivated = 'user_is_activated';
   static const _kTokenType = 'token_type';
   static const _kExpiresAt = 'expires_at';
+  // Qual endpoint de login foi usado (driver | parent). Fonte de verdade
+  // para roteamento quando o usuário possui múltiplos roles.
+  static const _kLoginRole = 'login_role';
 
   static Future<void> openBox() => Hive.openBox<dynamic>(_boxName);
 
@@ -40,12 +44,12 @@ class SessionStorage {
       final tokenType = (_box.get(_kTokenType) as String?) ?? 'Bearer';
       final rawUserId = _box.get(_kUserId);
       final userName = _box.get(_kUserName) as String?;
-      final userRole = _box.get(_kUserRole) as String?;
+      final userRoles = _extractStoredRoles(_box.get(_kUserRoles));
 
       if (token == null ||
           token.isEmpty ||
           rawUserId == null ||
-          userRole == null) {
+          userRoles.isEmpty) {
         return null;
       }
 
@@ -60,7 +64,7 @@ class SessionStorage {
         id: userId,
         name: userName ?? '',
         email: _box.get(_kUserEmail) as String?,
-        role: userRole,
+        roles: userRoles,
         cellPhone: _box.get(_kUserCellPhone) as String?,
         avatar: _box.get(_kUserAvatar) as String?,
         primaryDriverId: (_box.get(_kUserPrimaryDriverId) as num?)?.toInt(),
@@ -79,23 +83,53 @@ class SessionStorage {
     }
   }
 
-  Future<void> save(AuthSession session) async {
+  /// Carrega o role usado no último login bem-sucedido.
+  /// Retorna null se nunca foi persistido (sessões antigas).
+  UserRole? loadLoginRole() {
+    final stored = _box.get(_kLoginRole) as String?;
+    return switch (stored) {
+      'driver' => UserRole.driver,
+      'parent' => UserRole.parent,
+      _ => null,
+    };
+  }
+
+  Future<void> save(AuthSession session, {UserRole? loginRole}) async {
     await _secureStorage.writeAccessToken(session.accessToken);
     if (session.hasRefreshToken) {
       await _secureStorage.writeRefreshToken(session.refreshToken!);
     }
-    await _box.putAll(<String, dynamic>{
+    final data = <String, dynamic>{
       _kUserId: session.user.id,
       _kUserName: session.user.name,
       _kUserEmail: session.user.email,
-      _kUserRole: session.user.role,
+      _kUserRoles: session.user.roles,
       _kUserCellPhone: session.user.cellPhone,
       _kUserAvatar: session.user.avatar,
       _kUserPrimaryDriverId: session.user.primaryDriverId,
       _kUserIsActivated: session.user.isActivated,
       _kTokenType: session.tokenType,
       _kExpiresAt: session.expiresAt,
-    });
+    };
+    if (loginRole != null) {
+      data[_kLoginRole] = loginRole == UserRole.driver ? 'driver' : 'parent';
+    }
+    await _box.putAll(data);
+  }
+
+  static List<String> _extractStoredRoles(dynamic value) {
+    if (value is List) {
+      return value
+          .map((e) => e?.toString().trim())
+          .where((r) => r != null && r.isNotEmpty)
+          .cast<String>()
+          .toList(growable: false);
+    }
+    // Migração legada: o campo antigo armazenava uma String única.
+    if (value is String && value.trim().isNotEmpty) {
+      return [value.trim()];
+    }
+    return const [];
   }
 
   Future<void> clear() async {

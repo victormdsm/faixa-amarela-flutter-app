@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/theme/app_theme.dart';
+import '../../../core/presentation/widgets/app_shared_widgets.dart';
 import '../../../domain/models/child.dart';
 import 'status_pill.dart';
 
@@ -9,12 +10,16 @@ class ChildSummaryCard extends StatelessWidget {
   const ChildSummaryCard({
     super.key,
     required this.child,
+    this.schoolName,
+    this.hasRoute,
     this.onEdit,
     this.onDelete,
     this.onTap,
   });
 
   final Child child;
+  final String? schoolName;
+  final bool? hasRoute;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
   final VoidCallback? onTap;
@@ -22,6 +27,7 @@ class ChildSummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final routeStatus = hasRoute;
 
     return Card(
       child: InkWell(
@@ -34,17 +40,12 @@ class ChildSummaryCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  CircleAvatar(
-                    backgroundColor: AppColors.yellowLight,
-                    child: Text(
-                      child.name.isNotEmpty ? child.name[0] : '?',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: AppColors.ink,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
+                  AppNetworkAvatar(
+                    name: child.name,
+                    imageUrl: child.photoUrl,
+                    radius: 26,
                   ),
-                  const SizedBox(width: AppSpacing.lg),
+                  const SizedBox(width: AppSpacing.md),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -53,20 +54,30 @@ class ChildSummaryCard extends StatelessWidget {
                           child.name,
                           style: theme.textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.w700,
+                            color: AppColors.ink,
                           ),
                         ),
-                        const SizedBox(height: AppSpacing.xs),
-                        Text(
-                          '${child.schoolName} • ${child.shiftName}',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: AppColors.slate,
-                          ),
-                        ),
-                        if (child.isInDebt) ...[
+                        if (schoolName != null && schoolName!.isNotEmpty) ...[
                           const SizedBox(height: AppSpacing.xs),
-                          const StatusPill(
-                            label: 'Inadimplente',
-                            color: AppColors.danger,
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.school_outlined,
+                                size: 14,
+                                color: AppColors.muted,
+                              ),
+                              const SizedBox(width: AppSpacing.xs),
+                              Expanded(
+                                child: Text(
+                                  schoolName!,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: AppColors.slate,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ],
@@ -74,20 +85,34 @@ class ChildSummaryCard extends StatelessWidget {
                   ),
                 ],
               ),
-              if (onEdit != null || onDelete != null) ...[
+              if (routeStatus != null || child.isInDebt) ...[
                 const SizedBox(height: AppSpacing.md),
                 Wrap(
                   spacing: AppSpacing.sm,
                   runSpacing: AppSpacing.sm,
                   children: [
-                    if (onEdit != null)
-                      OutlinedButton.icon(
-                        onPressed: onEdit,
-                        icon: const Icon(Icons.edit_outlined, size: 18),
-                        label: const Text('Editar'),
+                    if (routeStatus != null)
+                      StatusPill(
+                        label: routeStatus ? 'Com transporte' : 'Sem rota',
+                        color: routeStatus ? AppColors.success : AppColors.muted,
                       ),
+                    if (child.isInDebt)
+                      const StatusPill(
+                        label: 'Inadimplente',
+                        color: AppColors.danger,
+                      ),
+                  ],
+                ),
+              ],
+              if (onEdit != null || onDelete != null) ...[
+                const SizedBox(height: AppSpacing.md),
+                const Divider(height: 1),
+                const SizedBox(height: AppSpacing.md),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
                     if (onDelete != null)
-                      OutlinedButton.icon(
+                      TextButton.icon(
                         onPressed: onDelete,
                         icon: const Icon(
                           Icons.delete_outline_rounded,
@@ -95,6 +120,14 @@ class ChildSummaryCard extends StatelessWidget {
                         ),
                         label: const Text('Excluir'),
                       ),
+                    if (onEdit != null) ...[
+                      const SizedBox(width: AppSpacing.sm),
+                      FilledButton.icon(
+                        onPressed: onEdit,
+                        icon: const Icon(Icons.edit_outlined, size: 18),
+                        label: const Text('Editar'),
+                      ),
+                    ],
                   ],
                 ),
               ],

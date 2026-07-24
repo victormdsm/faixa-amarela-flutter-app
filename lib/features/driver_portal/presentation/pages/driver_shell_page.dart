@@ -19,24 +19,24 @@ class DriverShellPage extends ConsumerWidget {
       bottomNavigationBar: FaixaBottomNav(
         items: [
           const FaixaNavItem(
-            icon: Icons.home_outlined,
+            icon: Icons.home_rounded,
             activeIcon: Icons.home_rounded,
-            label: 'Inicio',
+            label: 'Início',
           ),
           const FaixaNavItem(
-            icon: Icons.school_outlined,
-            activeIcon: Icons.school_rounded,
-            label: 'Matriculas',
+            icon: Icons.child_care_rounded,
+            activeIcon: Icons.child_care_rounded,
+            label: 'Alunos',
           ),
           const FaixaNavItem(
-            icon: Icons.route_outlined,
+            icon: Icons.route_rounded,
             activeIcon: Icons.route_rounded,
             label: 'Rotas',
           ),
           const FaixaNavItem(
-            icon: Icons.person_outline_rounded,
-            activeIcon: Icons.person_rounded,
-            label: 'Perfil',
+            icon: Icons.fact_check_rounded,
+            activeIcon: Icons.fact_check_rounded,
+            label: 'Matrículas',
           ),
           FaixaNavItem(
             icon: Icons.notifications_none_rounded,

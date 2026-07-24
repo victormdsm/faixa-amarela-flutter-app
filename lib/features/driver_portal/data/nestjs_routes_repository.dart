@@ -1,9 +1,9 @@
 import 'package:dio/dio.dart';
 
-import '../../../../core/network/api_exception.dart';
-import '../../../../data/dto/route_manifest_dto.dart';
-import '../../../../domain/models/route_manifest.dart';
-import '../../../../domain/repositories/routes_repository.dart';
+import '../../../core/network/api_exception.dart';
+import '../../../data/dto/route_manifest_dto.dart';
+import '../../../domain/models/route_manifest.dart';
+import '../../../domain/repositories/routes_repository.dart';
 
 class NestjsRoutesRepository implements RoutesRepository {
   NestjsRoutesRepository(this._dio);
@@ -65,7 +65,10 @@ class NestjsRoutesRepository implements RoutesRepository {
   @override
   Future<void> finishRoute(int id) async {
     try {
-      await _dio.post<Map<String, dynamic>>('/driver/routes/$id/finish');
+      await _dio.post<Map<String, dynamic>>(
+        '/driver/routes/$id/finish',
+        data: const <String, dynamic>{},
+      );
     } catch (error) {
       throw ApiException.fromDio(error);
     }
@@ -115,6 +118,19 @@ class NestjsRoutesRepository implements RoutesRepository {
   }
 
   @override
+  Future<RouteStop> markAbsent(int routeId, int childId) async {
+    try {
+      await _dio.post<void>(
+        '/driver/routes/$routeId/absent',
+        data: {'childId': childId},
+      );
+      return _findStopAfterAction(childId, StopStatus.absent);
+    } catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
+  @override
   Future<List<RouteStop>> bulkDisembarkAtSchool(
     int routeId,
     int schoolId,
@@ -156,10 +172,7 @@ class NestjsRoutesRepository implements RoutesRepository {
     try {
       await _dio.post<Map<String, dynamic>>(
         '/driver/routes/$routeId/notify-parent',
-        data: _messagePayload(
-          {'childId': childId, 'type': type},
-          message,
-        ),
+        data: _messagePayload({'childId': childId, 'type': type}, message),
       );
     } catch (error) {
       throw ApiException.fromDio(error);
@@ -178,12 +191,12 @@ class NestjsRoutesRepository implements RoutesRepository {
     }
   }
 
-  /// Extrai o payload do envelope { data: ... } retornado pelo NestJS.
+  /// Normaliza a resposta já desembrulhada pelo interceptor global.
+  ///
+  /// Antes o backend envolvia o payload em `{ data: ... }`; agora o
+  /// [NestjsResponseUnwrapInterceptor] remove esse envelope antes de chegar
+  /// aos repositories, então apenas garantimos o tipo correto.
   Map<String, dynamic>? _unwrapData(Map<String, dynamic>? response) {
-    if (response == null) return null;
-    final data = response['data'];
-    if (data is Map<String, dynamic>) return data;
-    if (data is Map) return Map<String, dynamic>.from(data);
     return response;
   }
 

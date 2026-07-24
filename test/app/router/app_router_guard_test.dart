@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 AuthSession _session({
   required String role,
-  bool activated = true,
+  bool isActivated = true,
   String? email,
 }) {
   return AuthSession(
@@ -16,8 +16,8 @@ AuthSession _session({
       id: 1,
       name: 'User',
       email: email ?? 'user@email.com',
-      role: role,
-      isActivated: activated,
+      roles: [role],
+      isActivated: isActivated,
     ),
   );
 }
@@ -29,6 +29,7 @@ void main() {
         AppRouterGuard.redirect(
           session: null,
           isLoading: true,
+          loginRole: null,
           location: AppRoutes.driverHome,
         ),
         isNull,
@@ -40,6 +41,7 @@ void main() {
         AppRouterGuard.redirect(
           session: null,
           isLoading: false,
+          loginRole: null,
           location: AppRoutes.parentHome,
         ),
         AppRoutes.login,
@@ -51,6 +53,7 @@ void main() {
         AppRouterGuard.redirect(
           session: null,
           isLoading: false,
+          loginRole: null,
           location: AppRoutes.login,
         ),
         isNull,
@@ -58,11 +61,12 @@ void main() {
     });
 
     test('non-activated user is redirected to activation page', () {
-      final session = _session(role: 'user', activated: false);
+      final session = _session(role: 'user', isActivated: false);
       expect(
         AppRouterGuard.redirect(
           session: session,
           isLoading: false,
+          loginRole: null,
           location: AppRoutes.parentHome,
         ),
         AppRoutes.activation,
@@ -70,11 +74,12 @@ void main() {
     });
 
     test('non-activated user can stay on activation page', () {
-      final session = _session(role: 'user', activated: false);
+      final session = _session(role: 'user', isActivated: false);
       expect(
         AppRouterGuard.redirect(
           session: session,
           isLoading: false,
+          loginRole: null,
           location: AppRoutes.activation,
         ),
         isNull,
@@ -87,6 +92,7 @@ void main() {
         AppRouterGuard.redirect(
           session: session,
           isLoading: false,
+          loginRole: null,
           location: AppRoutes.driverHome,
         ),
         AppRoutes.parentHome,
@@ -95,6 +101,7 @@ void main() {
         AppRouterGuard.redirect(
           session: session,
           isLoading: false,
+          loginRole: null,
           location: AppRoutes.driverRoutes,
         ),
         AppRoutes.parentHome,
@@ -107,6 +114,7 @@ void main() {
         AppRouterGuard.redirect(
           session: session,
           isLoading: false,
+          loginRole: null,
           location: AppRoutes.parentHome,
         ),
         AppRoutes.driverHome,
@@ -115,6 +123,7 @@ void main() {
         AppRouterGuard.redirect(
           session: session,
           isLoading: false,
+          loginRole: null,
           location: AppRoutes.parentChildren,
         ),
         AppRoutes.driverHome,
@@ -127,6 +136,7 @@ void main() {
         AppRouterGuard.redirect(
           session: session,
           isLoading: false,
+          loginRole: null,
           location: AppRoutes.parentHome,
         ),
         isNull,
@@ -139,6 +149,7 @@ void main() {
         AppRouterGuard.redirect(
           session: session,
           isLoading: false,
+          loginRole: null,
           location: AppRoutes.driverHome,
         ),
         isNull,
@@ -153,6 +164,7 @@ void main() {
         AppRouterGuard.redirect(
           session: parentSession,
           isLoading: false,
+          loginRole: null,
           location: AppRoutes.login,
         ),
         AppRoutes.parentHome,
@@ -162,10 +174,156 @@ void main() {
         AppRouterGuard.redirect(
           session: driverSession,
           isLoading: false,
+          loginRole: null,
           location: AppRoutes.login,
         ),
         AppRoutes.driverHome,
       );
+    });
+
+    test('reset password is treated as public route', () {
+      expect(
+        AppRouterGuard.redirect(
+          session: null,
+          isLoading: false,
+          loginRole: null,
+          location: AppRoutes.resetPassword,
+        ),
+        isNull,
+      );
+
+      final parentSession = _session(role: 'parent');
+      expect(
+        AppRouterGuard.redirect(
+          session: parentSession,
+          isLoading: false,
+          loginRole: null,
+          location: AppRoutes.resetPassword,
+        ),
+        AppRoutes.parentHome,
+      );
+    });
+
+    test('parent role also matches user role', () {
+      final parentSession = _session(role: 'parent');
+      final userSession = _session(role: 'user');
+
+      expect(parentSession.user.isParent, isTrue);
+      expect(userSession.user.isParent, isTrue);
+      expect(
+        AppRouterGuard.redirect(
+          session: parentSession,
+          isLoading: false,
+          loginRole: null,
+          location: AppRoutes.login,
+        ),
+        AppRoutes.parentHome,
+      );
+      expect(
+        AppRouterGuard.redirect(
+          session: userSession,
+          isLoading: false,
+          loginRole: null,
+          location: AppRoutes.login,
+        ),
+        AppRoutes.parentHome,
+      );
+    });
+
+    test('parent stays on any parent portal sub-route', () {
+      final session = _session(role: 'user');
+      for (final location in [
+        AppRoutes.parentHome,
+        AppRoutes.parentChildren,
+        AppRoutes.parentRoutes,
+        AppRoutes.parentBoardings,
+        AppRoutes.parentEnrollments,
+        AppRoutes.parentNotifications,
+      ]) {
+        expect(
+          AppRouterGuard.redirect(
+            session: session,
+            isLoading: false,
+            loginRole: null,
+            location: location,
+          ),
+          isNull,
+          reason: '$location should be allowed for parents',
+        );
+      }
+    });
+
+    test('driver stays on any driver portal sub-route', () {
+      final session = _session(role: 'driver');
+      for (final location in [
+        AppRoutes.driverHome,
+        AppRoutes.driverClients,
+        AppRoutes.driverAddClient,
+        AppRoutes.driverRoutes,
+        AppRoutes.driverNotifications,
+        AppRoutes.driverRouteExecution,
+        AppRoutes.driverEnrollments,
+        AppRoutes.driverSettings,
+      ]) {
+        expect(
+          AppRouterGuard.redirect(
+            session: session,
+            isLoading: false,
+            loginRole: null,
+            location: location,
+          ),
+          isNull,
+          reason: '$location should be allowed for drivers',
+        );
+      }
+    });
+
+    test('driver is redirected from any parent route to driver home', () {
+      final session = _session(role: 'driver');
+      for (final location in [
+        AppRoutes.parentHome,
+        AppRoutes.parentChildren,
+        AppRoutes.parentRoutes,
+        AppRoutes.parentBoardings,
+        AppRoutes.parentEnrollments,
+        AppRoutes.parentNotifications,
+      ]) {
+        expect(
+          AppRouterGuard.redirect(
+            session: session,
+            isLoading: false,
+            loginRole: null,
+            location: location,
+          ),
+          AppRoutes.driverHome,
+          reason: '$location should redirect drivers to ${AppRoutes.driverHome}',
+        );
+      }
+    });
+
+    test('parent is redirected from any driver route to parent home', () {
+      final session = _session(role: 'parent');
+      for (final location in [
+        AppRoutes.driverHome,
+        AppRoutes.driverClients,
+        AppRoutes.driverAddClient,
+        AppRoutes.driverRoutes,
+        AppRoutes.driverNotifications,
+        AppRoutes.driverRouteExecution,
+        AppRoutes.driverEnrollments,
+        AppRoutes.driverSettings,
+      ]) {
+        expect(
+          AppRouterGuard.redirect(
+            session: session,
+            isLoading: false,
+            loginRole: null,
+            location: location,
+          ),
+          AppRoutes.parentHome,
+          reason: '$location should redirect parents to ${AppRoutes.parentHome}',
+        );
+      }
     });
   });
 }

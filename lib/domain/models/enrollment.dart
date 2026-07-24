@@ -49,20 +49,20 @@ class Enrollment {
   factory Enrollment.fromJson(Map<String, dynamic> json) {
     return Enrollment(
       id: (json['id'] as num?)?.toInt() ?? 0,
-      childId: (json['child_id'] as num?)?.toInt() ?? 0,
-      childName: (json['child_name'] ?? '').toString(),
-      driverId: (json['driver_id'] as num?)?.toInt() ?? 0,
-      driverName: (json['driver_name'] ?? '').toString(),
-      vanPlate: (json['van_plate'] ?? '').toString(),
-      schoolName: (json['school_name'] ?? '').toString(),
+      childId: (json['childId'] as num?)?.toInt() ?? 0,
+      childName: (json['childName'] ?? '').toString(),
+      driverId: (json['driverId'] as num?)?.toInt() ?? 0,
+      driverName: (json['driverName'] ?? '').toString(),
+      vanPlate: (json['vanPlate'] ?? '').toString(),
+      schoolName: (json['schoolName'] ?? '').toString(),
       status: EnrollmentStatus.fromJson(
         (json['status'] ?? 'pending').toString(),
       ),
-      requestedAt: json['requested_at'] != null
-          ? DateTime.tryParse(json['requested_at'].toString())
+      requestedAt: json['requestedAt'] != null
+          ? DateTime.tryParse(json['requestedAt'].toString())
           : null,
-      respondedAt: json['responded_at'] != null
-          ? DateTime.tryParse(json['responded_at'].toString())
+      respondedAt: json['respondedAt'] != null
+          ? DateTime.tryParse(json['respondedAt'].toString())
           : null,
     );
   }

@@ -4,73 +4,53 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('ChildDto', () {
-    test('fromJson parses correctly', () {
+    test('fromJson parses NestJS camelCase contract', () {
       final json = <String, dynamic>{
         'id': 1,
         'name': 'Ana Silva',
         'cpf': '12345678901',
-        'birth_date': '2015-03-10T00:00:00.000Z',
-        'school_name': 'Escola Primavera',
-        'shift_id': 2,
-        'shift_name': 'Manhã',
-        'parent_id': 10,
-        'parent_name': 'Maria Silva',
-        'address': <String, dynamic>{
-          'street': 'Rua das Flores',
-          'number': '100',
-          'complement': 'Apto 2',
-          'neighborhood': 'Jardim',
-          'city': 'São Paulo',
-          'state': 'SP',
-          'zip_code': '01001000',
-          'latitude': -23.55,
-          'longitude': -46.63,
-        },
-        'photo_url': 'https://example.com/photo.jpg',
-        'is_in_debt': true,
-        'created_at': '2024-01-01T00:00:00.000Z',
+        'schoolId': 7,
+        'shiftId': 2,
+        'isInadimplent': true,
+        'createdAt': '2024-01-01T00:00:00.000Z',
       };
 
       final dto = ChildDto.fromJson(json);
       expect(dto.id, 1);
       expect(dto.name, 'Ana Silva');
       expect(dto.cpf, '12345678901');
-      expect(dto.birthDate, DateTime.parse('2015-03-10T00:00:00.000Z'));
-      expect(dto.schoolName, 'Escola Primavera');
+      expect(dto.schoolId, 7);
       expect(dto.shiftId, 2);
-      expect(dto.shiftName, 'Manhã');
-      expect(dto.parentId, 10);
-      expect(dto.parentName, 'Maria Silva');
-      expect(dto.address.street, 'Rua das Flores');
-      expect(dto.address.latitude, -23.55);
-      expect(dto.photoUrl, 'https://example.com/photo.jpg');
       expect(dto.isInDebt, true);
       expect(dto.createdAt, DateTime.parse('2024-01-01T00:00:00.000Z'));
     });
 
-    test('toJson serializes correctly', () {
+    test('fromJson parses internal camelCase keys', () {
+      final json = <String, dynamic>{
+        'id': 2,
+        'name': 'Bruno Souza',
+        'cpf': '98765432100',
+        'schoolId': 3,
+        'shiftId': 1,
+        'isInDebt': 1,
+        'createdAt': '2024-06-15T10:30:00.000Z',
+      };
+
+      final dto = ChildDto.fromJson(json);
+      expect(dto.id, 2);
+      expect(dto.schoolId, 3);
+      expect(dto.shiftId, 1);
+      expect(dto.isInDebt, true);
+      expect(dto.createdAt, DateTime.parse('2024-06-15T10:30:00.000Z'));
+    });
+
+    test('toJson serializes camelCase keys', () {
       final dto = ChildDto(
         id: 1,
         name: 'Ana Silva',
         cpf: '12345678901',
-        birthDate: DateTime.parse('2015-03-10T00:00:00.000Z'),
-        schoolName: 'Escola Primavera',
+        schoolId: 7,
         shiftId: 2,
-        shiftName: 'Manhã',
-        parentId: 10,
-        parentName: 'Maria Silva',
-        address: ChildAddressDto(
-          street: 'Rua das Flores',
-          number: '100',
-          complement: 'Apto 2',
-          neighborhood: 'Jardim',
-          city: 'São Paulo',
-          state: 'SP',
-          zipCode: '01001000',
-          latitude: -23.55,
-          longitude: -46.63,
-        ),
-        photoUrl: 'https://example.com/photo.jpg',
         isInDebt: true,
         createdAt: DateTime.parse('2024-01-01T00:00:00.000Z'),
       );
@@ -79,8 +59,10 @@ void main() {
       expect(json['id'], 1);
       expect(json['name'], 'Ana Silva');
       expect(json['cpf'], '12345678901');
-      expect(json['school_name'], 'Escola Primavera');
-      expect(json['address'], isA<Map<String, dynamic>>());
+      expect(json['schoolId'], 7);
+      expect(json['shiftId'], 2);
+      expect(json['isInDebt'], true);
+      expect(json['createdAt'], '2024-01-01T00:00:00.000Z');
     });
 
     test('toDomain maps correctly', () {
@@ -88,27 +70,21 @@ void main() {
         id: 1,
         name: 'Ana Silva',
         cpf: '12345678901',
-        birthDate: DateTime.parse('2015-03-10T00:00:00.000Z'),
-        schoolName: 'Escola Primavera',
+        schoolId: 7,
         shiftId: 2,
-        shiftName: 'Manhã',
-        parentId: 10,
-        parentName: 'Maria Silva',
-        address: ChildAddressDto(
-          street: 'Rua das Flores',
-          number: '100',
-          neighborhood: 'Jardim',
-          city: 'São Paulo',
-          state: 'SP',
-          zipCode: '01001000',
-        ),
-        isInDebt: false,
+        isInDebt: true,
+        createdAt: DateTime.parse('2024-01-01T00:00:00.000Z'),
       );
 
       final domain = dto.toDomain();
       expect(domain, isA<Child>());
+      expect(domain.id, 1);
       expect(domain.name, 'Ana Silva');
-      expect(domain.address.street, 'Rua das Flores');
+      expect(domain.cpf, '12345678901');
+      expect(domain.schoolId, 7);
+      expect(domain.shiftId, 2);
+      expect(domain.isInDebt, true);
+      expect(domain.createdAt, DateTime.parse('2024-01-01T00:00:00.000Z'));
     });
 
     test('fromDomain maps correctly', () {
@@ -116,25 +92,17 @@ void main() {
         id: 1,
         name: 'Ana Silva',
         cpf: '12345678901',
-        birthDate: DateTime.parse('2015-03-10T00:00:00.000Z'),
-        schoolName: 'Escola Primavera',
+        schoolId: 7,
         shiftId: 2,
-        shiftName: 'Manhã',
-        parentId: 10,
-        parentName: 'Maria Silva',
-        address: ChildAddress(
-          street: 'Rua das Flores',
-          number: '100',
-          neighborhood: 'Jardim',
-          city: 'São Paulo',
-          state: 'SP',
-          zipCode: '01001000',
-        ),
+        isInDebt: true,
+        createdAt: DateTime.parse('2024-01-01T00:00:00.000Z'),
       );
 
       final dto = ChildDto.fromDomain(child);
       expect(dto.name, 'Ana Silva');
-      expect(dto.address.city, 'São Paulo');
+      expect(dto.schoolId, 7);
+      expect(dto.shiftId, 2);
+      expect(dto.isInDebt, true);
     });
   });
 }

@@ -24,13 +24,13 @@ class NotificationDto {
   factory NotificationDto.fromJson(Map<String, dynamic> json) {
     return NotificationDto(
       id: (json['id'] as num?)?.toInt() ?? 0,
-      userId: (json['user_id'] as num?)?.toInt() ?? 0,
+      userId: (json['userId'] as num?)?.toInt() ?? 0,
       title: (json['title'] ?? '').toString(),
       body: (json['body'] ?? '').toString(),
       type: (json['type'] ?? '').toString(),
       read: json['read'] == true || json['read'] == 1,
-      createdAt: json['created_at'] != null
-          ? DateTime.tryParse(json['created_at'].toString())
+      createdAt: json['createdAt'] != null
+          ? DateTime.tryParse(json['createdAt'].toString())
           : null,
       metadata: json['metadata'] != null
           ? Map<String, dynamic>.from(json['metadata'] as Map)
@@ -41,12 +41,12 @@ class NotificationDto {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'user_id': userId,
+      'userId': userId,
       'title': title,
       'body': body,
       'type': type,
       'read': read,
-      if (createdAt != null) 'created_at': createdAt!.toIso8601String(),
+      if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
       if (metadata != null) 'metadata': metadata,
     };
   }

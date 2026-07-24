@@ -28,7 +28,7 @@ class ActivationController extends _$ActivationController {
 
     final code = state.code.trim();
     if (code.length != 6) {
-      state = state.copyWith(errorMessage: 'O codigo deve ter 6 digitos.');
+      state = state.copyWith(errorMessage: 'O código deve ter 6 dígitos.');
       return false;
     }
 
@@ -46,7 +46,7 @@ class ActivationController extends _$ActivationController {
     } catch (_) {
       state = state.copyWith(
         isLoading: false,
-        errorMessage: 'Nao foi possivel ativar a conta. Tente novamente.',
+        errorMessage: 'Não foi possível ativar a conta. Tente novamente.',
       );
       return false;
     }

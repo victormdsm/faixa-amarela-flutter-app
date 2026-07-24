@@ -35,7 +35,9 @@ class DriverLookupController extends Notifier<AsyncValue<ChildLookupResult?>> {
       state = await AsyncValue.guard(() async {
         final result = await _repo.lookupChildByCpf(cleaned);
         if (!result.found) {
-          throw Exception('Crianca nao encontrada para este CPF.');
+          throw Exception(
+            'Crianca nao encontrada. Verifique se o CPF informado e o da crianca e se o responsavel ja cadastrou o dependente.',
+          );
         }
         return result;
       });

@@ -27,7 +27,14 @@ class DriverDashboardController extends AsyncNotifier<DriverDashboardState> {
     final driverRepo = ref.read(driverProfileRepositoryProvider);
     final routesRepo = ref.read(driverRoutesRepositoryProvider);
     final profile = await driverRepo.getDriverProfile();
-    final activeRoute = await routesRepo.getActiveRoute();
+    // getActiveRoute é opcional: um motorista sem rota ativa retorna null,
+    // mas um erro de rede/API não deve impedir o carregamento do dashboard.
+    RouteManifest? activeRoute;
+    try {
+      activeRoute = await routesRepo.getActiveRoute();
+    } catch (_) {
+      activeRoute = null;
+    }
     return DriverDashboardState(profile: profile, activeRoute: activeRoute);
   }
 
@@ -37,7 +44,12 @@ class DriverDashboardController extends AsyncNotifier<DriverDashboardState> {
       final driverRepo = ref.read(driverProfileRepositoryProvider);
       final routesRepo = ref.read(driverRoutesRepositoryProvider);
       final profile = await driverRepo.getDriverProfile();
-      final activeRoute = await routesRepo.getActiveRoute();
+      RouteManifest? activeRoute;
+      try {
+        activeRoute = await routesRepo.getActiveRoute();
+      } catch (_) {
+        activeRoute = null;
+      }
       return DriverDashboardState(profile: profile, activeRoute: activeRoute);
     });
   }

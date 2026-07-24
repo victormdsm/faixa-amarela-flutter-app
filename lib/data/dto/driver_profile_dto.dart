@@ -52,21 +52,22 @@ class DriverProfileDto {
   final List<Map<String, dynamic>> coverageChangeRequestsRecent;
 
   factory DriverProfileDto.fromJson(Map<String, dynamic> json) {
-    int _toInt(dynamic value) {
+    int toInt(dynamic value) {
+      if (value == null) return 0;
       if (value is num) return value.toInt();
       if (value is String) return int.tryParse(value) ?? 0;
       return 0;
     }
 
-    final van = _map(_value(json, 'van', 'van'));
+    final van = _map(json['van']);
 
     // Novo contrato NestJS: coverage { schools: number[], districts: number[], shifts: number[] }
-    final coverage = _map(_value(json, 'coverage', 'coverage'));
-    final coverageSchools = _toIntList(coverage['schools']);
-    final coverageDistricts = _toIntList(coverage['districts']);
-    final coverageShifts = _toIntList(coverage['shifts']);
+    final coverage = _map(json['coverage']);
+    final coverageSchools = toIntList(coverage['schools']);
+    final coverageDistricts = toIntList(coverage['districts']);
+    final coverageShifts = toIntList(coverage['shifts']);
 
-    // Fallback para contrato antigo (campos planos e listas de maps)
+    // Fallback para listas de maps em camelCase (ex.: cache ou contratos antigos).
     final legacySchools = _listOfMaps(json['schools']);
     final legacyDistricts = _listOfMaps(json['districts']);
 
@@ -83,68 +84,64 @@ class DriverProfileDto {
                 // O NestJS retorna turnos globalmente; replicamos em cada
                 // bairro para manter a UI funcional ate haver mapeamento
                 // district->turnos no contrato.
-                'shift_ids': coverageShifts.toList(),
+                'shiftIds': coverageShifts.toList(),
               },
             )
             .toList();
 
+    // O contrato NestJS aninha o veiculo em `van`; campos planos sao
+    // mantidos apenas para compatibilidade com payloads ja serializados.
+    final int effectiveVanId;
+    final String effectiveVanPlate;
+    final String effectiveVanModel;
+    final String? effectiveVanColor;
+    final String effectiveVanYear;
+    final String? effectiveVanImageUrl;
+
+    if (van.isNotEmpty) {
+      effectiveVanId = toInt(van['id']);
+      effectiveVanPlate = (van['plate'] ?? '').toString();
+      effectiveVanModel = (van['model'] ?? '').toString();
+      effectiveVanColor = van['color']?.toString();
+      effectiveVanYear = (van['year'] ?? '').toString();
+      effectiveVanImageUrl = van['imageUrl']?.toString();
+    } else {
+      effectiveVanId = toInt(json['vanId']);
+      effectiveVanPlate = (json['vanPlate'] ?? '').toString();
+      effectiveVanModel = (json['vanModel'] ?? '').toString();
+      effectiveVanColor = json['vanColor']?.toString();
+      effectiveVanYear = (json['vanYear'] ?? '').toString();
+      effectiveVanImageUrl = json['vanImageUrl']?.toString();
+    }
+
     return DriverProfileDto(
-      id: _toInt(json['id']),
-      userId: _toInt(_value(json, 'user_id', 'userId')),
+      id: toInt(json['id']),
+      userId: toInt(json['userId']),
       name: (json['name'] ?? '').toString(),
       cpf: (json['cpf'] ?? '').toString(),
-      licenseNumber: (_value(json, 'cnh', 'cnh') ??
-              _value(json, 'license_number', 'licenseNumber') ??
-              '')
-          .toString(),
-      vanId: van.isNotEmpty
-          ? _toInt(van['id'])
-          : _toInt(_value(json, 'van_id', 'vanId')),
-      vanPlate: van.isNotEmpty
-          ? (van['plate'] ?? _value(json, 'van_plate', 'vanPlate') ?? '')
-              .toString()
-          : (_value(json, 'van_plate', 'vanPlate') ?? '').toString(),
-      vanModel: van.isNotEmpty
-          ? (van['model'] ?? _value(json, 'van_model', 'vanModel') ?? '')
-              .toString()
-          : (_value(json, 'van_model', 'vanModel') ?? '').toString(),
-      vanColor: van.isNotEmpty
-          ? van['color']?.toString()
-          : _value(json, 'van_color', 'vanColor')?.toString(),
-      vanYear: van.isNotEmpty
-          ? (van['year'] ?? _value(json, 'van_year', 'vanYear') ?? '')
-              .toString()
-          : (_value(json, 'van_year', 'vanYear') ?? '').toString(),
-      vanImageUrl: van.isNotEmpty
-          ? van['imageUrl']?.toString() ?? van['image_url']?.toString()
-          : _value(json, 'van_image_url', 'vanImageUrl')?.toString(),
-      coverageArea: (_value(json, 'coverage_area', 'coverageArea') ?? '')
-          .toString(),
-      isActive:
-          _value(json, 'is_active', 'isActive') == true ||
-          _value(json, 'is_active', 'isActive') == 1,
-      status: _value(json, 'status', 'status')?.toString(),
-      cnhCategory: _value(json, 'cnh_category', 'cnhCategory')?.toString(),
-      cellPhone: _value(json, 'cell_phone', 'cellPhone')?.toString(),
-      information: _value(json, 'information', 'information')?.toString(),
-      email: _value(json, 'email', 'email')?.toString(),
-      avatarUrl: _value(json, 'avatar_url', 'avatarUrl')?.toString(),
+      licenseNumber:
+          (json['cnh'] ?? json['licenseNumber'] ?? '').toString(),
+      vanId: effectiveVanId,
+      vanPlate: effectiveVanPlate,
+      vanModel: effectiveVanModel,
+      vanColor: effectiveVanColor,
+      vanYear: effectiveVanYear,
+      vanImageUrl: effectiveVanImageUrl,
+      coverageArea: (json['coverageArea'] ?? '').toString(),
+      isActive: json['isActive'] == true || json['isActive'] == 1,
+      status: json['status']?.toString(),
+      cnhCategory: json['cnhCategory']?.toString(),
+      cellPhone: json['cellPhone']?.toString(),
+      information: json['information']?.toString(),
+      email: json['email']?.toString(),
+      avatarUrl: json['avatarUrl']?.toString(),
       schools: schools,
       districts: districts,
-      coverageChangeRequest:
-          _value(json, 'coverage_change_request', 'coverageChangeRequest')
-              is Map
-          ? Map<String, dynamic>.from(
-              _value(json, 'coverage_change_request', 'coverageChangeRequest')
-                  as Map,
-            )
+      coverageChangeRequest: json['coverageChangeRequest'] is Map
+          ? Map<String, dynamic>.from(json['coverageChangeRequest'] as Map)
           : null,
       coverageChangeRequestsRecent: _listOfMaps(
-        _value(
-          json,
-          'coverage_change_requests_recent',
-          'coverageChangeRequestsRecent',
-        ),
+        json['coverageChangeRequestsRecent'],
       ),
     );
   }
@@ -152,29 +149,30 @@ class DriverProfileDto {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'user_id': userId,
+      'userId': userId,
       'name': name,
       'cpf': cpf,
-      'license_number': licenseNumber,
-      'cnh': licenseNumber,
-      'cell_phone': cellPhone,
+      'licenseNumber': licenseNumber,
+      'cellPhone': cellPhone,
       'information': information,
       'email': email,
-      'avatar_url': avatarUrl,
-      'van_id': vanId,
-      'van_plate': vanPlate,
-      'van_model': vanModel,
-      'van_color': vanColor,
-      'van_year': vanYear,
-      'van_image_url': vanImageUrl,
-      'coverage_area': coverageArea,
-      'is_active': isActive,
+      'avatarUrl': avatarUrl,
+      'van': <String, dynamic>{
+        'id': vanId,
+        'plate': vanPlate,
+        'model': vanModel,
+        'color': vanColor,
+        'year': vanYear,
+        'imageUrl': vanImageUrl,
+      },
+      'coverageArea': coverageArea,
+      'isActive': isActive,
       'status': status,
-      'cnh_category': cnhCategory,
+      'cnhCategory': cnhCategory,
       'schools': schools,
       'districts': districts,
-      'coverage_change_request': coverageChangeRequest,
-      'coverage_change_requests_recent': coverageChangeRequestsRecent,
+      'coverageChangeRequest': coverageChangeRequest,
+      'coverageChangeRequestsRecent': coverageChangeRequestsRecent,
     };
   }
 
@@ -244,7 +242,7 @@ class DriverProfileDto {
     return const <String, dynamic>{};
   }
 
-  static List<int> _toIntList(dynamic raw) {
+  static List<int> toIntList(dynamic raw) {
     if (raw is! List) return const [];
     return raw
         .map((e) {
@@ -257,7 +255,3 @@ class DriverProfileDto {
   }
 }
 
-Object? _value(Map<String, dynamic> json, String snakeCase, String camelCase) {
-  if (json.containsKey(snakeCase)) return json[snakeCase];
-  return json[camelCase];
-}

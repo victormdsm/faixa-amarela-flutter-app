@@ -76,24 +76,20 @@ class RouteStop {
   factory RouteStop.fromJson(Map<String, dynamic> json) {
     return RouteStop(
       id: (json['id'] as num?)?.toInt() ?? 0,
-      childId: ((json['child_id'] ?? json['childId']) as num?)?.toInt() ?? 0,
-      childName: (json['child_name'] ?? json['childName'] ?? '').toString(),
-      schoolName: (json['school_name'] ?? json['schoolName'] ?? '').toString(),
-      schoolId: ((json['school_id'] ?? json['schoolId']) as num?)?.toInt(),
+      childId: (json['childId'] as num?)?.toInt() ?? 0,
+      childName: (json['childName'] ?? '').toString(),
+      schoolName: (json['schoolName'] ?? '').toString(),
+      schoolId: (json['schoolId'] as num?)?.toInt(),
       address: (json['address'] ?? '').toString(),
-      sequence: ((json['sequence'] ?? json['order']) as num?)?.toInt() ?? 0,
+      sequence: (json['sequence'] as num?)?.toInt() ?? 0,
       status: StopStatus.fromJson((json['status'] ?? 'pending').toString()),
       latitude: (json['latitude'] as num?)?.toDouble(),
       longitude: (json['longitude'] as num?)?.toDouble(),
-      boardedAt: (json['boarded_at'] ?? json['boardedAt']) != null
-          ? DateTime.tryParse(
-              (json['boarded_at'] ?? json['boardedAt']).toString(),
-            )
+      boardedAt: json['boardedAt'] != null
+          ? DateTime.tryParse(json['boardedAt'].toString())
           : null,
-      disembarkedAt: (json['disembarked_at'] ?? json['disembarkedAt']) != null
-          ? DateTime.tryParse(
-              (json['disembarked_at'] ?? json['disembarkedAt']).toString(),
-            )
+      disembarkedAt: json['disembarkedAt'] != null
+          ? DateTime.tryParse(json['disembarkedAt'].toString())
           : null,
     );
   }
@@ -154,19 +150,14 @@ class RouteManifest {
     return RouteManifest(
       id: resolveId(),
       manifestId: resolveManifestId(),
-      driverId:
-          ((json['driver_id'] ?? json['driverId']) as num?)?.toInt() ?? 0,
-      vanId: ((json['van_id'] ?? json['vanId']) as num?)?.toInt() ?? 0,
+      driverId: (json['driverId'] as num?)?.toInt() ?? 0,
+      vanId: (json['vanId'] as num?)?.toInt() ?? 0,
       shiftId: resolveShiftId(),
-      startedAt: (json['started_at'] ?? json['startedAt']) != null
-          ? DateTime.tryParse(
-              (json['started_at'] ?? json['startedAt']).toString(),
-            )
+      startedAt: json['startedAt'] != null
+          ? DateTime.tryParse(json['startedAt'].toString())
           : null,
-      finishedAt: (json['finished_at'] ?? json['finishedAt']) != null
-          ? DateTime.tryParse(
-              (json['finished_at'] ?? json['finishedAt']).toString(),
-            )
+      finishedAt: json['finishedAt'] != null
+          ? DateTime.tryParse(json['finishedAt'].toString())
           : null,
       status: RouteStatus.fromJson((json['status'] ?? 'planning').toString()),
       stops:

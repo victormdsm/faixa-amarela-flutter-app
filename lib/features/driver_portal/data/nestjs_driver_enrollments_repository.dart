@@ -1,10 +1,9 @@
 import 'package:dio/dio.dart';
 
-import '../../../../core/network/api_exception.dart';
-import '../../../../data/dto/child_dto.dart';
-import '../../../../data/dto/enrollment_dto.dart';
-import '../../../../domain/models/enrollment.dart';
-import '../../../../domain/repositories/enrollments_repository.dart';
+import '../../../core/network/api_exception.dart';
+import '../../../data/dto/enrollment_dto.dart';
+import '../../../domain/models/enrollment.dart';
+import '../../../domain/repositories/enrollments_repository.dart';
 
 class NestjsDriverEnrollmentsRepository implements EnrollmentsRepository {
   NestjsDriverEnrollmentsRepository(this._dio);
@@ -19,41 +18,10 @@ class NestjsDriverEnrollmentsRepository implements EnrollmentsRepository {
         queryParameters: {'cpf': cpf},
       );
       final data = response.data ?? const <String, dynamic>{};
-
-      // Prefer nested child DTO when available
-      if (data['child'] is Map<String, dynamic>) {
-        final childDto = ChildDto.fromJson(
-          data['child'] as Map<String, dynamic>,
-        );
-        return ChildLookupResult(
-          found: true,
-          childId: childDto.id,
-          childName: childDto.name,
-          schoolName: childDto.schoolName,
-          shiftName: childDto.shiftName,
-          parentName: childDto.parentName,
-          address: _formatAddress(childDto.address),
-          isInDebt: childDto.isInDebt,
-          hasPendingEnrollment:
-              data['has_pending_enrollment'] == true ||
-              data['has_pending_enrollment'] == 1,
-        );
-      }
-
       return ChildLookupResult.fromJson(data);
     } catch (error) {
       throw ApiException.fromDio(error);
     }
-  }
-
-  String? _formatAddress(ChildAddressDto address) {
-    final parts = <String>[
-      address.street,
-      address.number,
-      address.neighborhood,
-      address.city,
-    ].where((s) => s.isNotEmpty).toList();
-    return parts.isEmpty ? null : parts.join(', ');
   }
 
   @override
@@ -88,17 +56,27 @@ class NestjsDriverEnrollmentsRepository implements EnrollmentsRepository {
   // ---------------------------------------------------------------------------
 
   @override
-  Future<List<Enrollment>> getPendingEnrollments() async {
+  Future<List<Enrollment>> getPendingEnrollments() {
     throw UnsupportedError('getPendingEnrollments is a parent-side action.');
   }
 
   @override
-  Future<void> acceptEnrollment(int id) async {
+  Future<List<Enrollment>> getActiveEnrollments() {
+    throw UnsupportedError('getActiveEnrollments is a parent-side action.');
+  }
+
+  @override
+  Future<void> acceptEnrollment(int id) {
     throw UnsupportedError('acceptEnrollment is a parent-side action.');
   }
 
   @override
-  Future<void> rejectEnrollment(int id) async {
+  Future<void> rejectEnrollment(int id) {
     throw UnsupportedError('rejectEnrollment is a parent-side action.');
+  }
+
+  @override
+  Future<void> cancelEnrollment(int id) {
+    throw UnsupportedError('cancelEnrollment is a parent-side action.');
   }
 }

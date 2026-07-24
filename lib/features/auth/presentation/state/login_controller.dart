@@ -2,7 +2,6 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/utils/validators.dart';
-import '../../../notifications/presentation/providers/notification_providers.dart';
 import '../../domain/entities/user_role.dart';
 import '../providers/auth_providers.dart';
 import 'app_session_controller.dart';
@@ -59,20 +58,29 @@ class LoginController extends _$LoginController {
             password: state.password,
             role: state.role,
           );
-      ref.read(appSessionControllerProvider.notifier).setSession(session);
-      await ref
-          .read(pushRegistrationServiceProvider)
-          .registerCurrentDevice(session.authorizationHeader);
-      state = state.copyWith(isLoading: false);
+      ref
+          .read(appSessionControllerProvider.notifier)
+          .setSession(session, loginRole: state.role);
+      // O registro de push é feito fora deste controller (autoDispose) para
+      // evitar StateError quando o provider é descartado após o redirect.
+      // Também só atualizamos o estado local se o controller ainda estiver
+      // montado, pois o redirect pode ter removido a LoginPage.
+      if (ref.mounted) {
+        state = state.copyWith(isLoading: false);
+      }
       return true;
     } on ApiException catch (e) {
-      state = state.copyWith(isLoading: false, errorMessage: e.message);
+      if (ref.mounted) {
+        state = state.copyWith(isLoading: false, errorMessage: e.message);
+      }
       return false;
     } catch (_) {
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: 'Nao foi possivel realizar o login. Tente novamente.',
-      );
+      if (ref.mounted) {
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage: 'Não foi possível realizar o login. Tente novamente.',
+        );
+      }
       return false;
     }
   }

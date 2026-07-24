@@ -21,8 +21,8 @@ class PaginatedResult<T> {
           .whereType<Map>()
           .map((e) => decoder(Map<String, dynamic>.from(e)))
           .toList(growable: false),
-      currentPage: (json['current_page'] as num?)?.toInt() ?? 1,
-      lastPage: (json['last_page'] as num?)?.toInt() ?? 1,
+      currentPage: (json['currentPage'] as num?)?.toInt() ?? 1,
+      lastPage: (json['lastPage'] as num?)?.toInt() ?? 1,
       total: (json['total'] as num?)?.toInt() ?? rawList.length,
     );
   }

@@ -46,35 +46,27 @@ class DriverRouteController extends AsyncNotifier<RouteManifest?> {
     final current = state.asData?.value;
     if (current == null) return;
 
-    // Local-only update: backend does not yet expose a dedicated absent endpoint.
-    final updatedStops = current.stops.map((stop) {
-      if (stop.childId == childId) {
-        return models.RouteStop(
-          id: stop.id,
-          childId: stop.childId,
-          childName: stop.childName,
-          schoolName: stop.schoolName,
-          address: stop.address,
-          sequence: stop.sequence,
-          status: models.StopStatus.absent,
-          boardedAt: stop.boardedAt,
-          disembarkedAt: stop.disembarkedAt,
-        );
-      }
-      return stop;
-    }).toList();
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async {
+      final repo = ref.read(driverRoutesRepositoryProvider);
+      final updatedStop = await repo.markAbsent(current.id, childId);
+      return _mergeStop(current, updatedStop);
+    });
+  }
 
-    state = AsyncData(
-      RouteManifest(
-        id: current.id,
-        driverId: current.driverId,
-        vanId: current.vanId,
-        startedAt: current.startedAt,
-        finishedAt: current.finishedAt,
-        status: current.status,
-        stops: updatedStops,
-      ),
-    );
+  Future<void> removeStudent(int childId) async {
+    final current = state.asData?.value;
+    if (current == null) return;
+
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async {
+      final repo = ref.read(driverRoutesRepositoryProvider);
+      await repo.removeStudent(current.id, childId);
+      // Recarrega a rota: a remoção é irreversível no dia e o backend é a
+      // fonte de verdade sobre o status final da parada.
+      final refreshed = await repo.getActiveRoute();
+      return refreshed ?? current;
+    });
   }
 
   Future<void> bulkDisembarkAtSchool(int schoolId) async {

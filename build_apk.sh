@@ -50,8 +50,7 @@ echo "    API_BASE_URL=$API_BASE_URL"
 
 flutter build apk --release \
   --target-platform android-arm64 \
-  --dart-define=API_BASE_URL="$API_BASE_URL" \
-  --dart-define=PUSHER_APP_KEY="$PUSHER_APP_KEY"
+  --dart-define=API_BASE_URL="$API_BASE_URL"
 
 APK="$SCRIPT_DIR/build/app/outputs/flutter-apk/app-release.apk"
 if [ -f "$APK" ]; then

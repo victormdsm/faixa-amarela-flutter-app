@@ -3,6 +3,7 @@ import 'package:app_faixa_amarela/domain/repositories/children_repository.dart';
 
 class FakeChildrenRepository implements ChildrenRepository {
   final List<Child> _children = [];
+  final List<Map<String, dynamic>> _addresses = [];
 
   void addChild(Child child) => _children.add(child);
 
@@ -22,29 +23,19 @@ class FakeChildrenRepository implements ChildrenRepository {
   Future<Child> createChild({
     required String name,
     required String cpf,
-    required DateTime birthDate,
-    required String schoolName,
-    required int shiftId,
-    required String shiftName,
-    required int parentId,
-    required String parentName,
+    required int? schoolId,
+    required int? shiftId,
     required ChildAddress address,
-    String? photoUrl,
   }) async {
     final child = Child(
       id: _children.length + 1,
       name: name,
       cpf: cpf,
-      birthDate: birthDate,
-      schoolName: schoolName,
+      schoolId: schoolId,
       shiftId: shiftId,
-      shiftName: shiftName,
-      parentId: parentId,
-      parentName: parentName,
-      address: address,
-      photoUrl: photoUrl,
     );
     _children.add(child);
+    await createChildAddress(childId: child.id, address: address);
     return child;
   }
 
@@ -53,29 +44,22 @@ class FakeChildrenRepository implements ChildrenRepository {
     required int id,
     String? name,
     String? cpf,
-    DateTime? birthDate,
-    String? schoolName,
+    int? schoolId,
     int? shiftId,
-    String? shiftName,
-    int? parentId,
-    String? parentName,
-    ChildAddress? address,
-    String? photoUrl,
   }) async {
     final index = _children.indexWhere((c) => c.id == id);
+    if (index == -1) {
+      throw Exception('Child not found');
+    }
     final existing = _children[index];
     _children[index] = Child(
       id: existing.id,
       name: name ?? existing.name,
       cpf: cpf ?? existing.cpf,
-      birthDate: birthDate ?? existing.birthDate,
-      schoolName: schoolName ?? existing.schoolName,
+      schoolId: schoolId ?? existing.schoolId,
       shiftId: shiftId ?? existing.shiftId,
-      shiftName: shiftName ?? existing.shiftName,
-      parentId: parentId ?? existing.parentId,
-      parentName: parentName ?? existing.parentName,
-      address: address ?? existing.address,
-      photoUrl: photoUrl ?? existing.photoUrl,
+      isInDebt: existing.isInDebt,
+      createdAt: existing.createdAt,
     );
     return _children[index];
   }
@@ -83,5 +67,73 @@ class FakeChildrenRepository implements ChildrenRepository {
   @override
   Future<void> deleteChild(int id) async {
     _children.removeWhere((c) => c.id == id);
+    _addresses.removeWhere((a) => a['child_id'] == id);
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getChildAddresses(int childId) async {
+    return _addresses
+        .where((a) => a['child_id'] == childId)
+        .toList(growable: false);
+  }
+
+  @override
+  Future<void> updateChildAddress({
+    required int childId,
+    required int addressId,
+    required ChildAddress address,
+  }) async {
+    final index = _addresses.indexWhere(
+      (a) => a['child_id'] == childId && a['id'] == addressId,
+    );
+    if (index == -1) {
+      throw Exception('Address not found');
+    }
+    _addresses[index] = {
+      'id': addressId,
+      'child_id': childId,
+      'street': address.street,
+      'number': address.number,
+      'complement': address.complement,
+      'zip_code': address.zipCode,
+    };
+  }
+
+  @override
+  Future<void> createChildAddress({
+    required int childId,
+    required ChildAddress address,
+  }) async {
+    _addresses.add({
+      'id': _addresses.length + 1,
+      'child_id': childId,
+      'street': address.street,
+      'number': address.number,
+      'complement': address.complement,
+      'zip_code': address.zipCode,
+    });
+  }
+
+  @override
+  Future<Child> uploadChildPhoto({
+    required int childId,
+    required String filePath,
+  }) async {
+    final index = _children.indexWhere((c) => c.id == childId);
+    if (index == -1) {
+      throw Exception('Child not found');
+    }
+    final existing = _children[index];
+    _children[index] = Child(
+      id: existing.id,
+      name: existing.name,
+      cpf: existing.cpf,
+      schoolId: existing.schoolId,
+      shiftId: existing.shiftId,
+      isInDebt: existing.isInDebt,
+      createdAt: existing.createdAt,
+      photoUrl: 'file://$filePath',
+    );
+    return _children[index];
   }
 }

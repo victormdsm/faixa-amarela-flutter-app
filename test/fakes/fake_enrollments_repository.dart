@@ -16,6 +16,13 @@ class FakeEnrollmentsRepository implements EnrollmentsRepository {
   }
 
   @override
+  Future<List<Enrollment>> getActiveEnrollments() async {
+    return _enrollments
+        .where((e) => e.status == EnrollmentStatus.active)
+        .toList();
+  }
+
+  @override
   Future<void> acceptEnrollment(int id) async {
     final index = _enrollments.indexWhere((e) => e.id == id);
     if (index != -1) {
@@ -47,6 +54,25 @@ class FakeEnrollmentsRepository implements EnrollmentsRepository {
         vanPlate: _enrollments[index].vanPlate,
         schoolName: _enrollments[index].schoolName,
         status: EnrollmentStatus.rejected,
+        requestedAt: _enrollments[index].requestedAt,
+        respondedAt: DateTime.now(),
+      );
+    }
+  }
+
+  @override
+  Future<void> cancelEnrollment(int id) async {
+    final index = _enrollments.indexWhere((e) => e.id == id);
+    if (index != -1) {
+      _enrollments[index] = Enrollment(
+        id: _enrollments[index].id,
+        childId: _enrollments[index].childId,
+        childName: _enrollments[index].childName,
+        driverId: _enrollments[index].driverId,
+        driverName: _enrollments[index].driverName,
+        vanPlate: _enrollments[index].vanPlate,
+        schoolName: _enrollments[index].schoolName,
+        status: EnrollmentStatus.canceled,
         requestedAt: _enrollments[index].requestedAt,
         respondedAt: DateTime.now(),
       );

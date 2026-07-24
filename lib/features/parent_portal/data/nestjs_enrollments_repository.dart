@@ -1,10 +1,10 @@
 import 'package:dio/dio.dart';
 
-import '../../../../core/errors/app_failure.dart';
-import '../../../../core/network/api_exception.dart';
-import '../../../../data/dto/enrollment_dto.dart';
-import '../../../../domain/models/enrollment.dart';
-import '../../../../domain/repositories/enrollments_repository.dart';
+import '../../../core/error/app_failure.dart';
+import '../../../core/network/api_exception.dart';
+import '../../../data/dto/enrollment_dto.dart';
+import '../../../domain/models/enrollment.dart';
+import '../../../domain/repositories/enrollments_repository.dart';
 
 class NestjsEnrollmentsRepository implements EnrollmentsRepository {
   NestjsEnrollmentsRepository(this._dio);
@@ -59,9 +59,28 @@ class NestjsEnrollmentsRepository implements EnrollmentsRepository {
   }
 
   @override
+  Future<List<Enrollment>> getActiveEnrollments() async {
+    try {
+      final response = await _dio.get<List<dynamic>>(
+        '/parent/enrollments/active',
+      );
+      final raw = response.data ?? const [];
+      return raw
+          .whereType<Map<String, dynamic>>()
+          .map((e) => EnrollmentDto.fromJson(e).toDomain())
+          .toList(growable: false);
+    } catch (e) {
+      throw _mapException(e);
+    }
+  }
+
+  @override
   Future<void> acceptEnrollment(int id) async {
     try {
-      await _dio.put('/parent/enrollments/$id/accept');
+      await _dio.put(
+        '/parent/enrollments/$id/accept',
+        data: const <String, dynamic>{},
+      );
     } catch (e) {
       throw _mapException(e);
     }
@@ -70,7 +89,22 @@ class NestjsEnrollmentsRepository implements EnrollmentsRepository {
   @override
   Future<void> rejectEnrollment(int id) async {
     try {
-      await _dio.put('/parent/enrollments/$id/reject');
+      await _dio.put(
+        '/parent/enrollments/$id/reject',
+        data: const <String, dynamic>{},
+      );
+    } catch (e) {
+      throw _mapException(e);
+    }
+  }
+
+  @override
+  Future<void> cancelEnrollment(int id) async {
+    try {
+      await _dio.put(
+        '/parent/enrollments/$id/cancel',
+        data: const <String, dynamic>{},
+      );
     } catch (e) {
       throw _mapException(e);
     }

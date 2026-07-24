@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 abstract final class BackendConfig {
+  static const _prodBaseUrl = 'https://api.faixaamarela.com.br/api/v1';
   static const _envBaseUrl = String.fromEnvironment('API_BASE_URL');
   static const _envPusherKey = String.fromEnvironment('PUSHER_APP_KEY');
   static const _envPusherCluster = String.fromEnvironment('PUSHER_APP_CLUSTER');
@@ -17,9 +18,7 @@ abstract final class BackendConfig {
     }
 
     if (kReleaseMode) {
-      throw StateError(
-        'API_BASE_URL deve ser definida via --dart-define=API_BASE_URL=... em release.',
-      );
+      return _prodBaseUrl;
     }
 
     if (kIsWeb) {

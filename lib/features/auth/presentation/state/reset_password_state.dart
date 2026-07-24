@@ -11,6 +11,8 @@ abstract class ResetPasswordState with _$ResetPasswordState {
     required String password,
     required String passwordConfirmation,
     required bool isLoading,
+    required bool obscurePassword,
+    required bool obscurePasswordConfirmation,
     String? errorMessage,
     String? successMessage,
   }) = _ResetPasswordState;
@@ -20,11 +22,15 @@ abstract class ResetPasswordState with _$ResetPasswordState {
     password: '',
     passwordConfirmation: '',
     isLoading: false,
+    obscurePassword: true,
+    obscurePasswordConfirmation: true,
   );
 
   bool get canSubmit =>
-      token.isNotEmpty &&
-      password.isNotEmpty &&
+      token.trim().isNotEmpty &&
+      password.length >= 6 &&
       password == passwordConfirmation &&
+      password.contains(RegExp(r'[A-Za-z]')) &&
+      password.contains(RegExp(r'[0-9]')) &&
       !isLoading;
 }

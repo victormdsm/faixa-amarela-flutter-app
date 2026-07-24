@@ -3,53 +3,34 @@ class Child {
     required this.id,
     required this.name,
     required this.cpf,
-    required this.birthDate,
-    required this.schoolName,
+    required this.schoolId,
     required this.shiftId,
-    required this.shiftName,
-    required this.parentId,
-    required this.parentName,
-    required this.address,
-    this.photoUrl,
     this.isInDebt = false,
     this.createdAt,
+    this.photoUrl,
   });
 
   final int id;
   final String name;
   final String cpf;
-  final DateTime? birthDate;
-  final String schoolName;
-  final int shiftId;
-  final String shiftName;
-  final int parentId;
-  final String parentName;
-  final ChildAddress address;
-  final String? photoUrl;
+  final int? schoolId;
+  final int? shiftId;
   final bool isInDebt;
   final DateTime? createdAt;
+  final String? photoUrl;
 
   factory Child.fromJson(Map<String, dynamic> json) {
     return Child(
       id: (json['id'] as num?)?.toInt() ?? 0,
       name: (json['name'] ?? '').toString(),
       cpf: (json['cpf'] ?? '').toString(),
-      birthDate: json['birth_date'] != null
-          ? DateTime.tryParse(json['birth_date'].toString())
+      schoolId: (json['schoolId'] as num?)?.toInt(),
+      shiftId: (json['shiftId'] as num?)?.toInt(),
+      isInDebt: json['isInDebt'] == true || json['isInDebt'] == 1,
+      createdAt: json['createdAt'] != null
+          ? DateTime.tryParse(json['createdAt'].toString())
           : null,
-      schoolName: (json['school_name'] ?? '').toString(),
-      shiftId: (json['shift_id'] as num?)?.toInt() ?? 0,
-      shiftName: (json['shift_name'] ?? '').toString(),
-      parentId: (json['parent_id'] as num?)?.toInt() ?? 0,
-      parentName: (json['parent_name'] ?? '').toString(),
-      address: ChildAddress.fromJson(
-        Map<String, dynamic>.from(json['address'] as Map? ?? {}),
-      ),
-      photoUrl: json['photo_url']?.toString(),
-      isInDebt: json['is_in_debt'] == true || json['is_in_debt'] == 1,
-      createdAt: json['created_at'] != null
-          ? DateTime.tryParse(json['created_at'].toString())
-          : null,
+      photoUrl: json['photoUrl']?.toString(),
     );
   }
 }
@@ -59,35 +40,20 @@ class ChildAddress {
     required this.street,
     required this.number,
     this.complement,
-    required this.neighborhood,
-    required this.city,
-    required this.state,
-    required this.zipCode,
-    this.latitude,
-    this.longitude,
+    this.zipCode,
   });
 
   final String street;
   final String number;
   final String? complement;
-  final String neighborhood;
-  final String city;
-  final String state;
-  final String zipCode;
-  final double? latitude;
-  final double? longitude;
+  final String? zipCode;
 
   factory ChildAddress.fromJson(Map<String, dynamic> json) {
     return ChildAddress(
       street: (json['street'] ?? '').toString(),
       number: (json['number'] ?? '').toString(),
       complement: json['complement']?.toString(),
-      neighborhood: (json['neighborhood'] ?? '').toString(),
-      city: (json['city'] ?? '').toString(),
-      state: (json['state'] ?? '').toString(),
-      zipCode: (json['zip_code'] ?? '').toString(),
-      latitude: (json['latitude'] as num?)?.toDouble(),
-      longitude: (json['longitude'] as num?)?.toDouble(),
+      zipCode: (json['zipCode'] ?? '').toString(),
     );
   }
 
@@ -95,13 +61,9 @@ class ChildAddress {
     return {
       'street': street,
       'number': number,
-      if (complement != null) 'complement': complement,
-      'neighborhood': neighborhood,
-      'city': city,
-      'state': state,
-      'zip_code': zipCode,
-      if (latitude != null) 'latitude': latitude,
-      if (longitude != null) 'longitude': longitude,
+      if (complement != null && complement!.trim().isNotEmpty)
+        'complement': complement,
+      if (zipCode != null && zipCode!.trim().isNotEmpty) 'zipCode': zipCode,
     };
   }
 }

@@ -35,7 +35,7 @@ class FakeAuthRepository implements AuthRepository {
         id: 1,
         name: 'Usuario Fake',
         email: email,
-        role: role == UserRole.parent ? 'parent' : 'driver',
+        roles: [role == UserRole.parent ? 'parent' : 'driver'],
       ),
     );
   }

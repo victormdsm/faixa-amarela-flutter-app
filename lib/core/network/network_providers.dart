@@ -2,7 +2,6 @@ import 'package:dio/dio.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../storage/secure_token_storage.dart';
-import 'api_client.dart';
 import 'auth_interceptor.dart';
 import 'backend_config.dart';
 import 'nestjs_response_unwrap_interceptor.dart';
@@ -32,9 +31,4 @@ Dio dio(Ref ref) {
   dio.interceptors.add(SafeLogInterceptor());
 
   return dio;
-}
-
-@riverpod
-ApiClient apiClient(Ref ref) {
-  return ApiClient(ref.watch(dioProvider));
 }

@@ -4,9 +4,13 @@ abstract interface class EnrollmentsRepository {
   // Parent actions
   Future<List<Enrollment>> getPendingEnrollments();
 
+  Future<List<Enrollment>> getActiveEnrollments();
+
   Future<void> acceptEnrollment(int id);
 
   Future<void> rejectEnrollment(int id);
+
+  Future<void> cancelEnrollment(int id);
 
   // Driver actions
   Future<ChildLookupResult> lookupChildByCpf(String cpf);
@@ -23,6 +27,7 @@ class ChildLookupResult {
     this.childName,
     this.schoolName,
     this.shiftName,
+    this.districtName,
     this.parentName,
     this.address,
     this.isInDebt = false,
@@ -34,6 +39,7 @@ class ChildLookupResult {
   final String? childName;
   final String? schoolName;
   final String? shiftName;
+  final String? districtName;
   final String? parentName;
   final String? address;
   final bool isInDebt;
@@ -44,48 +50,61 @@ class ChildLookupResult {
         ? json['child'] as Map<String, dynamic>
         : json;
 
+    int? toInt(dynamic value) {
+      if (value == null) return null;
+      if (value is int) return value;
+      if (value is num) return value.toInt();
+      if (value is String) return int.tryParse(value);
+      return null;
+    }
+
     return ChildLookupResult(
       found:
           json['found'] == true ||
           json['found'] == 1 ||
           child['id'] != null,
       childId:
-          (json['child_id'] as num?)?.toInt() ?? (child['id'] as num?)?.toInt(),
+          toInt(json['childId']) ??
+          toInt(child['id']),
       childName:
-          json['child_name']?.toString() ??
           json['childName']?.toString() ??
           child['name']?.toString(),
       schoolName:
-          json['school_name']?.toString() ??
           json['schoolName']?.toString() ??
-          child['school_name']?.toString() ??
           child['schoolName']?.toString(),
       shiftName:
-          child['shift_name']?.toString() ?? child['shiftName']?.toString(),
+          json['shiftName']?.toString() ??
+          child['shiftName']?.toString(),
+      districtName: json['districtName']?.toString(),
       parentName:
-          child['parent_name']?.toString() ?? child['parentName']?.toString(),
-      address: _extractAddress(child['address']),
+          json['parentName']?.toString() ??
+          child['parentName']?.toString(),
+      address: _extractAddress(json['address'] ?? child['address']),
       isInDebt:
-          child['is_in_debt'] == true ||
-          child['is_in_debt'] == 1 ||
+          json['inadimplencyAlert'] == true ||
+          json['inadimplencyAlert'] == 1 ||
           child['inadimplencyAlert'] == true ||
-          child['inadimplencyAlert'] == 1,
+          child['inadimplencyAlert'] == 1 ||
+          child['isInDebt'] == true ||
+          child['isInDebt'] == 1,
       hasPendingEnrollment:
-          json['has_pending_enrollment'] == true ||
-          json['has_pending_enrollment'] == 1 ||
           json['hasPendingEnrollment'] == true ||
           json['hasPendingEnrollment'] == 1,
     );
   }
 
   static String? _extractAddress(dynamic raw) {
-    if (raw is! Map<String, dynamic>) return raw?.toString();
-    final parts = <String?>[
-      raw['street']?.toString(),
-      raw['number']?.toString(),
-      raw['neighborhood']?.toString(),
-      raw['city']?.toString(),
-    ].where((s) => s != null && s.isNotEmpty).cast<String>().toList();
-    return parts.isEmpty ? null : parts.join(', ');
+    if (raw == null) return null;
+    if (raw is String) return raw.isEmpty ? null : raw;
+    if (raw is Map) {
+      final parts = <String?>[
+        raw['street']?.toString(),
+        raw['number']?.toString(),
+        raw['neighborhood']?.toString(),
+        raw['city']?.toString(),
+      ].where((s) => s != null && s.isNotEmpty).cast<String>().toList();
+      return parts.isEmpty ? null : parts.join(', ');
+    }
+    return raw.toString();
   }
 }

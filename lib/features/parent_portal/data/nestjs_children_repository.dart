@@ -1,15 +1,18 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
-import '../../../../core/errors/app_failure.dart';
-import '../../../../core/network/api_exception.dart';
-import '../../../../data/dto/child_dto.dart';
-import '../../../../domain/models/child.dart';
-import '../../../../domain/repositories/children_repository.dart';
+import '../../../core/error/app_failure.dart';
+import '../../../core/network/api_exception.dart';
+import '../../../data/dto/child_dto.dart';
+import '../../../domain/models/child.dart';
+import '../../../domain/repositories/children_repository.dart';
 
 class NestjsChildrenRepository implements ChildrenRepository {
   NestjsChildrenRepository(this._dio);
 
   final Dio _dio;
+
+  String _cleanCpf(String cpf) => cpf.replaceAll(RegExp(r'[^0-9]'), '');
 
   AppFailure _mapException(Object error) {
     final apiException = error is ApiException
@@ -45,6 +48,8 @@ class NestjsChildrenRepository implements ChildrenRepository {
   @override
   Future<List<Child>> getChildren() async {
     try {
+      // The NestJS response unwrap interceptor replaces the body with the
+      // `data` payload, so the response is a List<dynamic> directly.
       final response = await _dio.get<List<dynamic>>('/parent/children');
       final raw = response.data ?? const [];
       return raw
@@ -52,6 +57,7 @@ class NestjsChildrenRepository implements ChildrenRepository {
           .map((e) => ChildDto.fromJson(e).toDomain())
           .toList(growable: false);
     } catch (e) {
+      debugPrint('[NestjsChildrenRepository.getChildren] ERRO: $e');
       throw _mapException(e);
     }
   }
@@ -74,34 +80,29 @@ class NestjsChildrenRepository implements ChildrenRepository {
   Future<Child> createChild({
     required String name,
     required String cpf,
-    required DateTime birthDate,
-    required String schoolName,
-    required int shiftId,
-    required String shiftName,
-    required int parentId,
-    required String parentName,
+    required int? schoolId,
+    required int? shiftId,
     required ChildAddress address,
-    String? photoUrl,
   }) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
         '/parent/children',
         data: <String, dynamic>{
           'name': name.trim(),
-          'cpf': cpf.trim(),
-          'birth_date': birthDate.toIso8601String(),
-          'school_name': schoolName.trim(),
-          'shift_id': shiftId,
-          'address': address.toJson(),
-          if (photoUrl != null && photoUrl.trim().isNotEmpty)
-            'photo_url': photoUrl.trim(),
+          'cpf': _cleanCpf(cpf),
+          if (schoolId != null && schoolId > 0) 'schoolId': schoolId,
+          if (shiftId != null && shiftId > 0) 'shiftId': shiftId,
         },
       );
-      final data = response.data;
-      if (data == null) {
+      final body = response.data;
+      if (body == null) {
         throw const ServerFailure(message: 'Resposta vazia do servidor.');
       }
-      return ChildDto.fromJson(data).toDomain();
+      final child = ChildDto.fromJson(body).toDomain();
+
+      await _createAddress(child.id, address);
+
+      return child;
     } catch (e) {
       throw _mapException(e);
     }
@@ -112,28 +113,17 @@ class NestjsChildrenRepository implements ChildrenRepository {
     required int id,
     String? name,
     String? cpf,
-    DateTime? birthDate,
-    String? schoolName,
+    int? schoolId,
     int? shiftId,
-    String? shiftName,
-    int? parentId,
-    String? parentName,
-    ChildAddress? address,
-    String? photoUrl,
   }) async {
     try {
       final payload = <String, dynamic>{};
       if (name != null) payload['name'] = name.trim();
-      if (cpf != null) payload['cpf'] = cpf.trim();
-      if (birthDate != null) {
-        payload['birth_date'] = birthDate.toIso8601String();
+      if (cpf != null) payload['cpf'] = _cleanCpf(cpf);
+      if (schoolId != null) {
+        payload['schoolId'] = schoolId > 0 ? schoolId : null;
       }
-      if (schoolName != null) payload['school_name'] = schoolName.trim();
-      if (shiftId != null) payload['shift_id'] = shiftId;
-      if (address != null) payload['address'] = address.toJson();
-      if (photoUrl != null && photoUrl.trim().isNotEmpty) {
-        payload['photo_url'] = photoUrl.trim();
-      }
+      if (shiftId != null) payload['shiftId'] = shiftId > 0 ? shiftId : null;
 
       final response = await _dio.put<Map<String, dynamic>>(
         '/parent/children/$id',
@@ -152,7 +142,96 @@ class NestjsChildrenRepository implements ChildrenRepository {
   @override
   Future<void> deleteChild(int id) async {
     try {
-      await _dio.delete('/parent/children/$id');
+      await _dio.delete(
+        '/parent/children/$id',
+        options: Options(contentType: null),
+      );
+    } catch (e) {
+      throw _mapException(e);
+    }
+  }
+
+  Future<void> _createAddress(int childId, ChildAddress address) async {
+    await _dio.post<Map<String, dynamic>>(
+      '/parent/children/$childId/addresses',
+      data: <String, dynamic>{
+        'zipcode': (address.zipCode ?? '').trim(),
+        'street': address.street.trim(),
+        'number': address.number.trim(),
+        'reference': address.complement?.trim(),
+        'type': 'home',
+        'isDefault': true,
+      },
+    );
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getChildAddresses(int childId) async {
+    try {
+      final response = await _dio.get<List<dynamic>>(
+        '/parent/children/$childId/addresses',
+      );
+      return (response.data ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .toList(growable: false);
+    } catch (e) {
+      throw _mapException(e);
+    }
+  }
+
+  @override
+  Future<void> updateChildAddress({
+    required int childId,
+    required int addressId,
+    required ChildAddress address,
+  }) async {
+    try {
+      await _dio.put<Map<String, dynamic>>(
+        '/parent/children/$childId/addresses/$addressId',
+        data: <String, dynamic>{
+          'zipcode': (address.zipCode ?? '').trim(),
+          'street': address.street.trim(),
+          'number': address.number.trim(),
+          'reference': address.complement?.trim(),
+          'type': 'home',
+          'isDefault': true,
+        },
+      );
+    } catch (e) {
+      throw _mapException(e);
+    }
+  }
+
+  @override
+  Future<void> createChildAddress({
+    required int childId,
+    required ChildAddress address,
+  }) async {
+    try {
+      await _createAddress(childId, address);
+    } catch (e) {
+      throw _mapException(e);
+    }
+  }
+
+  @override
+  Future<Child> uploadChildPhoto({
+    required int childId,
+    required String filePath,
+  }) async {
+    try {
+      final form = FormData.fromMap({
+        'image': await MultipartFile.fromFile(filePath),
+      });
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/parent/children/$childId/photo',
+        data: form,
+      );
+      final data = response.data;
+      if (data == null) {
+        throw const ServerFailure(message: 'Resposta vazia do servidor.');
+      }
+      return ChildDto.fromJson(data).toDomain();
     } catch (e) {
       throw _mapException(e);
     }

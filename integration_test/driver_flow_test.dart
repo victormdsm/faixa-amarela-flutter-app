@@ -6,6 +6,7 @@ import 'package:app_faixa_amarela/domain/repositories/enrollments_repository.dar
 import 'package:app_faixa_amarela/features/auth/data/session_storage.dart';
 import 'package:app_faixa_amarela/features/auth/domain/entities/auth_session.dart';
 import 'package:app_faixa_amarela/features/auth/domain/entities/auth_user.dart';
+import 'package:app_faixa_amarela/features/auth/domain/entities/user_role.dart';
 import 'package:app_faixa_amarela/features/auth/presentation/state/app_session_controller.dart';
 import 'package:app_faixa_amarela/features/driver_portal/presentation/pages/driver_lookup_child_page.dart';
 import 'package:app_faixa_amarela/features/driver_portal/presentation/providers/driver_portal_providers.dart';
@@ -60,11 +61,11 @@ void main() {
         id: 5,
         name: 'José',
         email: 'j@e.com',
-        role: 'driver',
+        roles: ['driver'],
         isActivated: true,
       ),
     );
-    container.read(appSessionControllerProvider.notifier).setSession(session);
+    container.read(appSessionControllerProvider.notifier).setSession(session, loginRole: UserRole.driver);
     await tester.pumpAndSettle();
 
     await tester.pumpWidget(

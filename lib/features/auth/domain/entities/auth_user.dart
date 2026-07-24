@@ -3,7 +3,7 @@ class AuthUser {
     required this.id,
     required this.name,
     required this.email,
-    required this.role,
+    required this.roles,
     this.cellPhone,
     this.avatar,
     this.primaryDriverId,
@@ -13,58 +13,88 @@ class AuthUser {
   final int id;
   final String name;
   final String? email;
-  final String role;
+
+  /// Todas as roles retornadas pelo backend. O campo `role` (singular) é
+  /// legado e não deve ser usado como fonte de verdade.
+  final List<String> roles;
   final String? cellPhone;
   final String? avatar;
   final int? primaryDriverId;
   final bool isActivated;
 
-  String get normalizedRole => role.trim().toLowerCase();
+  /// Primeira role não-vazia da lista, usada apenas para mensagens legadas.
+  String get primaryRole => roles.isNotEmpty ? roles.first : '';
 
-  bool get isParent => normalizedRole == 'parent' || normalizedRole == 'user';
-  bool get isDriver => normalizedRole == 'driver';
+  List<String> get _normalizedRoles =>
+      roles.map((r) => r.trim().toLowerCase()).toList(growable: false);
+
+  bool _hasRole(String code) => _normalizedRoles.contains(code);
+
+  bool get isParent => _hasRole('parent') || _hasRole('user');
+  bool get isDriver => _hasRole('driver');
   bool get isAdmin =>
-      normalizedRole == 'admin' ||
-      normalizedRole == 'administrator' ||
-      normalizedRole == 'adm';
+      _hasRole('admin') || _hasRole('administrator') || _hasRole('adm');
   bool get isDriverAppRole => isDriver;
+
+  AuthUser copyWith({
+    int? id,
+    String? name,
+    String? email,
+    List<String>? roles,
+    String? cellPhone,
+    String? avatar,
+    int? primaryDriverId,
+    bool? isActivated,
+  }) {
+    return AuthUser(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      email: email ?? this.email,
+      roles: roles ?? this.roles,
+      cellPhone: cellPhone ?? this.cellPhone,
+      avatar: avatar ?? this.avatar,
+      primaryDriverId: primaryDriverId ?? this.primaryDriverId,
+      isActivated: isActivated ?? this.isActivated,
+    );
+  }
 
   factory AuthUser.fromJson(Map<String, dynamic> json) {
     return AuthUser(
       id: int.tryParse(json['id']?.toString() ?? '') ?? 0,
       name: (json['name'] ?? '').toString(),
       email: json['email']?.toString(),
-      role: _extractRole(json),
-      cellPhone: (json['cell_phone'] ?? json['cellPhone'])?.toString(),
+      roles: _extractRoles(json),
+      cellPhone: json['cellPhone']?.toString(),
       avatar: json['avatar']?.toString(),
-      primaryDriverId:
-          ((json['primary_driver_id'] ?? json['primaryDriverId']) as num?)
-              ?.toInt(),
-      // Defaults to true for backward compatibility with legacy backends
-      // that do not send is_activated.
+      primaryDriverId: (json['primaryDriverId'] as num?)?.toInt(),
+      // Defaults to true when the backend does not send isActive.
       isActivated: _extractIsActivated(json),
     );
   }
 
-  static String _extractRole(Map<String, dynamic> json) {
-    final direct = json['role']?.toString();
-    if (direct != null && direct.isNotEmpty) return direct;
+  static List<String> _extractRoles(Map<String, dynamic> json) {
     final roles = json['roles'];
     if (roles is List && roles.isNotEmpty) {
+      final result = <String>[];
       for (final r in roles) {
-        final roleText = r?.toString();
-        if (roleText != null && roleText.isNotEmpty) return roleText;
+        final roleText = r?.toString().trim();
+        if (roleText != null && roleText.isNotEmpty) {
+          result.add(roleText);
+        }
       }
+      if (result.isNotEmpty) return result;
     }
+
+    // Fallback legado: campo `role` singular (não deve ocorrer no NestJS).
+    final direct = json['role']?.toString().trim();
+    if (direct != null && direct.isNotEmpty) return [direct];
+
     throw const FormatException(
-      'Usuario sem perfil (role) identificado pelo servidor.',
+      'Usuario sem perfil (roles) identificado pelo servidor.',
     );
   }
 
   static bool _extractIsActivated(Map<String, dynamic> json) {
-    final legacy = json['is_activated'];
-    if (legacy == false || legacy == 0) return false;
-    if (legacy == true || legacy == 1) return true;
     final modern = json['isActive'];
     if (modern == false || modern == 0) return false;
     if (modern == true || modern == 1) return true;

@@ -6,6 +6,7 @@ import 'package:app_faixa_amarela/domain/models/enrollment.dart';
 import 'package:app_faixa_amarela/features/auth/data/session_storage.dart';
 import 'package:app_faixa_amarela/features/auth/domain/entities/auth_session.dart';
 import 'package:app_faixa_amarela/features/auth/domain/entities/auth_user.dart';
+import 'package:app_faixa_amarela/features/auth/domain/entities/user_role.dart';
 import 'package:app_faixa_amarela/features/auth/presentation/state/app_session_controller.dart';
 import 'package:app_faixa_amarela/features/parent_portal/presentation/pages/parent_children_page.dart';
 import 'package:app_faixa_amarela/features/parent_portal/presentation/pages/parent_enrollments_page.dart';
@@ -39,24 +40,12 @@ void main() {
     final enrollmentsRepo = FakeEnrollmentsRepository();
 
     childrenRepo.addChild(
-      Child(
+      const Child(
         id: 1,
         name: 'Ana Silva',
         cpf: '12345678901',
-        birthDate: DateTime(2015, 3, 10),
-        schoolName: 'Escola Primavera',
+        schoolId: 1,
         shiftId: 1,
-        shiftName: 'Manhã',
-        parentId: 1,
-        parentName: 'Maria Silva',
-        address: ChildAddress(
-          street: 'Rua das Flores',
-          number: '100',
-          neighborhood: 'Jardim',
-          city: 'São Paulo',
-          state: 'SP',
-          zipCode: '01001000',
-        ),
       ),
     );
 
@@ -88,11 +77,11 @@ void main() {
         id: 1,
         name: 'Maria',
         email: 'm@e.com',
-        role: 'user',
+        roles: ['user'],
         isActivated: true,
       ),
     );
-    container.read(appSessionControllerProvider.notifier).setSession(session);
+    container.read(appSessionControllerProvider.notifier).setSession(session, loginRole: UserRole.parent);
     await tester.pumpAndSettle();
 
     await tester.pumpWidget(

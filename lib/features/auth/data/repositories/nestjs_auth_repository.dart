@@ -24,20 +24,71 @@ class NestjsAuthRepository implements AuthRepository {
     required UserRole role,
   }) async {
     try {
+      final normalizedLogin = email.trim();
+      final payload = _isEmail(normalizedLogin)
+          ? <String, dynamic>{'email': normalizedLogin, 'password': password}
+          : <String, dynamic>{
+              'cpf': _digitsOnly(normalizedLogin),
+              'password': password,
+            };
+
       final response = await _dio.post<Map<String, dynamic>>(
         _loginEndpoint(role),
-        data: {'email': email.trim(), 'password': password},
+        data: payload,
       );
 
-      final data = response.data;
-      if (data == null) {
+      final responseData = response.data;
+      if (responseData == null) {
         throw ApiException(message: 'Resposta vazia da API no login.');
       }
 
-      final payload = data['data'] as Map<String, dynamic>? ?? data;
+      final session = AuthSession.fromJson(responseData);
+      await _secureStorage.writeAccessToken(session.accessToken);
+      if (session.hasRefreshToken) {
+        await _secureStorage.writeRefreshToken(session.refreshToken!);
+      }
+      return session;
+    } on ApiException {
+      rethrow;
+    } catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
+  Future<AuthSession> refreshSession(String refreshToken) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/auth/refresh',
+        data: {'refreshToken': refreshToken},
+      );
+
+      final payload = response.data;
+      if (payload == null) {
+        throw ApiException(message: 'Resposta vazia da API no refresh.');
+      }
+
       final session = AuthSession.fromJson(payload);
       await _secureStorage.writeAccessToken(session.accessToken);
+      if (session.hasRefreshToken) {
+        await _secureStorage.writeRefreshToken(session.refreshToken!);
+      }
       return session;
+    } on ApiException {
+      rethrow;
+    } catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
+  Future<void> logout({String? refreshToken, bool allDevices = false}) async {
+    try {
+      await _dio.post<Map<String, dynamic>>(
+        '/auth/logout',
+        data: <String, dynamic>{
+          'refreshToken': refreshToken,
+          'allDevices': allDevices,
+        },
+      );
     } on ApiException {
       rethrow;
     } catch (error) {
@@ -59,10 +110,27 @@ class NestjsAuthRepository implements AuthRepository {
 
   @override
   Future<void> requestActivationLink({required String login}) async {
-    throw ApiException(
-      message: 'Reenvio de link de ativacao nao suportado neste backend.',
-    );
+    try {
+      final normalized = login.trim();
+      final payload = _isEmail(normalized)
+          ? <String, dynamic>{'email': normalized}
+          : <String, dynamic>{'cpf': _digitsOnly(normalized)};
+
+      await _dio.post<Map<String, dynamic>>(
+        '/auth/resend-activation',
+        data: payload,
+      );
+    } on ApiException {
+      rethrow;
+    } catch (error) {
+      throw ApiException.fromDio(error);
+    }
   }
+
+  static bool _isEmail(String value) => value.contains('@');
+
+  static String _digitsOnly(String value) =>
+      value.replaceAll(RegExp(r'\D'), '');
 
   @override
   Future<void> signUpParent({
@@ -97,10 +165,15 @@ class NestjsAuthRepository implements AuthRepository {
     required String code,
   }) async {
     try {
-      await _dio.post<Map<String, dynamic>>(
-        '/auth/activate',
-        data: {'email': emailOrCpf.trim(), 'code': code.trim()},
-      );
+      final normalized = emailOrCpf.trim();
+      final payload = _isEmail(normalized)
+          ? <String, dynamic>{'email': normalized, 'code': code.trim()}
+          : <String, dynamic>{
+              'cpf': _digitsOnly(normalized),
+              'code': code.trim(),
+            };
+
+      await _dio.post<Map<String, dynamic>>('/auth/activate', data: payload);
     } on ApiException {
       rethrow;
     } catch (error) {

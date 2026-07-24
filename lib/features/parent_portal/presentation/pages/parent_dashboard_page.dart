@@ -4,11 +4,22 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/app_router.dart';
 import '../../../../app/theme/app_theme.dart';
+import '../../../../core/error/app_error_reporter.dart';
 import '../../../../core/models/paginated_result.dart';
-import '../../../../core/presentation/widgets/faixa_portal_home.dart';
+import '../../../../core/presentation/widgets/app_shared_widgets.dart';
+import '../../../../core/presentation/widgets/dashboard/dashboard_action_grid.dart';
+import '../../../../core/presentation/widgets/dashboard/dashboard_header.dart';
+import '../../../../core/presentation/widgets/dashboard/dashboard_metric_grid.dart';
+import '../../../../core/presentation/widgets/dashboard/dashboard_models.dart';
+import '../../../../core/presentation/widgets/dashboard/dashboard_section_title.dart';
+import '../../../../core/presentation/widgets/e2e_keys.dart';
+import '../../../../core/presentation/widgets/faixa_app_bar.dart';
 import '../../../auth/presentation/state/app_session_controller.dart';
 import '../../../driver_portal/presentation/pages/ad_banner_widget.dart';
+import '../../../../domain/models/child.dart';
 import '../providers/parent_portal_providers.dart';
+import '../widgets/parent_children_strip.dart';
+import '../widgets/parent_route_status_card.dart';
 
 class ParentDashboardPage extends ConsumerWidget {
   const ParentDashboardPage({super.key});
@@ -38,71 +49,154 @@ class ParentDashboardPage extends ConsumerWidget {
       (p) => p.items.where(_isActiveRoute).length,
     );
 
-    return FaixaPortalHome(
-      userName: session?.user.name ?? 'Responsavel',
-      roleLabel: 'Bem-vindo',
-      statusLabel: activeRouteCount.isZero
-          ? 'Nenhuma rota ativa'
-          : '${activeRouteCount.label} rota(s) ativa(s)',
-      statusActive: activeRouteCount.hasValue && !activeRouteCount.isZero,
-      onRefresh: refresh,
-      onLogout: () => ref.read(appSessionControllerProvider.notifier).clear(),
-      metrics: [
-        PortalHomeMetric(
-          label: 'Dependentes',
-          value: childCount.label,
-          icon: Icons.child_care_outlined,
+    final activeRoute = routesAsync.when(
+      data: (page) => page.items.where(_isActiveRoute).firstOrNull,
+      loading: () => null,
+      error: (_, _) => null,
+    );
+    final children = childrenAsync.when(
+      data: (page) => page.items,
+      loading: () => const <Child>[],
+      error: (_, _) => const <Child>[],
+    );
+    final boardings = boardingsAsync.when(
+      data: (page) => page.items,
+      loading: () => const <Map<String, dynamic>>[],
+      error: (_, _) => const <Map<String, dynamic>>[],
+    );
+
+    // Falha total (os três providers em erro): estado de erro de tela inteira
+    // com retry. Falhas parciais seguem degradadas (contadores "--").
+    final allFailed =
+        childrenAsync.hasError &&
+        routesAsync.hasError &&
+        boardingsAsync.hasError;
+
+    if (allFailed) {
+      return Scaffold(
+        key: E2EKeys.parentHome,
+        backgroundColor: AppColors.surfaceSoft,
+        appBar: FaixaAppBar.portal(),
+        body: FaixaErrorState(
+          message: AppErrorReporter.messageFor(
+            childrenAsync.error ??
+                routesAsync.error ??
+                boardingsAsync.error ??
+                Exception('Falha ao carregar o painel.'),
+          ),
+          onRetry: refresh,
         ),
-        PortalHomeMetric(
-          label: 'Rotas',
-          value: routeCount.label,
-          icon: Icons.route_outlined,
+      );
+    }
+
+    // Subtítulo do cabeçalho com informação real (quantidade de dependentes).
+    final String? headerSubtitle = childrenAsync.when(
+      data: (page) => page.items.isEmpty
+          ? 'Nenhum dependente cadastrado ainda.'
+          : 'Acompanhando ${page.items.length} '
+                '${page.items.length == 1 ? 'dependente' : 'dependentes'}.',
+      loading: () => null,
+      error: (_, _) => null,
+    );
+
+    return Scaffold(
+      key: E2EKeys.parentHome,
+      backgroundColor: AppColors.surfaceSoft,
+      appBar: FaixaAppBar.portal(
+        actions: [
+          IconButton(
+            tooltip: 'Perfil',
+            onPressed: () => context.push(AppRoutes.parentProfile),
+            icon: const Icon(Icons.account_circle_rounded),
+          ),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: () async => refresh(),
+        child: ListView(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          children: [
+            DashboardHeader(
+              userName: session?.user.name ?? 'Responsável',
+              subtitle: headerSubtitle,
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            ParentRouteStatusCard(
+              activeRoute: activeRoute,
+              onViewMap: activeRoute != null
+                  ? () => context.push(AppRoutes.parentRoutes)
+                  : null,
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            const DashboardSectionTitle('Meus dependentes'),
+            const SizedBox(height: AppSpacing.md),
+            ParentChildrenStrip(
+              children: children,
+              boardings: boardings,
+              onTap: (child) => _openChildDetail(context, child),
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            const DashboardSectionTitle('Resumo'),
+            const SizedBox(height: AppSpacing.md),
+            DashboardMetricGrid(
+              metrics: [
+                PortalHomeMetric(
+                  label: 'Alunos',
+                  value: childCount.label,
+                  icon: Icons.child_care_rounded,
+                ),
+                PortalHomeMetric(
+                  label: 'Rotas',
+                  value: routeCount.label,
+                  icon: Icons.route_rounded,
+                ),
+                PortalHomeMetric(
+                  label: 'Embarques',
+                  value: boardingCount.label,
+                  icon: Icons.fact_check_rounded,
+                ),
+                PortalHomeMetric(
+                  label: 'Rota Ativa',
+                  value: activeRouteCount.label,
+                  icon: Icons.near_me_rounded,
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            const DashboardSectionTitle('Ações rápidas'),
+            const SizedBox(height: AppSpacing.md),
+            DashboardActionGrid(
+              actions: [
+                PortalHomeAction(
+                  label: 'Ver Rotas',
+                  icon: Icons.alt_route_rounded,
+                  onTap: () => _goBranch(context, 2),
+                ),
+                PortalHomeAction(
+                  key: E2EKeys.parentChildrenAction,
+                  label: 'Alunos',
+                  icon: Icons.child_care_rounded,
+                  onTap: () => _goBranch(context, 1),
+                ),
+                PortalHomeAction(
+                  label: 'Embarques',
+                  icon: Icons.fact_check_rounded,
+                  onTap: () => _goBranch(context, 3),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            _MoreActionsPanel(
+              onSearchTransport: () => context.push(AppRoutes.searchTransport),
+              onEnrollments: () => context.push(AppRoutes.parentEnrollments),
+              onProfile: () => context.push(AppRoutes.parentProfile),
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            const AdBannerWidget(height: 104),
+            const SizedBox(height: AppSpacing.xxl),
+          ],
         ),
-        PortalHomeMetric(
-          label: 'Embarques',
-          value: boardingCount.label,
-          icon: Icons.fact_check_outlined,
-        ),
-        PortalHomeMetric(
-          label: 'Ativas',
-          value: activeRouteCount.label,
-          icon: Icons.near_me_outlined,
-          color: AppColors.success,
-        ),
-      ],
-      actions: [
-        PortalHomeAction(
-          label: 'Rotas',
-          icon: Icons.alt_route_rounded,
-          onTap: () => _goBranch(context, 2),
-        ),
-        PortalHomeAction(
-          label: 'Dependentes',
-          icon: Icons.child_care_rounded,
-          onTap: () => _goBranch(context, 1),
-        ),
-        PortalHomeAction(
-          label: 'Embarques',
-          icon: Icons.fact_check_rounded,
-          onTap: () => _goBranch(context, 3),
-        ),
-        PortalHomeAction(
-          label: 'Buscar van',
-          icon: Icons.search_rounded,
-          onTap: () => context.push(AppRoutes.searchTransport),
-        ),
-        PortalHomeAction(
-          label: 'Atualizar',
-          icon: Icons.sync_rounded,
-          onTap: refresh,
-        ),
-        PortalHomeAction(
-          label: 'Sair',
-          icon: Icons.logout_rounded,
-          onTap: () => ref.read(appSessionControllerProvider.notifier).clear(),
-        ),
-      ],
-      bottomContent: const AdBannerWidget(height: 104),
+      ),
     );
   }
 
@@ -118,9 +212,99 @@ class ParentDashboardPage extends ConsumerWidget {
     try {
       StatefulNavigationShell.of(context).goBranch(index);
     } catch (_) {
-      // Fora de um shell (ex.: deep link) — fallback para a home do responsavel.
       context.go(AppRoutes.parentHome);
     }
+  }
+
+  static void _openChildDetail(BuildContext context, Child child) {
+    context.push(AppRoutes.parentChildDetail, extra: child);
+  }
+}
+
+class _MoreActionsPanel extends StatefulWidget {
+  const _MoreActionsPanel({
+    required this.onSearchTransport,
+    required this.onEnrollments,
+    required this.onProfile,
+  });
+
+  final VoidCallback onSearchTransport;
+  final VoidCallback onEnrollments;
+  final VoidCallback onProfile;
+
+  @override
+  State<_MoreActionsPanel> createState() => _MoreActionsPanelState();
+}
+
+class _MoreActionsPanelState extends State<_MoreActionsPanel> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        InkWell(
+          onTap: () => setState(() => _expanded = !_expanded),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.lg,
+              vertical: AppSpacing.md,
+            ),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+              border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'Mais ações',
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.ink,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                AnimatedRotation(
+                  turns: _expanded ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: const Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    color: AppColors.ink,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (_expanded) ...[
+          const SizedBox(height: AppSpacing.md),
+          DashboardActionGrid(
+            crossAxisCount: 3,
+            actions: [
+              PortalHomeAction(
+                label: 'Buscar van',
+                icon: Icons.search_rounded,
+                onTap: widget.onSearchTransport,
+              ),
+              PortalHomeAction(
+                label: 'Matrículas',
+                icon: Icons.how_to_reg_rounded,
+                onTap: widget.onEnrollments,
+              ),
+              PortalHomeAction(
+                label: 'Perfil',
+                icon: Icons.account_circle_rounded,
+                onTap: widget.onProfile,
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
   }
 }
 

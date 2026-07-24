@@ -36,4 +36,13 @@ class EnrollmentsController extends AsyncNotifier<List<Enrollment>> {
       return _load();
     });
   }
+
+  Future<void> cancel(int id) async {
+    final repo = ref.read(enrollmentsRepositoryProvider);
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() async {
+      await repo.cancelEnrollment(id);
+      return _load();
+    });
+  }
 }

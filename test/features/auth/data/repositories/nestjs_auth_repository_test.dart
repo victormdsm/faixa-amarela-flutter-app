@@ -1,4 +1,3 @@
-import 'package:app_faixa_amarela/core/network/api_exception.dart';
 import 'package:app_faixa_amarela/core/storage/secure_token_storage.dart';
 import 'package:app_faixa_amarela/features/auth/data/repositories/nestjs_auth_repository.dart';
 import 'package:app_faixa_amarela/features/auth/domain/entities/user_role.dart';
@@ -31,8 +30,8 @@ void main() {
       ).thenAnswer(
         (_) async => Response(
           data: <String, dynamic>{
-            'access_token': 'nest_token',
-            'token_type': 'Bearer',
+            'accessToken': 'nest_token',
+            'tokenType': 'Bearer',
             'user': <String, dynamic>{
               'id': 1,
               'name': 'User',
@@ -55,7 +54,7 @@ void main() {
       );
 
       expect(session.accessToken, 'nest_token');
-      expect(session.user.role, 'user');
+      expect(session.user.roles, ['user']);
       verify(() => secureStorage.writeAccessToken('nest_token')).called(1);
     });
 
@@ -68,8 +67,8 @@ void main() {
       ).thenAnswer(
         (_) async => Response(
           data: <String, dynamic>{
-            'access_token': 'driver_token',
-            'token_type': 'Bearer',
+            'accessToken': 'driver_token',
+            'tokenType': 'Bearer',
             'user': <String, dynamic>{
               'id': 2,
               'name': 'Driver',
@@ -221,11 +220,52 @@ void main() {
   });
 
   group('requestActivationLink', () {
-    test('throws unsupported exception', () async {
-      expect(
-        () => repository.requestActivationLink(login: 'user@email.com'),
-        throwsA(isA<ApiException>()),
+    test('calls /auth/resend-activation with email', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/auth/resend-activation',
+          data: {'email': 'user@email.com'},
+        ),
+      ).thenAnswer(
+        (_) async => Response(
+          data: <String, dynamic>{},
+          statusCode: 200,
+          requestOptions: RequestOptions(),
+        ),
       );
+
+      await repository.requestActivationLink(login: 'user@email.com');
+
+      verify(
+        () => dio.post<Map<String, dynamic>>(
+          '/auth/resend-activation',
+          data: {'email': 'user@email.com'},
+        ),
+      ).called(1);
+    });
+
+    test('calls /auth/resend-activation with cleaned cpf', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/auth/resend-activation',
+          data: {'cpf': '12345678901'},
+        ),
+      ).thenAnswer(
+        (_) async => Response(
+          data: <String, dynamic>{},
+          statusCode: 200,
+          requestOptions: RequestOptions(),
+        ),
+      );
+
+      await repository.requestActivationLink(login: '123.456.789-01');
+
+      verify(
+        () => dio.post<Map<String, dynamic>>(
+          '/auth/resend-activation',
+          data: {'cpf': '12345678901'},
+        ),
+      ).called(1);
     });
   });
 }

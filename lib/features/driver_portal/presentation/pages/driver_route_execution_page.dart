@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/app_router.dart';
 import '../../../../app/theme/app_theme.dart';
+import '../../../../core/error/app_error_reporter.dart';
+import '../../../../core/presentation/widgets/app_shared_widgets.dart';
+import '../../../../core/presentation/widgets/faixa_app_bar.dart';
 import '../../../../domain/models/route_manifest.dart';
 import '../providers/driver_portal_providers.dart';
+import '../widgets/bulk_disembark_dialog.dart';
+import '../widgets/route_execution_stats_header.dart';
+import '../widgets/route_execution_stop_card.dart';
 
 class DriverRouteExecutionPage extends ConsumerWidget {
   const DriverRouteExecutionPage({super.key});
@@ -14,38 +21,39 @@ class DriverRouteExecutionPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final routeAsync = ref.watch(driverRouteControllerProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Execucao da rota'),
-        leading: IconButton(
-          onPressed: () => context.pop(),
-          icon: const Icon(Icons.arrow_back_rounded),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.dark,
+      child: Scaffold(
+        backgroundColor: AppColors.surfaceSoft,
+        appBar: FaixaAppBar.screen(
+          title: 'Execução da rota',
+          actions: [
+            IconButton(
+              onPressed: () =>
+                  ref.read(driverRouteControllerProvider.notifier).refresh(),
+              icon: const Icon(Icons.refresh_rounded),
+            ),
+          ],
         ),
-        actions: [
-          IconButton(
-            onPressed: () =>
+        body: routeAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, _) => FaixaErrorState(
+            message: AppErrorReporter.messageFor(error),
+            onRetry: () =>
                 ref.read(driverRouteControllerProvider.notifier).refresh(),
-            icon: const Icon(Icons.refresh_rounded),
           ),
-        ],
-      ),
-      body: routeAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => _ErrorState(
-          message: error.toString(),
-          onRetry: () =>
-              ref.read(driverRouteControllerProvider.notifier).refresh(),
+          data: (route) {
+            if (route == null) {
+              return FaixaEmptyState(
+                message: 'Nenhuma rota ativa no momento.',
+                icon: Icons.route_rounded,
+                actionLabel: 'Voltar ao início',
+                onAction: () => context.go(AppRoutes.driverHome),
+              );
+            }
+            return _RouteBody(route: route);
+          },
         ),
-        data: (route) {
-          if (route == null) {
-            return _EmptyState(
-              message: 'Nenhuma rota ativa no momento.',
-              onAction: () => context.go(AppRoutes.driverHome),
-              actionLabel: 'Voltar ao inicio',
-            );
-          }
-          return _RouteBody(route: route);
-        },
       ),
     );
   }
@@ -67,58 +75,30 @@ class _RouteBody extends ConsumerWidget {
 
     return Column(
       children: [
-        // Header stats
-        Container(
-          margin: const EdgeInsets.all(AppSpacing.lg),
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(AppRadius.lg),
-            border: Border.all(color: AppColors.border.withAlpha(180)),
-          ),
-          child: Row(
-            children: [
-              _StatChip(
-                label: 'Paradas',
-                value: '${route.stops.length}',
-                color: AppColors.ink,
-              ),
-              const SizedBox(width: AppSpacing.md),
-              _StatChip(
-                label: 'Embarcados',
-                value: '$boardedCount',
-                color: AppColors.success,
-              ),
-              const SizedBox(width: AppSpacing.md),
-              _StatChip(
-                label: 'Pendentes',
-                value: '$pendingCount',
-                color: AppColors.yellowDark,
-              ),
-            ],
-          ),
+        RouteExecutionStatsHeader(
+          totalStops: route.stops.length,
+          boardedCount: boardedCount,
+          pendingCount: pendingCount,
         ),
-
-        // Bulk disembark button
         if (boardedCount > 0)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
             child: SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: () => _showBulkDisembarkDialog(context, ref, route),
-                icon: const Icon(Icons.school_outlined),
+                onPressed: () => _showBulkDisembarkDialog(context, ref),
+                icon: const Icon(Icons.school_rounded),
                 label: const Text('Entregar todos na escola'),
               ),
             ),
           ),
-
-        const SizedBox(height: AppSpacing.lg),
-
-        // Stops list
+        const SizedBox(height: AppSpacing.md),
         Expanded(
           child: route.stops.isEmpty
-              ? const _EmptyState(message: 'Nenhuma parada nesta rota.')
+              ? const FaixaEmptyState(
+                  message: 'Nenhuma parada nesta rota.',
+                  icon: Icons.route_rounded,
+                )
               : ListView.builder(
                   padding: const EdgeInsets.symmetric(
                     horizontal: AppSpacing.lg,
@@ -126,7 +106,10 @@ class _RouteBody extends ConsumerWidget {
                   itemCount: route.stops.length,
                   itemBuilder: (context, index) {
                     final stop = route.stops[index];
-                    return _StopCard(stop: stop, routeId: route.id);
+                    return RouteExecutionStopCard(
+                      stop: stop,
+                      showRemoveButton: true,
+                    );
                   },
                 ),
         ),
@@ -134,394 +117,23 @@ class _RouteBody extends ConsumerWidget {
     );
   }
 
-  void _showBulkDisembarkDialog(
+  Future<void> _showBulkDisembarkDialog(
     BuildContext context,
     WidgetRef ref,
-    RouteManifest route,
-  ) {
+  ) async {
+    await showBulkDisembarkDialog(
+      context,
+      route: route,
+      onConfirm: () => ref
+          .read(driverRouteControllerProvider.notifier)
+          .bulkDisembarkAtSchool(_resolveSchoolId()),
+    );
+  }
+
+  int _resolveSchoolId() {
     final firstStopWithSchool = route.stops
         .where((s) => s.schoolId != null && s.schoolId! > 0)
         .firstOrNull;
-    final schoolName = firstStopWithSchool?.schoolName ??
-        route.stops.firstOrNull?.schoolName ??
-        'escola';
-    final schoolId = firstStopWithSchool?.schoolId ?? 0;
-
-    if (schoolId <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Nao foi possivel identificar a escola desta rota.'),
-        ),
-      );
-      return;
-    }
-
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Entregar todos na escola'),
-        content: Text(
-          'Deseja marcar todos os alunos embarcados como entregues na escola ($schoolName)?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.of(dialogContext).pop();
-              ref
-                  .read(driverRouteControllerProvider.notifier)
-                  .bulkDisembarkAtSchool(schoolId);
-            },
-            child: const Text('Confirmar'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StopCard extends ConsumerStatefulWidget {
-  const _StopCard({required this.stop, required this.routeId});
-
-  final RouteStop stop;
-  final int routeId;
-
-  @override
-  ConsumerState<_StopCard> createState() => _StopCardState();
-}
-
-class _StopCardState extends ConsumerState<_StopCard> {
-  bool _isProcessing = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final stop = widget.stop;
-    final (statusLabel, statusColor) = _stopStatusInfo(stop.status);
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: AppSpacing.md),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: statusColor.withAlpha(30),
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                  ),
-                  child: Icon(
-                    _stopIcon(stop.status),
-                    color: statusColor,
-                    size: 18,
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        stop.childName.isNotEmpty
-                            ? stop.childName
-                            : 'Aluno',
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      Text(
-                        stop.schoolName.isNotEmpty
-                            ? stop.schoolName
-                            : 'Escola nao informada',
-                        style: Theme.of(
-                          context,
-                        ).textTheme.bodySmall?.copyWith(color: AppColors.slate),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: statusColor.withAlpha(30),
-                    borderRadius: BorderRadius.circular(AppRadius.full),
-                  ),
-                  child: Text(
-                    statusLabel,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: statusColor,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              stop.address.isNotEmpty ? stop.address : 'Endereco nao informado',
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: AppColors.slate),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            Wrap(
-              spacing: AppSpacing.sm,
-              runSpacing: AppSpacing.sm,
-              children: [
-                if (stop.status == StopStatus.pending)
-                  _ActionButton(
-                    label: 'Embarcou',
-                    icon: Icons.login_rounded,
-                    loading: _isProcessing,
-                    onPressed: () => _run(() => ref
-                        .read(driverRouteControllerProvider.notifier)
-                        .markBoarded(stop.childId)),
-                  ),
-                if (stop.status == StopStatus.boarded)
-                  _ActionButton(
-                    label: 'Desembarcou',
-                    icon: Icons.logout_rounded,
-                    loading: _isProcessing,
-                    onPressed: () => _run(() => ref
-                        .read(driverRouteControllerProvider.notifier)
-                        .markDisembarked(stop.childId)),
-                  ),
-                if (stop.status == StopStatus.pending)
-                  _ActionButton(
-                    label: 'Ausente',
-                    icon: Icons.person_off_outlined,
-                    isSecondary: true,
-                    loading: _isProcessing,
-                    onPressed: () => _run(() => ref
-                        .read(driverRouteControllerProvider.notifier)
-                        .markAbsent(stop.childId)),
-                  ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _run(Future<void> Function() action) async {
-    if (_isProcessing) return;
-    setState(() => _isProcessing = true);
-    try {
-      await action();
-    } finally {
-      if (mounted) setState(() => _isProcessing = false);
-    }
-  }
-
-  (String, Color) _stopStatusInfo(StopStatus status) {
-    return switch (status) {
-      StopStatus.pending => ('Pendente', AppColors.yellowDark),
-      StopStatus.boarded => ('Embarcado', AppColors.success),
-      StopStatus.disembarked => ('Entregue', AppColors.info),
-      StopStatus.absent => ('Ausente', AppColors.danger),
-      StopStatus.removed => ('Removido', AppColors.muted),
-    };
-  }
-
-  IconData _stopIcon(StopStatus status) {
-    return switch (status) {
-      StopStatus.pending => Icons.schedule_rounded,
-      StopStatus.boarded => Icons.check_circle_outline_rounded,
-      StopStatus.disembarked => Icons.done_all_rounded,
-      StopStatus.absent => Icons.person_off_outlined,
-      StopStatus.removed => Icons.delete_outline_rounded,
-    };
-  }
-}
-
-class _ActionButton extends StatelessWidget {
-  const _ActionButton({
-    required this.label,
-    required this.icon,
-    required this.onPressed,
-    this.isSecondary = false,
-    this.loading = false,
-  });
-
-  final String label;
-  final IconData icon;
-  final VoidCallback onPressed;
-  final bool isSecondary;
-  final bool loading;
-
-  @override
-  Widget build(BuildContext context) {
-    final iconWidget = loading
-        ? const SizedBox(
-            width: 16,
-            height: 16,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          )
-        : Icon(icon, size: 16);
-    if (isSecondary) {
-      return OutlinedButton.icon(
-        onPressed: loading ? null : onPressed,
-        icon: iconWidget,
-        label: Text(label),
-        style: OutlinedButton.styleFrom(
-          minimumSize: const Size(0, 36),
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          textStyle: Theme.of(context).textTheme.labelMedium,
-        ),
-      );
-    }
-    return FilledButton.tonalIcon(
-      onPressed: loading ? null : onPressed,
-      icon: iconWidget,
-      label: Text(label),
-      style: FilledButton.styleFrom(
-        minimumSize: const Size(0, 36),
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        textStyle: Theme.of(context).textTheme.labelMedium,
-      ),
-    );
-  }
-}
-
-class _StatChip extends StatelessWidget {
-  const _StatChip({
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  final String label;
-  final String value;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
-        decoration: BoxDecoration(
-          color: color.withAlpha(20),
-          borderRadius: BorderRadius.circular(AppRadius.md),
-        ),
-        child: Column(
-          children: [
-            Text(
-              value,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-                color: color,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: Theme.of(
-                context,
-              ).textTheme.labelSmall?.copyWith(color: AppColors.slate),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.message, this.onAction, this.actionLabel});
-
-  final String message;
-  final VoidCallback? onAction;
-  final String? actionLabel;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.route_outlined, size: 48, color: AppColors.muted),
-            const SizedBox(height: AppSpacing.lg),
-            Text(
-              message,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: AppColors.slate),
-              textAlign: TextAlign.center,
-            ),
-            if (onAction != null && actionLabel != null) ...[
-              const SizedBox(height: AppSpacing.lg),
-              FilledButton.icon(
-                onPressed: onAction,
-                icon: const Icon(Icons.home_outlined),
-                label: Text(actionLabel!),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.message, this.onRetry});
-
-  final String message;
-  final VoidCallback? onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              Icons.error_outline_rounded,
-              size: 48,
-              color: AppColors.danger,
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            Text(
-              'Erro ao carregar rota',
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              message,
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: AppColors.slate),
-              textAlign: TextAlign.center,
-            ),
-            if (onRetry != null) ...[
-              const SizedBox(height: AppSpacing.lg),
-              FilledButton.icon(
-                onPressed: onRetry,
-                icon: const Icon(Icons.refresh_rounded),
-                label: const Text('Tentar novamente'),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
+    return firstStopWithSchool?.schoolId ?? 0;
   }
 }

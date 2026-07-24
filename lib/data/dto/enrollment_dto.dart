@@ -26,36 +26,32 @@ class EnrollmentDto {
   final DateTime? respondedAt;
 
   factory EnrollmentDto.fromJson(Map<String, dynamic> json) {
+    int toInt(dynamic value) {
+      if (value == null) return 0;
+      if (value is int) return value;
+      if (value is num) return value.toInt();
+      if (value is String) return int.tryParse(value) ?? 0;
+      return 0;
+    }
+
+    final respondedAtRaw = json['respondedAt'] ?? json['acceptedAt'];
+
     return EnrollmentDto(
-      id: (json['id'] as num?)?.toInt() ?? 0,
-      childId: (_value(json, 'child_id', 'childId') as num?)?.toInt() ?? 0,
-      childName: (_value(json, 'child_name', 'childName') ?? '').toString(),
-      driverId:
-          ((_value(json, 'driver_id', 'driverId') ??
-                      _value(json, 'driver_user_id', 'driverUserId'))
-                  as num?)
-              ?.toInt() ??
-          0,
-      driverName: (_value(json, 'driver_name', 'driverName') ?? '').toString(),
-      vanPlate: (_value(json, 'van_plate', 'vanPlate') ?? '').toString(),
-      schoolName: (_value(json, 'school_name', 'schoolName') ?? '').toString(),
+      id: toInt(json['id']),
+      childId: toInt(json['childId']),
+      childName: (json['childName'] ?? '').toString(),
+      driverId: toInt(json['driverUserId'] ?? json['driverId']),
+      driverName: (json['driverName'] ?? '').toString(),
+      vanPlate: (json['vanPlate'] ?? '').toString(),
+      schoolName: (json['schoolName'] ?? '').toString(),
       status: EnrollmentStatus.fromJson(
         (json['status'] ?? 'pending').toString(),
       ),
-      requestedAt: _value(json, 'requested_at', 'requestedAt') != null
-          ? DateTime.tryParse(
-              _value(json, 'requested_at', 'requestedAt').toString(),
-            )
+      requestedAt: json['requestedAt'] != null
+          ? DateTime.tryParse(json['requestedAt'].toString())
           : null,
-      respondedAt:
-          (_value(json, 'responded_at', 'respondedAt') ??
-                  _value(json, 'accepted_at', 'acceptedAt')) !=
-              null
-          ? DateTime.tryParse(
-              (_value(json, 'responded_at', 'respondedAt') ??
-                      _value(json, 'accepted_at', 'acceptedAt'))
-                  .toString(),
-            )
+      respondedAt: respondedAtRaw != null
+          ? DateTime.tryParse(respondedAtRaw.toString())
           : null,
     );
   }
@@ -63,15 +59,15 @@ class EnrollmentDto {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'child_id': childId,
-      'child_name': childName,
-      'driver_id': driverId,
-      'driver_name': driverName,
-      'van_plate': vanPlate,
-      'school_name': schoolName,
+      'childId': childId,
+      'childName': childName,
+      'driverId': driverId,
+      'driverName': driverName,
+      'vanPlate': vanPlate,
+      'schoolName': schoolName,
       'status': status.toJson(),
-      if (requestedAt != null) 'requested_at': requestedAt!.toIso8601String(),
-      if (respondedAt != null) 'responded_at': respondedAt!.toIso8601String(),
+      if (requestedAt != null) 'requestedAt': requestedAt!.toIso8601String(),
+      if (respondedAt != null) 'respondedAt': respondedAt!.toIso8601String(),
     };
   }
 
@@ -106,7 +102,3 @@ class EnrollmentDto {
   }
 }
 
-Object? _value(Map<String, dynamic> json, String snakeCase, String camelCase) {
-  if (json.containsKey(snakeCase)) return json[snakeCase];
-  return json[camelCase];
-}

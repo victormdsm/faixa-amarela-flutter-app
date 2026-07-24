@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 
-import '../../../../core/models/paginated_result.dart';
-import '../../../../core/network/api_exception.dart';
+import '../../../core/models/paginated_result.dart';
+import '../../../core/network/api_exception.dart';
 
 class NestjsParentRoutingRepository {
   NestjsParentRoutingRepository(this._dio);

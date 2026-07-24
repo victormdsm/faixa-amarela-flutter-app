@@ -3,6 +3,7 @@ import 'dart:developer' as developer;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import 'app_failure.dart';
 import '../network/api_exception.dart';
 
 final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey =
@@ -10,6 +11,7 @@ final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey =
 
 abstract final class AppErrorReporter {
   static String messageFor(Object error) {
+    if (error is AppFailure) return error.message;
     if (error is ApiException) return error.message;
     final apiError = ApiException.fromDio(error);
     if (apiError.message.isNotEmpty &&

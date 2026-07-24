@@ -15,6 +15,8 @@ abstract interface class RoutesRepository {
 
   Future<RouteStop> markDisembarking(int routeId, int childId);
 
+  Future<RouteStop> markAbsent(int routeId, int childId);
+
   Future<List<RouteStop>> bulkDisembarkAtSchool(int routeId, int schoolId);
 
   Future<void> removeStudent(int routeId, int childId);
@@ -106,7 +108,7 @@ class PlanningChild {
     return PlanningChild(
       id: ((json['id'] ?? json['childId']) as num?)?.toInt() ?? 0,
       name: (json['name'] ?? json['childName'] ?? '').toString(),
-      schoolName: (json['school_name'] ?? json['schoolName'] ?? '').toString(),
+      schoolName: (json['schoolName'] ?? '').toString(),
       address: (json['address'] ?? address).toString(),
     );
   }

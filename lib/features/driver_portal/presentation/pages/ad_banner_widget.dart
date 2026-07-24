@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../../app/theme/app_theme.dart';
 import '../../../../core/network/backend_config.dart';
 
 // ─── Model ───────────────────────────────────────────────────────────────────
@@ -39,10 +40,10 @@ class AdBanner {
     return AdBanner(
       id: (json['id'] as num).toInt(),
       name: json['name']?.toString() ?? '',
-      imageUrl: json['image_url']?.toString(),
+      imageUrl: json['imageUrl']?.toString(),
       link: json['link']?.toString(),
       order: (json['order'] as num?)?.toInt() ?? 0,
-      updatedAt: DateTime.tryParse(json['updated_at']?.toString() ?? ''),
+      updatedAt: DateTime.tryParse(json['updatedAt']?.toString() ?? ''),
     );
   }
 }
@@ -65,28 +66,13 @@ class AdBannersNotifier extends AsyncNotifier<List<AdBanner>> {
       final dio = Dio(BaseOptions(baseUrl: BackendConfig.apiBaseUrl));
 
       // Public endpoint – no auth required
-      final response = await dio.get<Map<String, dynamic>>(
-        '/publicities',
-        queryParameters: {'per_page': 20, 'only_active': true},
-      );
+      final response = await dio.get<Map<String, dynamic>>('/publicities');
 
       final raw = response.data;
       if (raw == null) return const [];
 
-      // Handle Laravel envelope { status, data: { data: [...] } }
-      List<dynamic>? items;
-      if (raw['status'] == 'success') {
-        final inner = raw['data'];
-        if (inner is Map && inner['data'] is List) {
-          items = inner['data'] as List;
-        } else if (inner is List) {
-          items = inner;
-        }
-      } else if (raw['data'] is List) {
-        items = raw['data'] as List;
-      }
-
-      if (items == null) return const [];
+      final items = raw['data'];
+      if (items is! List) return const [];
 
       return items
           .whereType<Map<String, dynamic>>()
@@ -279,9 +265,7 @@ class _AdBannerWidgetState extends ConsumerState<AdBannerWidget>
                       width: active ? 18 : 6,
                       height: 6,
                       decoration: BoxDecoration(
-                        color: active
-                            ? const Color(0xFFEFAB00)
-                            : const Color(0xFFCCC5A8),
+                        color: active ? AppColors.yellow : AppColors.muted,
                         borderRadius: BorderRadius.circular(3),
                       ),
                     );
@@ -323,7 +307,7 @@ class _AdCard extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           child: Stack(
             fit: StackFit.expand,
             children: [
@@ -334,7 +318,7 @@ class _AdCard extends StatelessWidget {
                 loadingBuilder: (context, child, loadingProgress) {
                   if (loadingProgress == null) return child;
                   return Container(
-                    color: const Color(0xFFF5F0E8),
+                    color: AppColors.surfaceSoft,
                     child: const Center(
                       child: SizedBox(
                         width: 24,
@@ -342,7 +326,7 @@ class _AdCard extends StatelessWidget {
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
                           valueColor: AlwaysStoppedAnimation<Color>(
-                            Color(0xFFEFAB00),
+                            AppColors.yellow,
                           ),
                         ),
                       ),
@@ -351,11 +335,11 @@ class _AdCard extends StatelessWidget {
                 },
                 errorBuilder: (context, error, stackTrace) {
                   return Container(
-                    color: const Color(0xFFF5F0E8),
+                    color: AppColors.surfaceSoft,
                     child: const Center(
                       child: Icon(
                         Icons.image_not_supported_outlined,
-                        color: Color(0xFFBBB29A),
+                        color: AppColors.muted,
                         size: 32,
                       ),
                     ),
@@ -373,7 +357,7 @@ class _AdCard extends StatelessWidget {
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
-                      colors: [Colors.transparent, Color(0x33000000)],
+                      colors: [Colors.transparent, AppColors.shadowMedium],
                     ),
                   ),
                 ),

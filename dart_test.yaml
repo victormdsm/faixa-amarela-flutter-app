@@ -1,0 +1,3 @@
+tags:
+  prod:
+    skip: "Requer ambiente de producao ou credenciais especificas"

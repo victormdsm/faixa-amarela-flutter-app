@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../app/router/app_router.dart';
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/presentation/widgets/app_feedback.dart';
 import '../state/finalize_registration_controller.dart';
@@ -21,7 +22,7 @@ class FinalizeRegistrationPage extends ConsumerWidget {
     return AuthShell(
       title: 'Finalizar cadastro',
       subtitle:
-          'Informe e-mail ou CPF para receber (ou reenviar) o link de ativacao da sua conta.',
+          'Informe e-mail ou CPF para receber (ou reenviar) o código de ativação da sua conta.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -33,10 +34,10 @@ class FinalizeRegistrationPage extends ConsumerWidget {
             onSubmitted: (_) async => _submit(context, ref),
             decoration: const InputDecoration(
               labelText: 'E-mail ou CPF',
-              prefixIcon: Icon(Icons.badge_outlined),
+              prefixIcon: Icon(Icons.badge_rounded),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 220),
             child: state.errorMessage != null
@@ -55,7 +56,7 @@ class FinalizeRegistrationPage extends ConsumerWidget {
                   )
                 : const SizedBox.shrink(key: ValueKey('empty')),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           FilledButton.icon(
             onPressed: state.isLoading
                 ? null
@@ -66,34 +67,38 @@ class FinalizeRegistrationPage extends ConsumerWidget {
                     height: 16,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Icon(Icons.mark_email_read_outlined),
+                : const Icon(Icons.mark_email_read_rounded),
             label: Text(
-              state.isLoading ? 'Enviando...' : 'Enviar link de finalizacao',
+              state.isLoading ? 'Enviando...' : 'Enviar código de ativação',
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(AppSpacing.md),
             decoration: BoxDecoration(
-              color: AppColors.yellow.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: AppColors.yellowDark.withValues(alpha: 0.24),
-              ),
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              border: Border.all(color: AppColors.border),
             ),
             child: Text(
-              'A conta do responsavel e unica. Se mudar de tio da van, ela pode ser transferida para outro motorista apos desvinculo e novo vinculo pelo CPF.',
+              'A conta do responsável é única. Se mudar de tio da van, ela pode ser transferida para outro motorista após desvínculo e novo vínculo pelo CPF.',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: AppColors.slate,
                 fontWeight: FontWeight.w600,
               ),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.sm),
           TextButton.icon(
             onPressed: () => context.pop(),
             icon: const Icon(Icons.arrow_back_rounded),
             label: const Text('Voltar para login'),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          TextButton.icon(
+            onPressed: () => context.push(AppRoutes.activation),
+            icon: const Icon(Icons.password_rounded),
+            label: const Text('Já tenho um código'),
           ),
         ],
       ),
@@ -108,7 +113,7 @@ class FinalizeRegistrationPage extends ConsumerWidget {
 
     showAppSnackBar(
       context,
-      message: 'Solicitacao de finalizacao enviada.',
+      message: 'Solicitação de finalização enviada.',
       type: AppFeedbackType.success,
     );
   }
