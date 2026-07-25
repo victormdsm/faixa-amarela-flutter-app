@@ -42,6 +42,9 @@ build/
 *.jpg
 *.jpeg
 
+# Assets de marca declarados no pubspec não são temporários
+!assets/images/logo_lockup.png
+
 # IDEs
 .idea/
 .vscode/

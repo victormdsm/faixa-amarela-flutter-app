@@ -102,6 +102,11 @@ class FakeEnrollmentsRepository implements EnrollmentsRepository {
   }
 
   @override
-  Future<List<Enrollment>> getMyEnrollments() async =>
-      List.unmodifiable(_enrollments);
+  Future<List<Enrollment>> getMyEnrollments() async => List.unmodifiable(
+    _enrollments.where(
+      (e) =>
+          e.status == EnrollmentStatus.pending ||
+          e.status == EnrollmentStatus.active,
+    ),
+  );
 }

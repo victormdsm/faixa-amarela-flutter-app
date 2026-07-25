@@ -93,16 +93,18 @@ class _AuthHeader extends StatelessWidget {
     return ClipPath(
       clipper: _AuthHeaderClipper(),
       child: Container(
-        height: 260,
         color: AppColors.yellow,
         child: SafeArea(
           bottom: false,
           child: Padding(
+            // O respiro inferior (xxxl = 48) é maior que a profundidade máxima
+            // do corte diagonal (36 no _AuthHeaderClipper): a faixa sempre
+            // corta área vazia do header, nunca o conteúdo.
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.lg,
               AppSpacing.sm,
               AppSpacing.lg,
-              AppSpacing.xl,
+              AppSpacing.xxxl,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -132,30 +134,19 @@ class _AuthHeader extends StatelessWidget {
                         )
                       : const SizedBox.shrink(),
                 ),
-                const Spacer(),
+                const SizedBox(height: AppSpacing.xxl),
                 Center(
-                  child: Container(
-                    width: 80,
-                    height: 80,
-                    padding: const EdgeInsets.all(AppSpacing.md - 2),
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(AppRadius.md + 8),
-                      boxShadow: const [
-                        BoxShadow(
-                          blurRadius: 16,
-                          offset: Offset(0, 6),
-                          color: Color(0x20000000),
-                        ),
-                      ],
-                    ),
-                    child: Image.asset(
-                      'assets/images/logo.png',
-                      fit: BoxFit.contain,
-                      semanticLabel: 'Faixa Amarela',
-                      errorBuilder: (context, error, stackTrace) =>
-                          const _LogoLoadError(),
-                    ),
+                  // Logo oficial direto sobre o amarelo, sem tile branco:
+                  // logo_lockup.png é a variante transparente (sem variantes
+                  // de densidade) prevista na skill de marca para superfícies
+                  // amarelas — o logo.png tem variantes 2x-4x opacas.
+                  child: Image.asset(
+                    'assets/images/logo_lockup.png',
+                    height: 96,
+                    fit: BoxFit.contain,
+                    semanticLabel: 'Faixa Amarela',
+                    errorBuilder: (context, error, stackTrace) =>
+                        const _LogoLoadError(),
                   ),
                 ),
                 const SizedBox(height: AppSpacing.md),
@@ -193,7 +184,7 @@ class _LogoLoadError extends StatelessWidget {
       color: AppColors.danger.withValues(alpha: 0.12),
       child: Center(
         child: Text(
-          'logo.png\nnão encontrado',
+          'logo_lockup.png\nnão encontrado',
           textAlign: TextAlign.center,
           style: Theme.of(
             context,

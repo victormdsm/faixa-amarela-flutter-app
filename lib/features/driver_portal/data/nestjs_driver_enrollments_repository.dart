@@ -51,6 +51,19 @@ class NestjsDriverEnrollmentsRepository implements EnrollmentsRepository {
     }
   }
 
+  /// Desvincula uma matrícula da carteira do motorista (ativa ou pendente).
+  @override
+  Future<void> cancelEnrollment(int id) async {
+    try {
+      await _dio.put(
+        '/driver/enrollments/$id/cancel',
+        data: const <String, dynamic>{},
+      );
+    } catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Parent-side actions — not used by driver portal
   // ---------------------------------------------------------------------------
@@ -73,10 +86,5 @@ class NestjsDriverEnrollmentsRepository implements EnrollmentsRepository {
   @override
   Future<void> rejectEnrollment(int id) {
     throw UnsupportedError('rejectEnrollment is a parent-side action.');
-  }
-
-  @override
-  Future<void> cancelEnrollment(int id) {
-    throw UnsupportedError('cancelEnrollment is a parent-side action.');
   }
 }

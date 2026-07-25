@@ -9,6 +9,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  // A logo do header (AuthShell) decodifica de forma assíncrona; sem o
+  // precache o primeiro golden que a usa renderiza sem a imagem.
+  Future<void> precacheLogo(WidgetTester tester) async {
+    await tester.runAsync(() async {
+      await precacheImage(
+        const AssetImage('assets/images/logo_lockup.png'),
+        tester.binding.rootElement!,
+      );
+    });
+  }
+
   testWidgets('ChildSummaryCard golden', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
@@ -47,6 +58,7 @@ void main() {
   });
 
   testWidgets('LoginPage golden', (tester) async {
+    await precacheLogo(tester);
     await tester.pumpWidget(
       const ProviderScope(child: MaterialApp(home: LoginPage())),
     );
@@ -58,6 +70,7 @@ void main() {
   });
 
   testWidgets('ActivationPage golden', (tester) async {
+    await precacheLogo(tester);
     await tester.pumpWidget(
       const ProviderScope(child: MaterialApp(home: ActivationPage())),
     );
