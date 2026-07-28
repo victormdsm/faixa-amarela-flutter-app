@@ -19,6 +19,11 @@ abstract interface class AuthRepository {
     required String cellPhone,
     required String password,
     required String passwordConfirmation,
+
+    /// F10 (LGPD): o backend exige o aceite explícito dos termos
+    /// (`acceptTerms: true`); sem ele responde 400
+    /// ('É necessário aceitar os termos de uso e privacidade.').
+    bool acceptTerms = false,
   });
 
   Future<void> activateAccount({

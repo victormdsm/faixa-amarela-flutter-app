@@ -35,7 +35,7 @@ class FakeChildrenRepository implements ChildrenRepository {
       shiftId: shiftId,
     );
     _children.add(child);
-    await createChildAddress(childId: child.id, address: address);
+    await createChildAddress(childId: child.id, address: address, isDefault: true);
     return child;
   }
 
@@ -78,6 +78,13 @@ class FakeChildrenRepository implements ChildrenRepository {
   }
 
   @override
+  Future<({double latitude, double longitude, String? label})?>
+  geocodeAddress(String text) async {
+    // Fake: sem geocoder — o mapa simplesmente não aparece nos testes.
+    return null;
+  }
+
+  @override
   Future<void> updateChildAddress({
     required int childId,
     required int addressId,
@@ -103,7 +110,15 @@ class FakeChildrenRepository implements ChildrenRepository {
   Future<void> createChildAddress({
     required int childId,
     required ChildAddress address,
+    bool isDefault = false,
   }) async {
+    if (isDefault) {
+      for (var i = 0; i < _addresses.length; i++) {
+        if (_addresses[i]['child_id'] == childId) {
+          _addresses[i] = {..._addresses[i], 'is_default': false};
+        }
+      }
+    }
     _addresses.add({
       'id': _addresses.length + 1,
       'child_id': childId,
@@ -111,7 +126,35 @@ class FakeChildrenRepository implements ChildrenRepository {
       'number': address.number,
       'complement': address.complement,
       'zip_code': address.zipCode,
+      'is_default': isDefault,
     });
+  }
+
+  @override
+  Future<void> deleteChildAddress({
+    required int childId,
+    required int addressId,
+  }) async {
+    _addresses.removeWhere(
+      (a) => a['child_id'] == childId && a['id'] == addressId,
+    );
+  }
+
+  @override
+  Future<void> setChildAddressDefault({
+    required int childId,
+    required int addressId,
+  }) async {
+    var found = false;
+    for (var i = 0; i < _addresses.length; i++) {
+      if (_addresses[i]['child_id'] != childId) continue;
+      final isTarget = _addresses[i]['id'] == addressId;
+      if (isTarget) found = true;
+      _addresses[i] = {..._addresses[i], 'is_default': isTarget};
+    }
+    if (!found) {
+      throw Exception('Address not found');
+    }
   }
 
   @override

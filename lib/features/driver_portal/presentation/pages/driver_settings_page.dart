@@ -58,6 +58,7 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
   bool _hydrated = false;
   bool _isSaving = false;
   bool _vehicleEditMode = false;
+  int? _vehicleId;
   String? _avatarImageUrl;
   String? _avatarImageLocalPath;
   String? _vehicleImageUrl;
@@ -106,6 +107,11 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
       next.whenData((data) {
         if (!_hydrated) {
           _applyProfile(data);
+        } else {
+          // Perfil já hidratado (ex.: push driver_profile_change_reviewed
+          // invalidou o provider): sincroniza apenas o que veio do servidor
+          // sem sobrescrever edições em andamento nos campos de texto.
+          _syncRemoteState(data);
         }
       });
     });
@@ -129,6 +135,10 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
       bottomNavigationBar: profileAsync.maybeWhen(
         data: (_) => SafeArea(
           top: false,
+          // Alguns aparelhos (MIUI/gesture bar custom) reportam inset bottom
+          // como 0 e o botão fica sob a barra de navegação do Android.
+          // O piso mínimo garante respiro mesmo nesses casos.
+          minimum: const EdgeInsets.only(bottom: AppSpacing.md),
           child: Container(
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.lg,
@@ -364,14 +374,16 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                 icon: Icons.history_rounded,
                 title: 'Minhas solicitações de alteração',
                 subtitle: 'Acompanhe o status de escolas, bairros, turnos e fotos enviadas.',
-                trailing: FilledButton.icon(
-                  onPressed: _isSaving
-                      ? null
-                      : () => context.push(AppRoutes.driverChangeRequests),
-                  icon: const Icon(Icons.arrow_forward_rounded, size: 18),
-                  label: const Text('Ver histórico'),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _isSaving
+                        ? null
+                        : () => context.push(AppRoutes.driverChangeRequests),
+                    icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+                    label: const Text('Ver histórico'),
+                  ),
                 ),
-                child: const SizedBox.shrink(),
               ),
               const SizedBox(height: AppSpacing.lg),
               OutlinedButton.icon(
@@ -414,6 +426,7 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
     ).map(_toChangeRequest).toList(growable: false);
 
     final van = _map(data['van']);
+    _vehicleId = (van['id'] as num?)?.toInt();
     _vehicleBrandController.text = (van['model'] ?? '').toString();
     _vehicleColorController.text = (van['color'] ?? '').toString();
     _vehicleYearController.text = (van['year'] ?? '').toString();
@@ -445,6 +458,30 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
       for (final entry in _districtShiftMap.entries)
         entry.key: Set<int>.from(entry.value),
     };
+
+    if (mounted) setState(() {});
+  }
+
+  /// Sincroniza com dados frescos do servidor sem tocar nos campos de texto
+  /// (o motorista pode estar editando). Atualiza avatar, foto do veículo e o
+  /// status das solicitações — é o que faz a foto aprovada aparecer sozinha
+  /// quando o push `driver_profile_change_reviewed` invalida o provider.
+  void _syncRemoteState(Map<String, dynamic> data) {
+    if (_avatarImageLocalPath == null) {
+      _avatarImageUrl = data['avatarUrl']?.toString();
+    }
+
+    final van = _map(data['van']);
+    _vehicleId = (van['id'] as num?)?.toInt();
+    if (_vehicleImageLocalPath == null) {
+      _vehicleImageUrl = van['imageUrl']?.toString();
+    }
+
+    final pending = _map(data['coverageChangeRequest']);
+    _coverageChangeRequest = pending.isEmpty ? null : pending;
+    _coverageChangeRequestsRecent = _listOfMaps(
+      data['coverageChangeRequestsRecent'],
+    ).map(_toChangeRequest).toList(growable: false);
 
     if (mounted) setState(() {});
   }
@@ -634,6 +671,7 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
           },
           avatarImagePath: avatarUrl,
           vehicleImagePath: vehicleImageUrl,
+          vehicleId: _vehicleId,
           requestNote: null,
         );
         coverageRequestSubmitted = true;

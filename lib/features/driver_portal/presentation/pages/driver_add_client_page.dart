@@ -6,6 +6,7 @@ import '../../../../core/network/api_exception.dart';
 import '../../../../core/presentation/widgets/app_shared_widgets.dart';
 import '../../../../core/presentation/widgets/faixa_app_bar.dart';
 import '../../../../core/presentation/widgets/faixa_section_card.dart';
+import '../../../../core/utils/validators.dart';
 import '../../../../domain/repositories/enrollments_repository.dart';
 import '../providers/driver_portal_providers.dart';
 
@@ -47,20 +48,20 @@ class _DriverAddClientPageState extends ConsumerState<DriverAddClientPage> {
           padding: const EdgeInsets.all(AppSpacing.lg),
           children: [
             FaixaSectionCard(
-              title: 'Vinculo por CPF',
+              title: 'Vinculo por CPF ou codigo',
               subtitle:
-                  'Busque a crianca pelo CPF para solicitar o vinculo ao seu veiculo.',
+                  'Busque a crianca pelo CPF ou pelo codigo compartilhado pelo responsavel para solicitar o vinculo ao seu veiculo.',
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   TextField(
                     controller: _cpfController,
-                    keyboardType: TextInputType.number,
+                    keyboardType: TextInputType.text,
                     enabled: !_submitting,
                     onChanged: (_) => _resetLookup(),
                     decoration: const InputDecoration(
-                      labelText: 'CPF da crianca',
-                      hintText: '000.000.000-00',
+                      labelText: 'CPF ou codigo da crianca',
+                      hintText: '000.000.000-00 ou codigo (UUID)',
                       prefixIcon: Icon(Icons.badge_outlined),
                     ),
                   ),
@@ -78,7 +79,7 @@ class _DriverAddClientPageState extends ConsumerState<DriverAddClientPage> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.person_search_rounded),
-                    label: const Text('Buscar crianca pelo CPF'),
+                    label: const Text('Buscar crianca'),
                   ),
 
                   // Child info banner
@@ -153,6 +154,16 @@ class _DriverAddClientPageState extends ConsumerState<DriverAddClientPage> {
                               ),
                             ),
                           ],
+                          if (result.hasActiveEnrollmentWithOtherDriver) ...[
+                            const SizedBox(height: AppSpacing.xs),
+                            Text(
+                              'Vinculo ativo com: ${result.activeDriverNames.isNotEmpty ? result.activeDriverNames.join(', ') : 'outro motorista'}.',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: AppColors.yellowDark,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -171,11 +182,7 @@ class _DriverAddClientPageState extends ConsumerState<DriverAddClientPage> {
                   // Error
                   if (_error != null) ...[
                     const SizedBox(height: AppSpacing.md),
-                    AppInfoBanner(
-                      message: _error!,
-                      icon: Icons.error_outline_rounded,
-                      color: AppColors.danger,
-                    ),
+                    FaixaErrorBanner(message: _error!),
                   ],
 
                   const SizedBox(height: AppSpacing.lg),
@@ -212,11 +219,14 @@ class _DriverAddClientPageState extends ConsumerState<DriverAddClientPage> {
   }
 
   Future<void> _lookupByCpf() async {
-    final cpf = _cpfController.text.trim();
-    if (cpf.replaceAll(RegExp(r'\D'), '').length < 11) {
-      setState(() => _error = 'Informe um CPF valido.');
+    final query = _cpfController.text.trim();
+    final isUuid = Validators.isUuid(query);
+    final digits = query.replaceAll(RegExp(r'\D'), '');
+    if (!isUuid && digits.length != 11) {
+      setState(() => _error = 'Informe um CPF valido ou o codigo da crianca.');
       return;
     }
+    final lookup = isUuid ? query.toLowerCase() : digits;
 
     setState(() {
       _lookingUpCpf = true;
@@ -228,7 +238,7 @@ class _DriverAddClientPageState extends ConsumerState<DriverAddClientPage> {
     try {
       final result = await ref
           .read(driverEnrollmentsRepositoryProvider)
-          .lookupChildByCpf(cpf);
+          .lookupChildByCpf(lookup);
 
       setState(() {
         _lookupResult = result;
@@ -247,8 +257,39 @@ class _DriverAddClientPageState extends ConsumerState<DriverAddClientPage> {
   }
 
   Future<void> _link() async {
-    final childId = _lookupResult?.childId;
+    final result = _lookupResult;
+    final childId = result?.childId;
     if (childId == null) return;
+
+    // F4 multi-vínculo: exige confirmação explícita antes de solicitar o
+    // vínculo quando a criança já tem matrícula ativa com outro motorista.
+    if (result!.hasActiveEnrollmentWithOtherDriver) {
+      final names = result.activeDriverNames.isNotEmpty
+          ? result.activeDriverNames.join(', ')
+          : 'outro motorista';
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Vinculo ativo existente'),
+          content: Text(
+            'Esta crianca ja possui vinculo ativo com $names. '
+            'Deseja continuar e solicitar mesmo assim?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Solicitar mesmo assim'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+    }
+
     if (_inadimplencyWarning != null) {
       final confirmed = await showDialog<bool>(
         context: context,

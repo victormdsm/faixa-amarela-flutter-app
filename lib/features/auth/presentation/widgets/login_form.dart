@@ -4,10 +4,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/app_router.dart';
 import '../../../../app/theme/app_theme.dart';
+import '../../../../core/presentation/widgets/app_shared_widgets.dart';
 import '../../../../core/presentation/widgets/e2e_keys.dart';
 import '../../domain/entities/user_role.dart';
 import '../state/login_controller.dart';
-import 'auth_shell.dart';
 import 'login_anonymous_search.dart';
 import 'login_role_selector.dart';
 import 'login_signup_prompt.dart';
@@ -107,11 +107,7 @@ class LoginForm extends ConsumerWidget {
         ),
         if (state.errorMessage != null) ...[
           const SizedBox(height: AppSpacing.md),
-          AuthInlineFeedback(
-            color: AppColors.danger,
-            icon: Icons.error_outline_rounded,
-            message: state.errorMessage!,
-          ),
+          FaixaErrorBanner(message: state.errorMessage!),
         ],
         const SizedBox(height: AppSpacing.xl),
         FilledButton(

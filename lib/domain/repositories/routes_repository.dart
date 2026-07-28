@@ -1,11 +1,14 @@
 import '../models/route_manifest.dart';
 
 abstract interface class RoutesRepository {
-  Future<RoutePlanningOptions> getPlanningOptions();
+  /// Opções de planejamento de rota. [shiftId]/[period] filtram as crianças
+  /// pelos turnos do período (ver ROUTE_PERIODS no backend); [shiftId] tem
+  /// precedência quando ambos são informados.
+  Future<RoutePlanningOptions> getPlanningOptions({int? shiftId, String? period});
 
   Future<List<Map<String, dynamic>>> listDriverRoutes();
 
-  Future<RouteManifest> startRoute();
+  Future<RouteManifest> startRoute({int? shiftId, String? period});
 
   Future<void> finishRoute(int id);
 
@@ -92,12 +95,16 @@ class PlanningChild {
     required this.name,
     required this.schoolName,
     required this.address,
+    this.shiftId,
+    this.shiftName,
   });
 
   final int id;
   final String name;
   final String schoolName;
   final String address;
+  final int? shiftId;
+  final String? shiftName;
 
   factory PlanningChild.fromJson(Map<String, dynamic> json) {
     final address = [
@@ -110,6 +117,8 @@ class PlanningChild {
       name: (json['name'] ?? json['childName'] ?? '').toString(),
       schoolName: (json['schoolName'] ?? '').toString(),
       address: (json['address'] ?? address).toString(),
+      shiftId: (json['shiftId'] as num?)?.toInt(),
+      shiftName: json['shiftName']?.toString(),
     );
   }
 }

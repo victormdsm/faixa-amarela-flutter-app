@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/router/app_router.dart';
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/presentation/widgets/app_feedback.dart';
+import '../../../../core/presentation/widgets/app_shared_widgets.dart';
 import '../state/activation_controller.dart';
 import '../widgets/auth_shell.dart';
 
@@ -81,11 +82,7 @@ class _ActivationPageState extends ConsumerState<ActivationPage> {
           ),
           const SizedBox(height: AppSpacing.xl),
           if (state.errorMessage != null)
-            AuthInlineFeedback(
-              icon: Icons.error_outline_rounded,
-              color: AppColors.danger,
-              message: state.errorMessage!,
-            ),
+            FaixaErrorBanner(message: state.errorMessage!),
           const SizedBox(height: AppSpacing.xl),
           FilledButton(
             onPressed: state.isLoading || !state.canSubmit ? null : _submit,

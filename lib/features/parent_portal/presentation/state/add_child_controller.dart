@@ -100,14 +100,27 @@ class AddChildController extends AsyncNotifier<void> {
 
       final addresses = await repo.getChildAddresses(id);
       if (addresses.isNotEmpty) {
-        final addressId = (addresses.first['id'] as num).toInt();
+        bool isDefault(Map<String, dynamic> a) {
+          final raw = a['isDefault'] ?? a['is_default'];
+          return raw == true || raw == 1;
+        }
+
+        final defaultAddress = addresses.firstWhere(
+          isDefault,
+          orElse: () => addresses.first,
+        );
+        final addressId = (defaultAddress['id'] as num).toInt();
         await repo.updateChildAddress(
           childId: id,
           addressId: addressId,
           address: formData.address,
         );
       } else {
-        await repo.createChildAddress(childId: id, address: formData.address);
+        await repo.createChildAddress(
+          childId: id,
+          address: formData.address,
+          isDefault: true,
+        );
       }
 
       final localPath = formData.photoLocalPath;

@@ -1,3 +1,4 @@
+import 'package:app_faixa_amarela/app/theme/app_theme.dart';
 import 'package:app_faixa_amarela/domain/models/child.dart';
 import 'package:app_faixa_amarela/ui/core/widgets/child_summary_card.dart';
 import 'package:flutter/material.dart';
@@ -62,4 +63,41 @@ void main() {
 
     expect(find.text('Inadimplente'), findsOneWidget);
   });
+
+  testWidgets(
+    'ChildSummaryCard com ações não estoura em tela estreita com o tema do app',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final child = Child(
+        id: 1,
+        name: 'Ana Silva',
+        cpf: '12345678901',
+        schoolId: 1,
+        shiftId: 1,
+        isInDebt: false,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          home: Scaffold(
+            body: ChildSummaryCard(
+              child: child,
+              onEdit: () {},
+              onDelete: () {},
+            ),
+          ),
+        ),
+      );
+
+      // O FilledButton "Editar" fica num Row não-flex; com o tema global
+      // (largura mínima infinita) ele overflow sem o style local.
+      expect(tester.takeException(), isNull);
+      expect(find.text('Editar'), findsOneWidget);
+      expect(find.text('Excluir'), findsOneWidget);
+    },
+  );
 }

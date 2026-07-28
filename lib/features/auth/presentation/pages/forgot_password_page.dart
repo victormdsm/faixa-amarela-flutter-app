@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/router/app_router.dart';
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/presentation/widgets/app_feedback.dart';
+import '../../../../core/presentation/widgets/app_shared_widgets.dart';
 import '../state/forgot_password_controller.dart';
 import '../widgets/auth_shell.dart';
 
@@ -36,10 +37,8 @@ class ForgotPasswordPage extends ConsumerWidget {
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 220),
             child: state.errorMessage != null
-                ? AuthInlineFeedback(
+                ? FaixaErrorBanner(
                     key: const ValueKey('error'),
-                    icon: Icons.error_outline_rounded,
-                    color: AppColors.danger,
                     message: state.errorMessage!,
                   )
                 : state.successMessage != null

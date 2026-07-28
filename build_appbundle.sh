@@ -23,6 +23,15 @@ fi
 echo "==> flutter pub get"
 flutter pub get
 
+# integration_test (dev_dependency) vaza para o GeneratedPluginRegistrant após
+# `flutter test` e quebra o compile de release ("package ...integration_test
+# does not exist"). Remove a linha do plugin após o pub get; o build roda com
+# --no-pub para não regenerar o arquivo antes de compilar.
+REGISTRANT="$SCRIPT_DIR/android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java"
+if [ -f "$REGISTRANT" ]; then
+  sed -i '' '/integration_test/d' "$REGISTRANT"
+fi
+
 # Patch maplibre NDK version to match installed NDK (28.2.13676358)
 for BUILD_GRADLE in \
   "$HOME/.pub-cache/hosted/pub.dev/maplibre_gl-0.21.0/android/build.gradle" \
@@ -46,7 +55,7 @@ echo "==> flutter build appbundle --release"
 echo "    API_BASE_URL=$API_BASE_URL"
 echo "    version=$(grep '^version:' pubspec.yaml)"
 
-flutter build appbundle --release \
+flutter build appbundle --release --no-pub \
   --dart-define=API_BASE_URL="$API_BASE_URL"
 
 AAB="$SCRIPT_DIR/build/app/outputs/bundle/release/app-release.aab"

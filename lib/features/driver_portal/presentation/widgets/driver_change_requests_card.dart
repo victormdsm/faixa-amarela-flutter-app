@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_theme.dart';
+import '../../../../core/utils/date_formatters.dart';
 import '../../../../domain/models/driver_profile_change_request.dart';
 
 /// Card com as solicitações recentes de alteração de perfil do motorista.
@@ -32,10 +33,7 @@ class DriverChangeRequestsCard extends StatelessWidget {
           ...items.map((item) {
             final status = item.status.toLowerCase();
             final note = (item.reviewNote ?? '').trim();
-            final updatedAt =
-                item.reviewedAt?.toLocal().toString() ??
-                item.createdAt?.toLocal().toString() ??
-                '';
+            final dateText = formatDateTime(item.reviewedAt ?? item.createdAt);
             final statusLabel = switch (status) {
               'pending' => 'Pendente',
               'approved' => 'Aprovada',
@@ -46,8 +44,8 @@ class DriverChangeRequestsCard extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: AppSpacing.xs),
               child: Text(
                 note.isNotEmpty
-                    ? '• $statusLabel ($updatedAt) - $note'
-                    : '• $statusLabel ($updatedAt)',
+                    ? '• $statusLabel ($dateText) - $note'
+                    : '• $statusLabel ($dateText)',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: AppColors.slate,
                 ),

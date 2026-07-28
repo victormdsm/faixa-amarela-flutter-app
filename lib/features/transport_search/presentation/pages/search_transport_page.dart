@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/presentation/widgets/faixa_app_bar.dart';
-import '../../../driver_portal/presentation/pages/ad_banner_widget.dart';
+import '../../../ads/domain/ad.dart';
+import '../../../ads/presentation/widgets/ad_banner_widget.dart';
 import '../providers/transport_search_providers.dart';
 import '../state/transport_search_controller.dart';
 import '../../domain/entities/service_period.dart';
@@ -67,7 +68,11 @@ class SearchTransportPage extends ConsumerWidget {
                     onPeriodChanged: controller.setPeriod,
                   ),
                   const SizedBox(height: AppSpacing.md),
-                  const AdBannerWidget(height: 104),
+                  const AdBannerWidget(
+                    placement: AdPlacements.searchInlineBanner,
+                    role: AdRole.public,
+                    height: 104,
+                  ),
                 ],
               ),
             ),

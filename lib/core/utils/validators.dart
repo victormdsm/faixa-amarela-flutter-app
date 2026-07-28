@@ -56,4 +56,12 @@ abstract final class Validators {
     if (digits.length < 10) return 'Informe um telefone valido.';
     return null;
   }
+
+  static final RegExp _uuidRegex = RegExp(
+    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+  );
+
+  /// Código público da criança (LGPD) usado no lookup do motorista como
+  /// alternativa ao CPF.
+  static bool isUuid(String value) => _uuidRegex.hasMatch(value.trim());
 }

@@ -104,5 +104,30 @@ void main() {
       expect(dto.shiftId, 2);
       expect(dto.isInDebt, true);
     });
+
+    test('fromJson parses the public uuid (LGPD child code)', () {
+      final json = <String, dynamic>{
+        'id': 1,
+        'uuid': '550e8400-e29b-41d4-a716-446655440000',
+        'name': 'Ana Silva',
+        'cpf': '12345678901',
+      };
+
+      final dto = ChildDto.fromJson(json);
+      expect(dto.uuid, '550e8400-e29b-41d4-a716-446655440000');
+      expect(dto.toDomain().uuid, '550e8400-e29b-41d4-a716-446655440000');
+      expect(dto.toJson()['uuid'], '550e8400-e29b-41d4-a716-446655440000');
+    });
+
+    test('uuid stays null when absent from the payload', () {
+      final dto = ChildDto.fromJson(const <String, dynamic>{
+        'id': 1,
+        'name': 'Ana Silva',
+        'cpf': '12345678901',
+      });
+
+      expect(dto.uuid, isNull);
+      expect(dto.toJson().containsKey('uuid'), isFalse);
+    });
   });
 }

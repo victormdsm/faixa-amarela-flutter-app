@@ -43,6 +43,38 @@ class _DriverLookupChildPageState extends ConsumerState<DriverLookupChildPage> {
         message.contains('not found');
   }
 
+  /// F4 multi-vínculo: exige confirmação explícita do motorista antes de
+  /// solicitar matrícula de criança que já tem vínculo ativo com outro
+  /// motorista.
+  Future<bool> _confirmMultiDriverWarning(ChildLookupResult result) async {
+    final names = result.activeDriverNames.isNotEmpty
+        ? result.activeDriverNames.join(', ')
+        : 'outro motorista';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        surfaceTintColor: AppColors.surface,
+        title: const Text('Vínculo ativo existente'),
+        content: Text(
+          'Esta criança já possui vínculo ativo com $names. '
+          'Deseja continuar e solicitar mesmo assim?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Solicitar mesmo assim'),
+          ),
+        ],
+      ),
+    );
+    return confirmed == true;
+  }
+
   @override
   Widget build(BuildContext context) {
     final lookupAsync = ref.watch(driverLookupControllerProvider);
@@ -61,13 +93,10 @@ class _DriverLookupChildPageState extends ConsumerState<DriverLookupChildPage> {
             TextField(
               key: E2EKeys.driverCpfInput,
               controller: _cpfController,
-              keyboardType: TextInputType.number,
-              inputFormatters: [
-                FilteringTextInputFormatter.digitsOnly,
-                LengthLimitingTextInputFormatter(11),
-              ],
+              keyboardType: TextInputType.text,
+              inputFormatters: [LengthLimitingTextInputFormatter(36)],
               decoration: InputDecoration(
-                hintText: 'Digite o CPF da criança',
+                hintText: 'Digite o CPF ou o código da criança',
                 prefixIcon: const Icon(Icons.search_rounded),
                 suffixIcon: _cpfController.text.isNotEmpty
                     ? IconButton(
@@ -128,7 +157,7 @@ class _DriverLookupChildPageState extends ConsumerState<DriverLookupChildPage> {
       data: (result) {
         if (result == null) {
           return const FaixaEmptyState(
-            message: 'Digite o CPF da criança para buscar.',
+            message: 'Digite o CPF ou o código da criança para buscar.',
             icon: Icons.child_care_rounded,
             subtitle:
                 'Você poderá solicitar a matrícula após localizar a criança.',
@@ -143,6 +172,10 @@ class _DriverLookupChildPageState extends ConsumerState<DriverLookupChildPage> {
           result: result,
           onRequestEnrollment: () async {
             if (result.childId == null) return;
+            if (result.hasActiveEnrollmentWithOtherDriver) {
+              final confirmed = await _confirmMultiDriverWarning(result);
+              if (!confirmed || !mounted) return;
+            }
             try {
               await ref
                   .read(driverLookupControllerProvider.notifier)
@@ -182,10 +215,10 @@ class _ChildNotFoundState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const FaixaEmptyState(
-      message: 'Nenhuma criança encontrada para este CPF.',
+      message: 'Nenhuma criança encontrada para este CPF ou código.',
       icon: Icons.person_search_rounded,
       subtitle:
-          'Verifique se o CPF informado é o da criança e se o responsável já cadastrou o dependente.',
+          'Verifique se o CPF ou código informado é o da criança e se o responsável já cadastrou o dependente.',
     );
   }
 }
@@ -300,6 +333,16 @@ class _ChildResultCard extends StatelessWidget {
                       'Já existe uma solicitação de matrícula pendente para esta criança.',
                   icon: Icons.hourglass_top_rounded,
                   color: AppColors.info,
+                ),
+                const SizedBox(height: AppSpacing.lg),
+              ],
+              if (result.hasActiveEnrollmentWithOtherDriver) ...[
+                AppInfoBanner(
+                  message:
+                      'Esta criança já possui vínculo ativo com ${result.activeDriverNames.isNotEmpty ? result.activeDriverNames.join(', ') : 'outro motorista'}. '
+                      'Ao solicitar, você precisará confirmar que deseja continuar.',
+                  icon: Icons.warning_amber_rounded,
+                  color: AppColors.yellowDark,
                 ),
                 const SizedBox(height: AppSpacing.lg),
               ],

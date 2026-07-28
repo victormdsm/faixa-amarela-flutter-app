@@ -64,6 +64,7 @@ class _FakeAuthRepository implements AuthRepository {
     required String cellPhone,
     required String password,
     required String passwordConfirmation,
+    bool acceptTerms = false,
   }) async {}
 }
 

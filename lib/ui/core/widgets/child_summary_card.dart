@@ -123,6 +123,12 @@ class ChildSummaryCard extends StatelessWidget {
                     if (onEdit != null) ...[
                       const SizedBox(width: AppSpacing.sm),
                       FilledButton.icon(
+                        // O tema global define largura mínima infinita nos
+                        // FilledButtons; dentro deste Row (filho não-flex) o
+                        // botão precisa de largura mínima finita.
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size(0, 48),
+                        ),
                         onPressed: onEdit,
                         icon: const Icon(Icons.edit_outlined, size: 18),
                         label: const Text('Editar'),

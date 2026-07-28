@@ -151,7 +151,11 @@ class NestjsChildrenRepository implements ChildrenRepository {
     }
   }
 
-  Future<void> _createAddress(int childId, ChildAddress address) async {
+  Future<void> _createAddress(
+    int childId,
+    ChildAddress address, {
+    bool isDefault = true,
+  }) async {
     await _dio.post<Map<String, dynamic>>(
       '/parent/children/$childId/addresses',
       data: <String, dynamic>{
@@ -160,9 +164,38 @@ class NestjsChildrenRepository implements ChildrenRepository {
         'number': address.number.trim(),
         'reference': address.complement?.trim(),
         'type': 'home',
-        'isDefault': true,
+        'isDefault': isDefault,
+        if (address.latitude != null && address.longitude != null) ...{
+          'latitude': address.latitude,
+          'longitude': address.longitude,
+        },
       },
     );
+  }
+
+  @override
+  Future<({double latitude, double longitude, String? label})?>
+  geocodeAddress(String text) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/parent/addresses/geocode',
+        queryParameters: {'text': text},
+      );
+      final data = response.data;
+      if (data == null) return null;
+      final latitude = (data['latitude'] as num?)?.toDouble();
+      final longitude = (data['longitude'] as num?)?.toDouble();
+      if (latitude == null || longitude == null) return null;
+      return (
+        latitude: latitude,
+        longitude: longitude,
+        label: data['label']?.toString(),
+      );
+    } catch (_) {
+      // Best-effort: 404 (não localizado) ou ORS fora simplesmente escondem
+      // o mapa; o cadastro segue sem coordenadas, como antes.
+      return null;
+    }
   }
 
   @override
@@ -195,6 +228,10 @@ class NestjsChildrenRepository implements ChildrenRepository {
           'reference': address.complement?.trim(),
           'type': 'home',
           'isDefault': true,
+          if (address.latitude != null && address.longitude != null) ...{
+            'latitude': address.latitude,
+            'longitude': address.longitude,
+          },
         },
       );
     } catch (e) {
@@ -206,9 +243,40 @@ class NestjsChildrenRepository implements ChildrenRepository {
   Future<void> createChildAddress({
     required int childId,
     required ChildAddress address,
+    bool isDefault = false,
   }) async {
     try {
-      await _createAddress(childId, address);
+      await _createAddress(childId, address, isDefault: isDefault);
+    } catch (e) {
+      throw _mapException(e);
+    }
+  }
+
+  @override
+  Future<void> deleteChildAddress({
+    required int childId,
+    required int addressId,
+  }) async {
+    try {
+      await _dio.delete(
+        '/parent/children/$childId/addresses/$addressId',
+        options: Options(contentType: null),
+      );
+    } catch (e) {
+      throw _mapException(e);
+    }
+  }
+
+  @override
+  Future<void> setChildAddressDefault({
+    required int childId,
+    required int addressId,
+  }) async {
+    try {
+      await _dio.put<Map<String, dynamic>>(
+        '/parent/children/$childId/addresses/$addressId',
+        data: const <String, dynamic>{'isDefault': true},
+      );
     } catch (e) {
       throw _mapException(e);
     }

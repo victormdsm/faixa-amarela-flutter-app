@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../../../app/router/app_router.dart';
 import '../../../../app/theme/app_theme.dart';
@@ -15,6 +18,7 @@ import '../../../../domain/models/enrollment.dart';
 import '../../../../features/catalog/data/catalog_repository.dart';
 import '../../../../ui/core/widgets/status_pill.dart';
 import '../providers/parent_portal_providers.dart';
+import '../widgets/address_map_picker.dart';
 
 final _childDetailAddressesProvider = FutureProvider.family
     .autoDispose<List<Map<String, dynamic>>, int>((ref, childId) async {
@@ -81,8 +85,15 @@ class ChildDetailPage extends ConsumerWidget {
               schoolName: schoolName,
               shiftName: shiftName,
             ),
+            if (child.uuid != null && child.uuid!.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.lg),
+              _ChildCodeSection(uuid: child.uuid!),
+            ],
             const SizedBox(height: AppSpacing.lg),
-            _AddressSection(addressesAsync: addressesAsync),
+            _AddressSection(
+              childId: child.id,
+              addressesAsync: addressesAsync,
+            ),
             const SizedBox(height: AppSpacing.lg),
             _EnrollmentSection(
               enrollmentAsync: enrollmentAsync,
@@ -294,75 +305,532 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
-class _AddressSection extends StatelessWidget {
-  const _AddressSection({required this.addressesAsync});
+class _ChildCodeSection extends StatelessWidget {
+  const _ChildCodeSection({required this.uuid});
 
-  final AsyncValue<List<Map<String, dynamic>>> addressesAsync;
+  final String uuid;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return FaixaSectionCard(
+      icon: Icons.key_rounded,
+      title: 'Código da criança',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: SelectableText(
+                  uuid,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.ink,
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Copiar código',
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: uuid));
+                  if (context.mounted) {
+                    showAppSnackBar(
+                      context,
+                      message: 'Código copiado',
+                      type: AppFeedbackType.success,
+                    );
+                  }
+                },
+                icon: const Icon(Icons.copy_rounded, size: 20),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'Compartilhe este código com o motorista em vez do CPF.',
+            style: theme.textTheme.bodySmall?.copyWith(color: AppColors.slate),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AddressSection extends ConsumerWidget {
+  const _AddressSection({required this.childId, required this.addressesAsync});
+
+  final int childId;
+  final AsyncValue<List<Map<String, dynamic>>> addressesAsync;
+
+  static bool _isDefault(Map<String, dynamic> addr) {
+    final raw = addr['isDefault'] ?? addr['is_default'];
+    return raw == true || raw == 1;
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     return FaixaSectionCard(
       icon: Icons.location_on_rounded,
-      title: 'Endereço',
+      title: 'Endereços',
       child: addressesAsync.when(
         loading: () => const SizedBox(
           height: 40,
           child: Center(child: CircularProgressIndicator()),
         ),
         error: (error, _) => AppInfoBanner(
-          message: 'Erro ao carregar endereço: $error',
+          message: 'Erro ao carregar endereços: $error',
           icon: Icons.error_outline_rounded,
           color: AppColors.danger,
         ),
         data: (addresses) {
-          if (addresses.isEmpty) {
-            return Text(
-              'Nenhum endereço cadastrado.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppColors.slate,
-              ),
-            );
-          }
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: addresses.map((addr) {
-              final street = (addr['street'] ?? '').toString();
-              final number = (addr['number'] ?? '').toString();
-              final complement = (addr['reference'] ?? '').toString();
-              final zipcode = (addr['zipcode'] ?? '').toString();
-
-              final parts = <String>[
-                if (street.isNotEmpty) street,
-                if (number.isNotEmpty) number,
-                if (complement.isNotEmpty) complement,
-                if (zipcode.isNotEmpty) 'CEP: $zipcode',
-              ];
-
-              return Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(
-                      Icons.home_rounded,
-                      size: 18,
-                      color: AppColors.muted,
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    Expanded(
-                      child: Text(
-                        parts.join(', '),
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppColors.ink,
-                        ),
-                      ),
-                    ),
-                  ],
+            children: [
+              if (addresses.isEmpty)
+                Text(
+                  'Nenhum endereço cadastrado.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.slate,
+                  ),
+                )
+              else
+                ...addresses.map(
+                  (addr) => _AddressTile(
+                    address: addr,
+                    isDefault: _isDefault(addr),
+                    onSetDefault: _isDefault(addr)
+                        ? null
+                        : () => _setDefault(context, ref, addr),
+                    onDelete: () => _confirmDelete(context, ref, addr),
+                  ),
                 ),
-              );
-            }).toList(),
+              const SizedBox(height: AppSpacing.sm),
+              OutlinedButton.icon(
+                onPressed: () =>
+                    _openAddressForm(context, ref, addresses.isEmpty),
+                icon: const Icon(Icons.add_location_alt_rounded, size: 18),
+                label: const Text('Adicionar endereço'),
+              ),
+            ],
           );
         },
+      ),
+    );
+  }
+
+  Future<void> _setDefault(
+    BuildContext context,
+    WidgetRef ref,
+    Map<String, dynamic> addr,
+  ) async {
+    final addressId = (addr['id'] as num?)?.toInt();
+    if (addressId == null) return;
+    try {
+      await ref
+          .read(childrenRepositoryProvider)
+          .setChildAddressDefault(childId: childId, addressId: addressId);
+      ref.invalidate(_childDetailAddressesProvider(childId));
+      if (context.mounted) {
+        showAppSnackBar(
+          context,
+          message: 'Endereço padrão atualizado.',
+          type: AppFeedbackType.success,
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        showAppSnackBar(
+          context,
+          message: 'Erro ao atualizar endereço padrão: ${e.toString()}',
+          type: AppFeedbackType.error,
+        );
+      }
+    }
+  }
+
+  Future<void> _confirmDelete(
+    BuildContext context,
+    WidgetRef ref,
+    Map<String, dynamic> addr,
+  ) async {
+    final addressId = (addr['id'] as num?)?.toInt();
+    if (addressId == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        surfaceTintColor: AppColors.surface,
+        title: const Text('Excluir endereço'),
+        content: const Text(
+          'Deseja excluir este endereço? Se ele for o padrão, outro endereço '
+          'será definido como padrão automaticamente.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Voltar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.danger,
+              foregroundColor: AppColors.surface,
+            ),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Excluir'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    try {
+      await ref
+          .read(childrenRepositoryProvider)
+          .deleteChildAddress(childId: childId, addressId: addressId);
+      ref.invalidate(_childDetailAddressesProvider(childId));
+      if (context.mounted) {
+        showAppSnackBar(
+          context,
+          message: 'Endereço removido.',
+          type: AppFeedbackType.warning,
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        showAppSnackBar(
+          context,
+          message: 'Erro ao excluir endereço: ${e.toString()}',
+          type: AppFeedbackType.error,
+        );
+      }
+    }
+  }
+
+  Future<void> _openAddressForm(
+    BuildContext context,
+    WidgetRef ref,
+    bool isFirstAddress,
+  ) async {
+    final address = await showModalBottomSheet<ChildAddress>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (_) => const _AddressFormSheet(),
+    );
+    if (address == null || !context.mounted) return;
+
+    try {
+      await ref
+          .read(childrenRepositoryProvider)
+          .createChildAddress(
+            childId: childId,
+            address: address,
+            isDefault: isFirstAddress,
+          );
+      ref.invalidate(_childDetailAddressesProvider(childId));
+      if (context.mounted) {
+        showAppSnackBar(
+          context,
+          message: 'Endereço adicionado.',
+          type: AppFeedbackType.success,
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        showAppSnackBar(
+          context,
+          message: 'Erro ao adicionar endereço: ${e.toString()}',
+          type: AppFeedbackType.error,
+        );
+      }
+    }
+  }
+}
+
+class _AddressTile extends StatelessWidget {
+  const _AddressTile({
+    required this.address,
+    required this.isDefault,
+    this.onSetDefault,
+    this.onDelete,
+  });
+
+  final Map<String, dynamic> address;
+  final bool isDefault;
+  final VoidCallback? onSetDefault;
+  final VoidCallback? onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final street = (address['street'] ?? '').toString();
+    final number = (address['number'] ?? '').toString();
+    final complement = (address['reference'] ?? address['complement'] ?? '')
+        .toString();
+    final zipcode = (address['zipcode'] ?? address['zipCode'] ?? '').toString();
+
+    final parts = <String>[
+      if (street.isNotEmpty) street,
+      if (number.isNotEmpty) number,
+      if (complement.isNotEmpty) complement,
+      if (zipcode.isNotEmpty) 'CEP: $zipcode',
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.home_rounded, size: 18, color: AppColors.muted),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  parts.join(', '),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: AppColors.ink),
+                ),
+                if (isDefault) ...[
+                  const SizedBox(height: AppSpacing.xs),
+                  const StatusPill(label: 'Padrão', color: AppColors.success),
+                ],
+              ],
+            ),
+          ),
+          PopupMenuButton<String>(
+            tooltip: 'Opções do endereço',
+            iconSize: 20,
+            onSelected: (value) {
+              if (value == 'default') {
+                onSetDefault?.call();
+              } else if (value == 'delete') {
+                onDelete?.call();
+              }
+            },
+            itemBuilder: (context) => [
+              if (!isDefault && onSetDefault != null)
+                const PopupMenuItem(
+                  value: 'default',
+                  child: Text('Tornar padrão'),
+                ),
+              const PopupMenuItem(
+                value: 'delete',
+                child: Text(
+                  'Excluir',
+                  style: TextStyle(color: AppColors.danger),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AddressFormSheet extends ConsumerStatefulWidget {
+  const _AddressFormSheet();
+
+  @override
+  ConsumerState<_AddressFormSheet> createState() => _AddressFormSheetState();
+}
+
+class _AddressFormSheetState extends ConsumerState<_AddressFormSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _streetCtrl = TextEditingController();
+  final _numberCtrl = TextEditingController();
+  final _complementCtrl = TextEditingController();
+  final _zipCodeCtrl = TextEditingController();
+
+  // Mapa do endereço (mesmo padrão do add_child_page): geocode com debounce
+  // de 800ms ao digitar e marcador ajustável por arraste. Sem geocode, o
+  // mapa fica escondido e o endereço é salvo sem coordenadas.
+  Timer? _geocodeDebounce;
+  int _geocodeSeq = 0;
+  bool _geocoding = false;
+  LatLng? _marker;
+  String? _resolvedLabel;
+
+  @override
+  void initState() {
+    super.initState();
+    _streetCtrl.addListener(_scheduleGeocode);
+    _numberCtrl.addListener(_scheduleGeocode);
+    _zipCodeCtrl.addListener(_scheduleGeocode);
+  }
+
+  @override
+  void dispose() {
+    _geocodeDebounce?.cancel();
+    _streetCtrl.dispose();
+    _numberCtrl.dispose();
+    _complementCtrl.dispose();
+    _zipCodeCtrl.dispose();
+    super.dispose();
+  }
+
+  void _scheduleGeocode() {
+    _geocodeSeq++;
+    _geocodeDebounce?.cancel();
+    final ready =
+        _streetCtrl.text.trim().isNotEmpty &&
+        _numberCtrl.text.trim().isNotEmpty &&
+        _zipCodeCtrl.text.trim().length >= 8;
+    if (!ready) {
+      if (_marker != null || _geocoding) {
+        setState(() {
+          _marker = null;
+          _resolvedLabel = null;
+          _geocoding = false;
+        });
+      }
+      return;
+    }
+    _geocodeDebounce = Timer(const Duration(milliseconds: 800), _runGeocode);
+  }
+
+  Future<void> _runGeocode() async {
+    final seq = ++_geocodeSeq;
+    final text =
+        '${_streetCtrl.text.trim()}, ${_numberCtrl.text.trim()}, '
+        '${_zipCodeCtrl.text.trim()}';
+    setState(() => _geocoding = true);
+    final result = await ref
+        .read(childrenRepositoryProvider)
+        .geocodeAddress(text);
+    if (!mounted || seq != _geocodeSeq) return;
+    setState(() {
+      _geocoding = false;
+      if (result == null) {
+        _marker = null;
+        _resolvedLabel = null;
+      } else {
+        _marker = LatLng(result.latitude, result.longitude);
+        _resolvedLabel = result.label;
+      }
+    });
+  }
+
+  void _save() {
+    if (!_formKey.currentState!.validate()) return;
+    Navigator.of(context).pop(
+      ChildAddress(
+        street: _streetCtrl.text.trim(),
+        number: _numberCtrl.text.trim(),
+        complement: _complementCtrl.text.trim().isEmpty
+            ? null
+            : _complementCtrl.text.trim(),
+        zipCode: _zipCodeCtrl.text.trim(),
+        latitude: _marker?.latitude,
+        longitude: _marker?.longitude,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.sm,
+        AppSpacing.lg,
+        AppSpacing.lg + MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Novo endereço',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              TextFormField(
+                controller: _streetCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Rua',
+                  prefixIcon: Icon(Icons.signpost_outlined),
+                ),
+                textInputAction: TextInputAction.next,
+                validator: (v) =>
+                    v == null || v.trim().isEmpty ? 'Rua e obrigatoria.' : null,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              TextFormField(
+                controller: _numberCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Numero',
+                  prefixIcon: Icon(Icons.numbers_outlined),
+                ),
+                textInputAction: TextInputAction.next,
+                validator: (v) => v == null || v.trim().isEmpty
+                    ? 'Numero e obrigatorio.'
+                    : null,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              TextFormField(
+                controller: _complementCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Complemento (opcional)',
+                  prefixIcon: Icon(Icons.apartment_outlined),
+                ),
+                textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              TextFormField(
+                controller: _zipCodeCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'CEP',
+                  prefixIcon: Icon(Icons.location_on_outlined),
+                ),
+                textInputAction: TextInputAction.done,
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(8),
+                ],
+                validator: (v) =>
+                    v == null || v.trim().isEmpty ? 'CEP e obrigatorio.' : null,
+              ),
+              if (_geocoding) ...[
+                const SizedBox(height: AppSpacing.sm),
+                const LinearProgressIndicator(minHeight: 2),
+              ],
+              if (_marker != null) ...[
+                const SizedBox(height: AppSpacing.md),
+                AddressMapPicker(
+                  position: _marker!,
+                  onChanged: (p) => setState(() => _marker = p),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  _resolvedLabel != null
+                      ? 'Local aproximado: $_resolvedLabel. Arraste o marcador para ajustar.'
+                      : 'Arraste o marcador para ajustar a localizacao.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+              const SizedBox(height: AppSpacing.lg),
+              FilledButton.icon(
+                onPressed: _save,
+                icon: const Icon(Icons.check_rounded),
+                label: const Text('Salvar endereço'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

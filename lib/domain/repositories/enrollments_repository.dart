@@ -24,6 +24,7 @@ class ChildLookupResult {
   const ChildLookupResult({
     required this.found,
     this.childId,
+    this.childUuid,
     this.childName,
     this.schoolName,
     this.shiftName,
@@ -32,10 +33,13 @@ class ChildLookupResult {
     this.address,
     this.isInDebt = false,
     this.hasPendingEnrollment = false,
+    this.hasActiveEnrollmentWithOtherDriver = false,
+    this.activeDriverNames = const [],
   });
 
   final bool found;
   final int? childId;
+  final String? childUuid;
   final String? childName;
   final String? schoolName;
   final String? shiftName;
@@ -44,6 +48,12 @@ class ChildLookupResult {
   final String? address;
   final bool isInDebt;
   final bool hasPendingEnrollment;
+
+  /// F4 multi-vínculo: true quando a criança já possui matrícula ATIVA com
+  /// outro motorista. Não bloqueia a solicitação — o app exige confirmação
+  /// explícita do motorista antes de chamar requestEnrollment.
+  final bool hasActiveEnrollmentWithOtherDriver;
+  final List<String> activeDriverNames;
 
   factory ChildLookupResult.fromJson(Map<String, dynamic> json) {
     final child = json['child'] is Map<String, dynamic>
@@ -66,6 +76,9 @@ class ChildLookupResult {
       childId:
           toInt(json['childId']) ??
           toInt(child['id']),
+      childUuid:
+          json['childUuid']?.toString() ??
+          child['uuid']?.toString(),
       childName:
           json['childName']?.toString() ??
           child['name']?.toString(),
@@ -90,6 +103,14 @@ class ChildLookupResult {
       hasPendingEnrollment:
           json['hasPendingEnrollment'] == true ||
           json['hasPendingEnrollment'] == 1,
+      hasActiveEnrollmentWithOtherDriver:
+          json['hasActiveEnrollmentWithOtherDriver'] == true ||
+          json['hasActiveEnrollmentWithOtherDriver'] == 1,
+      activeDriverNames:
+          (json['activeDriverNames'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList(growable: false) ??
+          const [],
     );
   }
 

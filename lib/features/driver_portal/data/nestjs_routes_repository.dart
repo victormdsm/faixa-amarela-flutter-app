@@ -11,10 +11,17 @@ class NestjsRoutesRepository implements RoutesRepository {
   final Dio _dio;
 
   @override
-  Future<RoutePlanningOptions> getPlanningOptions() async {
+  Future<RoutePlanningOptions> getPlanningOptions({
+    int? shiftId,
+    String? period,
+  }) async {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
         '/driver/routes/planning-options',
+        queryParameters: <String, dynamic>{
+          'shiftId': ?shiftId,
+          'period': ?period,
+        },
       );
       return RoutePlanningOptions.fromJson(
         _unwrapData(response.data) ?? const <String, dynamic>{},
@@ -49,11 +56,14 @@ class NestjsRoutesRepository implements RoutesRepository {
   }
 
   @override
-  Future<RouteManifest> startRoute() async {
+  Future<RouteManifest> startRoute({int? shiftId, String? period}) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
         '/driver/routes/start',
-        data: const <String, dynamic>{},
+        data: <String, dynamic>{
+          'shiftId': ?shiftId,
+          'period': ?period,
+        },
       );
       final routeData = _unwrapData(response.data) ?? const <String, dynamic>{};
       return _parseRouteResponse(routeData);

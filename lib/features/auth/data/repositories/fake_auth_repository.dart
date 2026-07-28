@@ -68,8 +68,14 @@ class FakeAuthRepository implements AuthRepository {
     required String cellPhone,
     required String password,
     required String passwordConfirmation,
+    bool acceptTerms = false,
   }) async {
     await Future<void>.delayed(const Duration(milliseconds: 900));
+    if (!acceptTerms) {
+      throw const AuthException(
+        'E necessario aceitar os termos de uso e privacidade.',
+      );
+    }
     if (password != passwordConfirmation) {
       throw const AuthException('A confirmacao de senha nao confere.');
     }

@@ -5,6 +5,7 @@ class ChildDto {
     required this.id,
     required this.name,
     required this.cpf,
+    this.uuid,
     this.schoolId,
     this.shiftId,
     this.isInDebt = false,
@@ -15,6 +16,7 @@ class ChildDto {
   final int id;
   final String name;
   final String cpf;
+  final String? uuid;
   final int? schoolId;
   final int? shiftId;
   final bool isInDebt;
@@ -29,6 +31,7 @@ class ChildDto {
       id: _toInt(json['id']) ?? 0,
       name: (json['name'] ?? '').toString(),
       cpf: (json['cpf'] ?? '').toString(),
+      uuid: json['uuid']?.toString(),
       schoolId: _toInt(json['schoolId']),
       shiftId: _toInt(json['shiftId']),
       isInDebt: isInDebtRaw == true || isInDebtRaw == 1,
@@ -44,6 +47,7 @@ class ChildDto {
       'id': id,
       'name': name,
       'cpf': cpf,
+      if (uuid != null) 'uuid': uuid,
       if (schoolId != null) 'schoolId': schoolId,
       if (shiftId != null) 'shiftId': shiftId,
       'isInDebt': isInDebt,
@@ -57,6 +61,7 @@ class ChildDto {
       id: id,
       name: name,
       cpf: cpf,
+      uuid: uuid,
       schoolId: schoolId,
       shiftId: shiftId,
       isInDebt: isInDebt,
@@ -70,6 +75,7 @@ class ChildDto {
       id: child.id,
       name: child.name,
       cpf: child.cpf,
+      uuid: child.uuid,
       schoolId: child.schoolId,
       shiftId: child.shiftId,
       isInDebt: child.isInDebt,

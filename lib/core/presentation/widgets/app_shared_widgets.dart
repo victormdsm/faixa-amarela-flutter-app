@@ -508,3 +508,118 @@ class AppInfoBanner extends StatelessWidget {
     );
   }
 }
+
+/// Tipo semântico de erro exibido pelo [FaixaErrorBanner].
+enum FaixaErrorType { network, auth, validation, server, unknown }
+
+/// Infere o [FaixaErrorType] a partir da mensagem amigável (pt-BR) produzida
+/// pela camada de tradução de `ApiException` ou por validações locais.
+FaixaErrorType inferFaixaErrorType(String message) {
+  final m = message.toLowerCase();
+  bool hasAny(List<String> tokens) => tokens.any(m.contains);
+
+  if (hasAny(const [
+    'sem conex',
+    'tempo de resposta',
+    'falha de comunica',
+    'falar com o servidor',
+    'comunicar com a api',
+    'verifique sua conex',
+  ])) {
+    return FaixaErrorType.network;
+  }
+  if (hasAny(const [
+    'erro interno',
+    'servidor indispon',
+    'muitas tentativas',
+  ])) {
+    return FaixaErrorType.server;
+  }
+  if (hasAny(const [
+    'sess',
+    'credenciais',
+    'permiss',
+    'token',
+    'autentica',
+    'acesso negado',
+    'acesso restrito',
+    'faca login',
+    'faça login',
+    'ativada',
+    'tentativas excedido',
+  ])) {
+    return FaixaErrorType.auth;
+  }
+  if (hasAny(const [
+    'dados inv',
+    'e-mail válido',
+    'muito curto',
+    'muito longo',
+    'obrigatór',
+    'inválid',
+    'já está em uso',
+    'não confere',
+    'revise os campos',
+  ])) {
+    return FaixaErrorType.validation;
+  }
+  return FaixaErrorType.unknown;
+}
+
+/// Banner de erro com ícone semântico por tipo e cor por severidade.
+///
+/// Segue o padrão visual Faixa (surface + hairline, sem bloco com alpha),
+/// alinhado ao `AuthInlineFeedback` das telas de autenticação.
+class FaixaErrorBanner extends StatelessWidget {
+  const FaixaErrorBanner({super.key, required this.message, this.type});
+
+  final String message;
+
+  /// Quando nulo, o tipo é inferido da mensagem via [inferFaixaErrorType].
+  final FaixaErrorType? type;
+
+  @override
+  Widget build(BuildContext context) {
+    final resolved = type ?? inferFaixaErrorType(message);
+    final (icon, color) = switch (resolved) {
+      FaixaErrorType.network => (Icons.wifi_off_rounded, AppColors.warning),
+      FaixaErrorType.auth => (Icons.lock_outline_rounded, AppColors.danger),
+      FaixaErrorType.validation => (
+        Icons.warning_amber_rounded,
+        AppColors.warning,
+      ),
+      FaixaErrorType.server => (Icons.error_outline_rounded, AppColors.danger),
+      FaixaErrorType.unknown => (
+        Icons.error_outline_rounded,
+        AppColors.danger,
+      ),
+    };
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 18),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              message,
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                fontSize: 13,
+                color: color,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

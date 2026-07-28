@@ -133,6 +133,13 @@ class PublicTransportDriverCard extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 FilledButton(
+                  // O tema global define minimumSize: Size.fromHeight(48)
+                  // (largura mínima infinita). Dentro deste Row (filho
+                  // não-flex) isso zeraria a largura do Expanded do texto,
+                  // então o botão fixa sua própria largura mínima.
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(88, 48),
+                  ),
                   onPressed: (driver.cellPhone ?? '').trim().isEmpty
                       ? null
                       : () async {

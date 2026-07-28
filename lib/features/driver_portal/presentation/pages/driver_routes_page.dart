@@ -235,6 +235,17 @@ class _RoutesStatusBanner extends StatelessWidget {
 // Adhoc Route Planner
 // ─────────────────────────────────────────────
 
+/// F5 — períodos de viagem aceitos pelo backend (ver ROUTE_PERIODS no NestJS).
+/// O período selecionado filtra as crianças no planning-options e é enviado
+/// no start da rota.
+const _routePeriodOptions = <(String, String)>[
+  ('manha_ida', 'Manhã Ida'),
+  ('manha_volta', 'Manhã Volta'),
+  ('tarde_ida', 'Tarde Ida'),
+  ('tarde_volta', 'Tarde Volta'),
+  ('noite_ida', 'Noite Ida'),
+];
+
 Future<void> _openAdhocPlanner(BuildContext context, WidgetRef ref) async {
   final repo = ref.read(driverRoutesRepositoryProvider);
 
@@ -243,47 +254,24 @@ Future<void> _openAdhocPlanner(BuildContext context, WidgetRef ref) async {
     isScrollControlled: true,
     useSafeArea: true,
     showDragHandle: true,
-    builder: (ctx) => FutureBuilder<RoutePlanningOptions>(
-      future: repo.getPlanningOptions(),
-      builder: (ctx, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const Padding(
-            padding: EdgeInsets.all(AppSpacing.xl),
-            child: Center(child: CircularProgressIndicator()),
-          );
-        }
-        if (snapshot.hasError) {
-          return Padding(
-            padding: const EdgeInsets.all(AppSpacing.xl),
-            child: FaixaErrorState(
-              message: AppErrorReporter.messageFor(
-                snapshot.error ?? Exception('Falha ao carregar dados da rota.'),
-              ),
-            ),
-          );
-        }
-        final options =
-            snapshot.data ?? const RoutePlanningOptions(vans: [], children: []);
-        return _AdhocPlannerContent(
-          options: options,
-          onStart: () async {
-            final response = await repo.startRoute();
-            if (!context.mounted) return;
-            await startTrackingFromResponse(context, ref, response);
-            if (!context.mounted) return;
-            ref.invalidate(driverRoutesProvider);
-          },
-        );
+    builder: (ctx) => _AdhocPlannerContent(
+      repo: repo,
+      onStart: (period) async {
+        final response = await repo.startRoute(period: period);
+        if (!context.mounted) return;
+        await startTrackingFromResponse(context, ref, response);
+        if (!context.mounted) return;
+        ref.invalidate(driverRoutesProvider);
       },
     ),
   );
 }
 
 class _AdhocPlannerContent extends StatefulWidget {
-  const _AdhocPlannerContent({required this.options, required this.onStart});
+  const _AdhocPlannerContent({required this.repo, required this.onStart});
 
-  final RoutePlanningOptions options;
-  final Future<void> Function() onStart;
+  final RoutesRepository repo;
+  final Future<void> Function(String? period) onStart;
 
   @override
   State<_AdhocPlannerContent> createState() => _AdhocPlannerContentState();
@@ -292,11 +280,25 @@ class _AdhocPlannerContent extends StatefulWidget {
 class _AdhocPlannerContentState extends State<_AdhocPlannerContent> {
   bool _busy = false;
   String? _error;
+  String? _period;
+  late Future<RoutePlanningOptions> _optionsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _optionsFuture = widget.repo.getPlanningOptions();
+  }
+
+  void _selectPeriod(String? period) {
+    setState(() {
+      _period = period;
+      _optionsFuture = widget.repo.getPlanningOptions(period: period);
+      _error = null;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final children = widget.options.children;
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.lg,
@@ -320,22 +322,68 @@ class _AdhocPlannerContentState extends State<_AdhocPlannerContent> {
               context,
             ).textTheme.bodySmall?.copyWith(color: AppColors.slate),
           ),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            'Período',
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: AppColors.ink,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            children: [
+              for (final (value, label) in _routePeriodOptions)
+                ChoiceChip(
+                  label: Text(label),
+                  selected: _period == value,
+                  onSelected: _busy
+                      ? null
+                      : (selected) => _selectPeriod(selected ? value : null),
+                ),
+            ],
+          ),
           const SizedBox(height: AppSpacing.lg),
           Expanded(
-            child: children.isEmpty
-                ? const FaixaEmptyState(
-                    message: 'Nenhum aluno ativo vinculado no momento.',
+            child: FutureBuilder<RoutePlanningOptions>(
+              future: _optionsFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState != ConnectionState.done) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return FaixaErrorState(
+                    message: AppErrorReporter.messageFor(
+                      snapshot.error ??
+                          Exception('Falha ao carregar dados da rota.'),
+                    ),
+                    onRetry: () => _selectPeriod(_period),
+                  );
+                }
+                final children =
+                    snapshot.data?.children ?? const <PlanningChild>[];
+                if (children.isEmpty) {
+                  return FaixaEmptyState(
+                    message: _period == null
+                        ? 'Nenhum aluno ativo vinculado no momento.'
+                        : 'Nenhum aluno ativo neste período.',
                     icon: Icons.child_care_rounded,
-                    subtitle:
-                        'Vincule crianças ao seu veículo para iniciar uma rota.',
-                  )
-                : ListView.separated(
-                    shrinkWrap: true,
-                    itemCount: children.length,
-                    separatorBuilder: (_, _) =>
-                        const SizedBox(height: AppSpacing.sm),
-                    itemBuilder: (context, i) => _buildChildItem(children[i]),
-                  ),
+                    subtitle: _period == null
+                        ? 'Vincule crianças ao seu veículo para iniciar uma rota.'
+                        : 'Selecione outro período ou verifique o turno das crianças.',
+                  );
+                }
+                return ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: children.length,
+                  separatorBuilder: (_, _) =>
+                      const SizedBox(height: AppSpacing.sm),
+                  itemBuilder: (context, i) => _buildChildItem(children[i]),
+                );
+              },
+            ),
           ),
           if (_error != null) ...[
             const SizedBox(height: AppSpacing.sm),
@@ -362,6 +410,7 @@ class _AdhocPlannerContentState extends State<_AdhocPlannerContent> {
   }
 
   Widget _buildChildItem(PlanningChild child) {
+    final shiftName = child.shiftName;
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
@@ -406,7 +455,9 @@ class _AdhocPlannerContentState extends State<_AdhocPlannerContent> {
               ),
             ],
           ),
-          if (child.schoolName.isNotEmpty || child.address.isNotEmpty) ...[
+          if (child.schoolName.isNotEmpty ||
+              child.address.isNotEmpty ||
+              (shiftName != null && shiftName.isNotEmpty)) ...[
             const SizedBox(height: AppSpacing.md),
             Container(
               padding: const EdgeInsets.all(AppSpacing.md),
@@ -422,13 +473,23 @@ class _AdhocPlannerContentState extends State<_AdhocPlannerContent> {
                       icon: Icons.school_outlined,
                       text: 'Escola: ${child.schoolName}',
                     ),
-                  if (child.schoolName.isNotEmpty && child.address.isNotEmpty)
-                    const SizedBox(height: AppSpacing.xs),
-                  if (child.address.isNotEmpty)
+                  if (shiftName != null && shiftName.isNotEmpty) ...[
+                    if (child.schoolName.isNotEmpty)
+                      const SizedBox(height: AppSpacing.xs),
+                    AppIconTextRow(
+                      icon: Icons.access_time_rounded,
+                      text: 'Turno: $shiftName',
+                    ),
+                  ],
+                  if (child.address.isNotEmpty) ...[
+                    if (child.schoolName.isNotEmpty ||
+                        (shiftName != null && shiftName.isNotEmpty))
+                      const SizedBox(height: AppSpacing.xs),
                     AppIconTextRow(
                       icon: Icons.location_on_rounded,
                       text: 'Endereço: ${child.address}',
                     ),
+                  ],
                 ],
               ),
             ),
@@ -444,7 +505,7 @@ class _AdhocPlannerContentState extends State<_AdhocPlannerContent> {
       _error = null;
     });
     try {
-      await widget.onStart();
+      await widget.onStart(_period);
       if (!mounted) return;
       Navigator.of(context).pop();
       showAppSnackBar(

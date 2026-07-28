@@ -1,98 +1,29 @@
 import 'dart:async';
 
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../app/theme/app_theme.dart';
-import '../../../../core/network/backend_config.dart';
+import '../../data/ads_repository.dart';
+import '../../domain/ad.dart';
+import '../providers/ads_providers.dart';
+import 'ad_link_launcher.dart';
 
-// ─── Model ───────────────────────────────────────────────────────────────────
-
-class AdBanner {
-  const AdBanner({
-    required this.id,
-    required this.name,
-    this.imageUrl,
-    this.link,
-    required this.order,
-    this.updatedAt,
+/// Carrossel de banners de anúncio com autoplay.
+///
+/// Consome [adsProvider] para o [placement]/[role] informados e não renderiza
+/// nada quando não há anúncios ou quando a busca falha. A impressão é
+/// registrada 1× por anúncio por sessão por placement (dedup no repository).
+class AdBannerWidget extends ConsumerStatefulWidget {
+  const AdBannerWidget({
+    super.key,
+    required this.placement,
+    required this.role,
+    this.height = 110,
   });
 
-  final int id;
-  final String name;
-  final String? imageUrl;
-  final String? link;
-  final int order;
-  final DateTime? updatedAt;
-
-  String? get resolvedImageUrl {
-    final raw = imageUrl;
-    if (raw == null || raw.isEmpty) return null;
-    final version = updatedAt?.millisecondsSinceEpoch;
-    if (version == null) return raw;
-    final separator = raw.contains('?') ? '&' : '?';
-    return '$raw${separator}v=$version';
-  }
-
-  factory AdBanner.fromJson(Map<String, dynamic> json) {
-    return AdBanner(
-      id: (json['id'] as num).toInt(),
-      name: json['name']?.toString() ?? '',
-      imageUrl: json['imageUrl']?.toString(),
-      link: json['link']?.toString(),
-      order: (json['order'] as num?)?.toInt() ?? 0,
-      updatedAt: DateTime.tryParse(json['updatedAt']?.toString() ?? ''),
-    );
-  }
-}
-
-// ─── Provider ────────────────────────────────────────────────────────────────
-
-final adBannersProvider =
-    AsyncNotifierProvider<AdBannersNotifier, List<AdBanner>>(
-      AdBannersNotifier.new,
-    );
-
-class AdBannersNotifier extends AsyncNotifier<List<AdBanner>> {
-  @override
-  Future<List<AdBanner>> build() async {
-    return _fetchAds();
-  }
-
-  Future<List<AdBanner>> _fetchAds() async {
-    try {
-      final dio = Dio(BaseOptions(baseUrl: BackendConfig.apiBaseUrl));
-
-      // Public endpoint – no auth required
-      final response = await dio.get<Map<String, dynamic>>('/publicities');
-
-      final raw = response.data;
-      if (raw == null) return const [];
-
-      final items = raw['data'];
-      if (items is! List) return const [];
-
-      return items
-          .whereType<Map<String, dynamic>>()
-          .map(AdBanner.fromJson)
-          .where((b) => b.imageUrl != null && b.imageUrl!.isNotEmpty)
-          .toList();
-    } catch (_) {
-      // Silently fail – ads are non-critical
-      return const [];
-    }
-  }
-}
-
-// ─── Widget ───────────────────────────────────────────────────────────────────
-
-/// A smooth auto-scrolling ad banner carousel.
-/// Shows nothing when there are no active ads or when the fetch fails.
-class AdBannerWidget extends ConsumerStatefulWidget {
-  const AdBannerWidget({super.key, this.height = 110});
-
+  final String placement;
+  final AdRole role;
   final double height;
 
   @override
@@ -103,12 +34,11 @@ class _AdBannerWidgetState extends ConsumerState<AdBannerWidget>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final PageController _pageController;
   Timer? _autoPlayTimer;
-  Timer? _refreshTimer;
   int _currentPage = 0;
-  final Set<int> _impressionsSent = <int>{};
-  final Dio _trackingDio = Dio(BaseOptions(baseUrl: BackendConfig.apiBaseUrl));
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
+
+  AdQuery get _query => (placement: widget.placement, role: widget.role);
 
   @override
   void initState() {
@@ -124,19 +54,12 @@ class _AdBannerWidgetState extends ConsumerState<AdBannerWidget>
       curve: Curves.easeIn,
     );
     _fadeController.forward();
-    Future.microtask(() => ref.invalidate(adBannersProvider));
-    _refreshTimer = Timer.periodic(const Duration(seconds: 45), (_) {
-      if (mounted) {
-        ref.invalidate(adBannersProvider);
-      }
-    });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _autoPlayTimer?.cancel();
-    _refreshTimer?.cancel();
     _pageController.dispose();
     _fadeController.dispose();
     super.dispose();
@@ -145,7 +68,7 @@ class _AdBannerWidgetState extends ConsumerState<AdBannerWidget>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && mounted) {
-      ref.invalidate(adBannersProvider);
+      ref.invalidate(adsProvider(_query));
     }
   }
 
@@ -163,64 +86,45 @@ class _AdBannerWidgetState extends ConsumerState<AdBannerWidget>
     });
   }
 
-  Future<void> _openLink(String link) async {
-    final uri = _normalizeUri(link);
-    if (uri == null) return;
-
-    final openedExternally = await launchUrl(
-      uri,
-      mode: LaunchMode.externalApplication,
-    );
-    if (openedExternally) return;
-
-    final openedDefault = await launchUrl(
-      uri,
-      mode: LaunchMode.platformDefault,
-    );
-    if (openedDefault) return;
-
-    await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
+  void _trackImpression(Ad ad) {
+    ref
+        .read(adsRepositoryProvider)
+        .trackImpression(
+          ad.id,
+          placement: widget.placement,
+          surface: AdFormat.banner.wireValue,
+        );
   }
 
-  Future<void> _trackImpression(AdBanner ad) async {
-    if (_impressionsSent.contains(ad.id)) return;
-    _impressionsSent.add(ad.id);
-    try {
-      await _trackingDio.post<Map<String, dynamic>>(
-        '/publicities/${ad.id}/impression',
-      );
-    } catch (_) {
-      // Non-critical metric endpoint.
-    }
-  }
-
-  Future<void> _trackClick(AdBanner ad) async {
-    try {
-      await _trackingDio.post<Map<String, dynamic>>(
-        '/publicities/${ad.id}/click',
-      );
-    } catch (_) {
-      // Non-critical metric endpoint.
-    }
+  Future<void> _onAdTapped(Ad ad) async {
+    await ref
+        .read(adsRepositoryProvider)
+        .trackClick(
+          ad.id,
+          placement: widget.placement,
+          surface: AdFormat.banner.wireValue,
+        );
+    await openAdLink(ad.linkUrl!);
   }
 
   @override
   Widget build(BuildContext context) {
-    final bannersAsync = ref.watch(adBannersProvider);
+    final adsAsync = ref.watch(adsProvider(_query));
 
-    return bannersAsync.when(
+    return adsAsync.when(
       loading: () => const SizedBox.shrink(),
       error: (error, stackTrace) => const SizedBox.shrink(),
-      data: (banners) {
+      data: (ads) {
+        final banners = ads
+            .where((ad) => ad.format != AdFormat.card)
+            .toList(growable: false);
         if (banners.isEmpty) return const SizedBox.shrink();
 
         // Start/restart auto-play when data arrives
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
             _startAutoPlay(banners.length);
-            if (banners.isNotEmpty) {
-              _trackImpression(banners[_currentPage % banners.length]);
-            }
+            _trackImpression(banners[_currentPage % banners.length]);
           }
         });
 
@@ -240,14 +144,9 @@ class _AdBannerWidgetState extends ConsumerState<AdBannerWidget>
                   },
                   itemBuilder: (context, index) {
                     final ad = banners[index];
-                    return _AdCard(
+                    return _AdBannerCard(
                       ad: ad,
-                      onTap: ad.link != null && ad.link!.isNotEmpty
-                          ? () async {
-                              await _trackClick(ad);
-                              await _openLink(ad.link!);
-                            }
-                          : null,
+                      onTap: ad.isClickable ? () => _onAdTapped(ad) : null,
                     );
                   },
                 ),
@@ -280,24 +179,10 @@ class _AdBannerWidgetState extends ConsumerState<AdBannerWidget>
   }
 }
 
-Uri? _normalizeUri(String raw) {
-  final trimmed = raw.trim();
-  if (trimmed.isEmpty) return null;
+class _AdBannerCard extends StatelessWidget {
+  const _AdBannerCard({required this.ad, this.onTap});
 
-  final parsed = Uri.tryParse(trimmed);
-  if (parsed != null && parsed.hasScheme) {
-    return parsed;
-  }
-
-  return Uri.tryParse('https://$trimmed');
-}
-
-// ─── Ad Card ─────────────────────────────────────────────────────────────────
-
-class _AdCard extends StatelessWidget {
-  const _AdCard({required this.ad, this.onTap});
-
-  final AdBanner ad;
+  final Ad ad;
   final VoidCallback? onTap;
 
   @override

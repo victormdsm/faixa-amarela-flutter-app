@@ -25,6 +25,13 @@ abstract interface class ChildrenRepository {
 
   Future<List<Map<String, dynamic>>> getChildAddresses(int childId);
 
+  /// Geocoding leve (texto livre) para plotar o endereço no mapa enquanto o
+  /// pai digita. Retorna null quando o endereço não é localizado — nesse caso
+  /// o mapa não aparece e o cadastro segue sem coordenadas, como hoje.
+  Future<({double latitude, double longitude, String? label})?> geocodeAddress(
+    String text,
+  );
+
   Future<void> updateChildAddress({
     required int childId,
     required int addressId,
@@ -34,6 +41,18 @@ abstract interface class ChildrenRepository {
   Future<void> createChildAddress({
     required int childId,
     required ChildAddress address,
+    bool isDefault = false,
+  });
+
+  Future<void> deleteChildAddress({
+    required int childId,
+    required int addressId,
+  });
+
+  /// Marca o endereço como default da criança (o backend desmarca os demais).
+  Future<void> setChildAddressDefault({
+    required int childId,
+    required int addressId,
   });
 
   Future<Child> uploadChildPhoto({

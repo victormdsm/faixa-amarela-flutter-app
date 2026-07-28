@@ -34,7 +34,7 @@ Only `Theme.of(context).textTheme`. Poppins for display and numbers, Inter for b
 
 ## Iconography and brand marks
 
-- Brand source of truth: `assets/brand/logo.svg` (official: black F + white A on yellow square). Rendered assets: `assets/images/logo.png` + density variants. A missing asset fails visibly (error widget) — a silent stock-icon fallback turns the brand into clip-art.
+- Brand source of truth: `assets/brand/logo.svg` (official: Pantone 1375C yellow square with black FA monogram and black wordmark). Rendered assets: `assets/images/logo.png` + density variants. A missing asset fails visibly (error widget) — a silent stock-icon fallback turns the brand into clip-art.
 - On yellow surfaces the yellow square disappears: use the transparent variant `assets/brand/logo-transparent.svg` (legacy composition: yellow F, ink A) or set the square logo on a white tile.
 - Vehicle glyph: the van with faixa. Until a custom asset exists, `Icons.directions_bus_rounded` set on a yellow faixa — the bare `airport_shuttle`/`school` stock icons are out.
 - Icons sit plain, or ink on yellow. The colored-icon-inside-a-tinted-square (alpha ≈ 0.08) is the admin-template cliché this redesign exists to remove.

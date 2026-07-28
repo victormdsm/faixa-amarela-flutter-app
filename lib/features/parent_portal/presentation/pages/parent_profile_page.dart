@@ -102,6 +102,9 @@ class _ParentProfilePageState extends ConsumerState<ParentProfilePage> {
         bottomNavigationBar: profileAsync.maybeWhen(
           data: (_) => SafeArea(
             top: false,
+            // Ver driver_settings_page.dart: piso mínimo para aparelhos que
+            // reportam inset bottom = 0 (botão sob a barra de navegação).
+            minimum: const EdgeInsets.only(bottom: AppSpacing.md),
             child: Container(
               padding: const EdgeInsets.fromLTRB(
                 AppSpacing.lg,

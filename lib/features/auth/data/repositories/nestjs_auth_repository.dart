@@ -140,6 +140,7 @@ class NestjsAuthRepository implements AuthRepository {
     required String cellPhone,
     required String password,
     required String passwordConfirmation,
+    bool acceptTerms = false,
   }) async {
     try {
       await _dio.post<Map<String, dynamic>>(
@@ -150,6 +151,7 @@ class NestjsAuthRepository implements AuthRepository {
           'cpf': cpf.trim(),
           'cellPhone': cellPhone.trim(),
           'password': password,
+          'acceptTerms': acceptTerms,
         },
       );
     } on ApiException {

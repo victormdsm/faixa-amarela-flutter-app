@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/models/catalog_option.dart';
@@ -16,6 +19,7 @@ import '../../../../domain/models/child.dart';
 import '../../../../features/catalog/data/catalog_repository.dart';
 import '../providers/parent_portal_providers.dart';
 import '../state/add_child_controller.dart';
+import '../widgets/address_map_picker.dart';
 
 class AddChildPage extends ConsumerStatefulWidget {
   const AddChildPage({super.key, this.childToEdit});
@@ -40,6 +44,15 @@ class _AddChildPageState extends ConsumerState<AddChildPage> {
   CatalogOption? _school;
   String? _photoLocalPath;
 
+  // Mapa do endereço: marcador plotado pelo geocode (debounce de 800ms ao
+  // digitar) e ajustável por arraste. Null = mapa escondido (geocode falhou
+  // ou campos incompletos) e o cadastro segue sem coordenadas, como antes.
+  Timer? _geocodeDebounce;
+  int _geocodeSeq = 0;
+  bool _geocoding = false;
+  LatLng? _marker;
+  String? _resolvedLabel;
+
   bool get _isEditing => widget.childToEdit != null;
 
   @override
@@ -56,6 +69,53 @@ class _AddChildPageState extends ConsumerState<AddChildPage> {
     if (_isEditing) {
       Future.microtask(() => _loadAddress());
     }
+
+    _streetCtrl.addListener(_scheduleGeocode);
+    _numberCtrl.addListener(_scheduleGeocode);
+    _zipCodeCtrl.addListener(_scheduleGeocode);
+  }
+
+  void _scheduleGeocode() {
+    // Invalida qualquer resposta ainda em voo: os campos mudaram.
+    _geocodeSeq++;
+    _geocodeDebounce?.cancel();
+    final ready =
+        _streetCtrl.text.trim().isNotEmpty &&
+        _numberCtrl.text.trim().isNotEmpty &&
+        _zipCodeCtrl.text.trim().length >= 8;
+    if (!ready) {
+      if (_marker != null || _geocoding) {
+        setState(() {
+          _marker = null;
+          _resolvedLabel = null;
+          _geocoding = false;
+        });
+      }
+      return;
+    }
+    _geocodeDebounce = Timer(const Duration(milliseconds: 800), _runGeocode);
+  }
+
+  Future<void> _runGeocode() async {
+    final seq = ++_geocodeSeq;
+    final text =
+        '${_streetCtrl.text.trim()}, ${_numberCtrl.text.trim()}, '
+        '${_zipCodeCtrl.text.trim()}';
+    setState(() => _geocoding = true);
+    final result = await ref
+        .read(childrenRepositoryProvider)
+        .geocodeAddress(text);
+    if (!mounted || seq != _geocodeSeq) return;
+    setState(() {
+      _geocoding = false;
+      if (result == null) {
+        _marker = null;
+        _resolvedLabel = null;
+      } else {
+        _marker = LatLng(result.latitude, result.longitude);
+        _resolvedLabel = result.label;
+      }
+    });
   }
 
   Future<void> _loadAddress() async {
@@ -65,11 +125,28 @@ class _AddChildPageState extends ConsumerState<AddChildPage> {
       final repo = ref.read(childrenRepositoryProvider);
       final addresses = await repo.getChildAddresses(c.id);
       if (addresses.isNotEmpty && mounted) {
-        final addr = addresses.first;
+        bool isDefault(Map<String, dynamic> a) {
+          final raw = a['isDefault'] ?? a['is_default'];
+          return raw == true || raw == 1;
+        }
+
+        final addr = addresses.firstWhere(
+          isDefault,
+          orElse: () => addresses.first,
+        );
         _streetCtrl.text = (addr['street'] ?? '').toString();
         _numberCtrl.text = (addr['number'] ?? '').toString();
-        _complementCtrl.text = (addr['reference'] ?? '').toString();
-        _zipCodeCtrl.text = (addr['zipcode'] ?? '').toString();
+        _complementCtrl.text = (addr['reference'] ?? addr['complement'] ?? '')
+            .toString();
+        _zipCodeCtrl.text = (addr['zipcode'] ?? addr['zipCode'] ?? '')
+            .toString();
+        // Endereço já salvo com coordenadas: mostra o marcador direto, sem
+        // esperar o debounce do geocode.
+        final lat = (addr['latitude'] as num?)?.toDouble();
+        final lng = (addr['longitude'] as num?)?.toDouble();
+        if (lat != null && lng != null) {
+          setState(() => _marker = LatLng(lat, lng));
+        }
       }
     } catch (_) {
       // Endereco nao e bloqueante para edicao dos dados pessoais.
@@ -78,6 +155,7 @@ class _AddChildPageState extends ConsumerState<AddChildPage> {
 
   @override
   void dispose() {
+    _geocodeDebounce?.cancel();
     _nameCtrl.dispose();
     _cpfCtrl.dispose();
     _streetCtrl.dispose();
@@ -154,6 +232,8 @@ class _AddChildPageState extends ConsumerState<AddChildPage> {
             ? null
             : _complementCtrl.text.trim(),
         zipCode: _zipCodeCtrl.text.trim(),
+        latitude: _marker?.latitude,
+        longitude: _marker?.longitude,
       ),
       photoLocalPath: _photoLocalPath,
     );
@@ -279,7 +359,10 @@ class _AddChildPageState extends ConsumerState<AddChildPage> {
             ),
             const SizedBox(height: AppSpacing.lg),
             FaixaSectionCard(
-              title: 'Endereco',
+              title: _isEditing ? 'Endereco padrao' : 'Endereco',
+              subtitle: _isEditing
+                  ? 'Para gerenciar varios enderecos, use a tela de detalhes do dependente.'
+                  : null,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -336,6 +419,24 @@ class _AddChildPageState extends ConsumerState<AddChildPage> {
                         ? 'CEP e obrigatorio.'
                         : null,
                   ),
+                  if (_geocoding) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    const LinearProgressIndicator(minHeight: 2),
+                  ],
+                  if (_marker != null) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    AddressMapPicker(
+                      position: _marker!,
+                      onChanged: (p) => setState(() => _marker = p),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      _resolvedLabel != null
+                          ? 'Local aproximado: $_resolvedLabel. Arraste o marcador para ajustar.'
+                          : 'Arraste o marcador para ajustar a localizacao.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
                 ],
               ),
             ),

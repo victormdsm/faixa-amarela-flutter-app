@@ -106,6 +106,7 @@ void main() {
             'cpf': '12345678901',
             'cellPhone': '11999999999',
             'password': 'secret',
+            'acceptTerms': true,
           },
         ),
       ).thenAnswer(
@@ -123,6 +124,7 @@ void main() {
         cellPhone: '11999999999',
         password: 'secret',
         passwordConfirmation: 'secret',
+        acceptTerms: true,
       );
 
       verify(
