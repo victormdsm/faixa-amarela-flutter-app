@@ -47,6 +47,9 @@ class ChildAddress {
     required this.number,
     this.complement,
     this.zipCode,
+    this.district,
+    this.city,
+    this.state,
     this.latitude,
     this.longitude,
   });
@@ -55,6 +58,14 @@ class ChildAddress {
   final String number;
   final String? complement;
   final String? zipCode;
+
+  /// Bairro (opcional — preenchido pelo reverse geocoding quando disponível).
+  final String? district;
+
+  /// Cidade/UF selecionadas no formulário (obrigatórias na UI) ou resolvidas
+  /// pelo geocoding. Enviadas ao backend quando presentes.
+  final String? city;
+  final String? state;
 
   /// Coordenadas confirmadas no mapa (geocode + ajuste manual do marcador).
   /// Quando presentes, o backend as grava direto, sem chamar o geocoder.
@@ -67,6 +78,9 @@ class ChildAddress {
       number: (json['number'] ?? '').toString(),
       complement: json['complement']?.toString(),
       zipCode: (json['zipCode'] ?? '').toString(),
+      district: json['district']?.toString(),
+      city: json['city']?.toString(),
+      state: json['state']?.toString(),
       latitude: (json['latitude'] as num?)?.toDouble(),
       longitude: (json['longitude'] as num?)?.toDouble(),
     );
@@ -79,6 +93,9 @@ class ChildAddress {
       if (complement != null && complement!.trim().isNotEmpty)
         'complement': complement,
       if (zipCode != null && zipCode!.trim().isNotEmpty) 'zipCode': zipCode,
+      if (district != null && district!.trim().isNotEmpty) 'district': district,
+      if (city != null && city!.trim().isNotEmpty) 'city': city,
+      if (state != null && state!.trim().isNotEmpty) 'state': state,
       if (latitude != null) 'latitude': latitude,
       if (longitude != null) 'longitude': longitude,
     };

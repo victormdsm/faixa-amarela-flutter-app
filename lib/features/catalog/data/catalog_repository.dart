@@ -20,6 +20,10 @@ final districtsCatalogProvider = FutureProvider<List<CatalogOption>>((
   return ref.watch(catalogRepositoryProvider).listDistricts();
 });
 
+final citiesCatalogProvider = FutureProvider<List<CatalogOption>>((ref) async {
+  return ref.watch(catalogRepositoryProvider).listCities();
+});
+
 final shiftsCatalogProvider = FutureProvider<List<CatalogOption>>((ref) async {
   return ref.watch(catalogRepositoryProvider).listShifts();
 });

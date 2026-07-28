@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,30 +6,34 @@ import 'package:latlong2/latlong.dart';
 
 import '../../../../app/router/app_router.dart';
 import '../../../../app/theme/app_theme.dart';
+import '../../../../core/error/app_error_reporter.dart';
+import '../../../../core/models/catalog_option.dart';
 import '../../../../core/presentation/widgets/app_feedback.dart';
 import '../../../../core/presentation/widgets/app_shared_widgets.dart';
 import '../../../../core/presentation/widgets/faixa_app_bar.dart';
 import '../../../../core/presentation/widgets/faixa_delete_child_dialog.dart';
 import '../../../../core/presentation/widgets/faixa_section_card.dart';
+import '../../../../domain/models/address_suggestion.dart';
 import '../../../../domain/models/child.dart';
 import '../../../../domain/models/enrollment.dart';
 import '../../../../features/catalog/data/catalog_repository.dart';
 import '../../../../ui/core/widgets/status_pill.dart';
 import '../providers/parent_portal_providers.dart';
 import '../widgets/address_map_picker.dart';
+import '../widgets/city_state_fields.dart';
 
 final _childDetailAddressesProvider = FutureProvider.family
     .autoDispose<List<Map<String, dynamic>>, int>((ref, childId) async {
-  final repo = ref.watch(childrenRepositoryProvider);
-  return repo.getChildAddresses(childId);
-});
+      final repo = ref.watch(childrenRepositoryProvider);
+      return repo.getChildAddresses(childId);
+    });
 
 final _childDetailEnrollmentProvider = FutureProvider.family
     .autoDispose<Enrollment?, int>((ref, childId) async {
-  final repo = ref.watch(enrollmentsRepositoryProvider);
-  final active = await repo.getActiveEnrollments();
-  return active.where((e) => e.childId == childId).firstOrNull;
-});
+      final repo = ref.watch(enrollmentsRepositoryProvider);
+      final active = await repo.getActiveEnrollments();
+      return active.where((e) => e.childId == childId).firstOrNull;
+    });
 
 class ChildDetailPage extends ConsumerWidget {
   const ChildDetailPage({super.key, required this.child});
@@ -77,6 +79,30 @@ class ChildDetailPage extends ConsumerWidget {
             ),
           ],
         ),
+        bottomNavigationBar: SafeArea(
+          top: false,
+          // Mesmo padrão do driver_settings: piso mínimo para aparelhos
+          // (MIUI/gesture bar custom) que reportam inset bottom 0.
+          minimum: const EdgeInsets.only(bottom: AppSpacing.md),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.md,
+              AppSpacing.lg,
+              AppSpacing.lg,
+            ),
+            decoration: const BoxDecoration(
+              color: AppColors.surface,
+              border: Border(
+                top: BorderSide(color: AppColors.border, width: 0.5),
+              ),
+            ),
+            child: _ActionButtons(
+              onEdit: () => _editChild(context),
+              onDelete: () => _confirmDelete(context, ref),
+            ),
+          ),
+        ),
         body: ListView(
           padding: const EdgeInsets.all(AppSpacing.lg),
           children: [
@@ -90,20 +116,12 @@ class ChildDetailPage extends ConsumerWidget {
               _ChildCodeSection(uuid: child.uuid!),
             ],
             const SizedBox(height: AppSpacing.lg),
-            _AddressSection(
-              childId: child.id,
-              addressesAsync: addressesAsync,
-            ),
+            _AddressSection(childId: child.id, addressesAsync: addressesAsync),
             const SizedBox(height: AppSpacing.lg),
             _EnrollmentSection(
               enrollmentAsync: enrollmentAsync,
               onCancelEnrollment: (enrollment) =>
                   _confirmCancelEnrollment(context, ref, enrollment),
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            _ActionButtons(
-              onEdit: () => _editChild(context),
-              onDelete: () => _confirmDelete(context, ref),
             ),
             const SizedBox(height: AppSpacing.xxl),
           ],
@@ -142,7 +160,7 @@ class ChildDetailPage extends ConsumerWidget {
       if (context.mounted) {
         showAppSnackBar(
           context,
-          message: 'Erro ao verificar vínculos: ${e.toString()}',
+          message: AppErrorReporter.messageFor(e),
           type: AppFeedbackType.error,
         );
       }
@@ -201,7 +219,7 @@ class ChildDetailPage extends ConsumerWidget {
       if (context.mounted) {
         showAppSnackBar(
           context,
-          message: 'Erro ao cancelar matrícula: ${e.toString()}',
+          message: AppErrorReporter.messageFor(e),
           type: AppFeedbackType.error,
         );
       }
@@ -255,10 +273,7 @@ class _HeaderCard extends StatelessWidget {
           ),
           if (child.isInDebt) ...[
             const SizedBox(height: AppSpacing.md),
-            const StatusPill(
-              label: 'Inadimplente',
-              color: AppColors.danger,
-            ),
+            const StatusPill(label: 'Inadimplente', color: AppColors.danger),
           ],
         ],
       ),
@@ -380,7 +395,7 @@ class _AddressSection extends ConsumerWidget {
           child: Center(child: CircularProgressIndicator()),
         ),
         error: (error, _) => AppInfoBanner(
-          message: 'Erro ao carregar endereços: $error',
+          message: AppErrorReporter.messageFor(error),
           icon: Icons.error_outline_rounded,
           color: AppColors.danger,
         ),
@@ -390,10 +405,10 @@ class _AddressSection extends ConsumerWidget {
             children: [
               if (addresses.isEmpty)
                 Text(
-                  'Nenhum endereço cadastrado.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppColors.slate,
-                  ),
+                  'Nenhum endereço cadastrado ainda.',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: AppColors.slate),
                 )
               else
                 ...addresses.map(
@@ -443,7 +458,7 @@ class _AddressSection extends ConsumerWidget {
       if (context.mounted) {
         showAppSnackBar(
           context,
-          message: 'Erro ao atualizar endereço padrão: ${e.toString()}',
+          message: AppErrorReporter.messageFor(e),
           type: AppFeedbackType.error,
         );
       }
@@ -503,7 +518,7 @@ class _AddressSection extends ConsumerWidget {
       if (context.mounted) {
         showAppSnackBar(
           context,
-          message: 'Erro ao excluir endereço: ${e.toString()}',
+          message: AppErrorReporter.messageFor(e),
           type: AppFeedbackType.error,
         );
       }
@@ -544,7 +559,7 @@ class _AddressSection extends ConsumerWidget {
       if (context.mounted) {
         showAppSnackBar(
           context,
-          message: 'Erro ao adicionar endereço: ${e.toString()}',
+          message: AppErrorReporter.messageFor(e),
           type: AppFeedbackType.error,
         );
       }
@@ -571,12 +586,18 @@ class _AddressTile extends StatelessWidget {
     final number = (address['number'] ?? '').toString();
     final complement = (address['reference'] ?? address['complement'] ?? '')
         .toString();
+    final district = (address['neighborhood'] ?? address['district'] ?? '')
+        .toString();
+    final city = (address['city'] ?? '').toString();
+    final state = (address['state'] ?? '').toString();
     final zipcode = (address['zipcode'] ?? address['zipCode'] ?? '').toString();
 
     final parts = <String>[
       if (street.isNotEmpty) street,
       if (number.isNotEmpty) number,
       if (complement.isNotEmpty) complement,
+      if (district.isNotEmpty) district,
+      if (city.isNotEmpty) state.isNotEmpty ? '$city/$state' : city,
       if (zipcode.isNotEmpty) 'CEP: $zipcode',
     ];
 
@@ -647,79 +668,98 @@ class _AddressFormSheetState extends ConsumerState<_AddressFormSheet> {
   final _streetCtrl = TextEditingController();
   final _numberCtrl = TextEditingController();
   final _complementCtrl = TextEditingController();
+  final _districtCtrl = TextEditingController();
   final _zipCodeCtrl = TextEditingController();
 
-  // Mapa do endereço (mesmo padrão do add_child_page): geocode com debounce
-  // de 800ms ao digitar e marcador ajustável por arraste. Sem geocode, o
-  // mapa fica escondido e o endereço é salvo sem coordenadas.
-  Timer? _geocodeDebounce;
-  int _geocodeSeq = 0;
-  bool _geocoding = false;
+  // Mesmo fluxo do add_child_page: cidade/UF (obrigatórios) habilitam o mapa
+  // estilo Uber (pin central + busca + GPS). [_marker] null = ponto nunca
+  // definido; salvar assim exige consentimento (backend re-geocodifica).
+  CatalogOption? _city;
+  String? _stateUf;
   LatLng? _marker;
   String? _resolvedLabel;
 
-  @override
-  void initState() {
-    super.initState();
-    _streetCtrl.addListener(_scheduleGeocode);
-    _numberCtrl.addListener(_scheduleGeocode);
-    _zipCodeCtrl.addListener(_scheduleGeocode);
+  String? get _cityBias {
+    final city = _city;
+    final uf = _stateUf;
+    if (city == null || uf == null) return null;
+    return '${city.name}, $uf';
   }
 
   @override
   void dispose() {
-    _geocodeDebounce?.cancel();
     _streetCtrl.dispose();
     _numberCtrl.dispose();
     _complementCtrl.dispose();
+    _districtCtrl.dispose();
     _zipCodeCtrl.dispose();
     super.dispose();
   }
 
-  void _scheduleGeocode() {
-    _geocodeSeq++;
-    _geocodeDebounce?.cancel();
-    final ready =
-        _streetCtrl.text.trim().isNotEmpty &&
-        _numberCtrl.text.trim().isNotEmpty &&
-        _zipCodeCtrl.text.trim().length >= 8;
-    if (!ready) {
-      if (_marker != null || _geocoding) {
-        setState(() {
-          _marker = null;
-          _resolvedLabel = null;
-          _geocoding = false;
-        });
-      }
-      return;
-    }
-    _geocodeDebounce = Timer(const Duration(milliseconds: 800), _runGeocode);
-  }
-
-  Future<void> _runGeocode() async {
-    final seq = ++_geocodeSeq;
-    final text =
-        '${_streetCtrl.text.trim()}, ${_numberCtrl.text.trim()}, '
-        '${_zipCodeCtrl.text.trim()}';
-    setState(() => _geocoding = true);
-    final result = await ref
-        .read(childrenRepositoryProvider)
-        .geocodeAddress(text);
-    if (!mounted || seq != _geocodeSeq) return;
+  /// Preenche os campos com o endereço resolvido pelo mapa (reverse ou
+  /// autocomplete). Só sobrescreve o que veio preenchido.
+  void _applySuggestion(AddressSuggestion suggestion) {
     setState(() {
-      _geocoding = false;
-      if (result == null) {
-        _marker = null;
-        _resolvedLabel = null;
-      } else {
-        _marker = LatLng(result.latitude, result.longitude);
-        _resolvedLabel = result.label;
+      _resolvedLabel = suggestion.label;
+      if ((suggestion.street ?? '').isNotEmpty) {
+        _streetCtrl.text = suggestion.street!;
+      }
+      if ((suggestion.number ?? '').isNotEmpty) {
+        _numberCtrl.text = suggestion.number!;
+      }
+      if ((suggestion.district ?? '').isNotEmpty) {
+        _districtCtrl.text = suggestion.district!;
+      }
+      final uf = suggestion.state?.toUpperCase();
+      if (uf != null && kBrazilStates.contains(uf)) {
+        _stateUf = uf;
+      }
+      final cityName = suggestion.city;
+      if (cityName != null && cityName.trim().isNotEmpty) {
+        final cities = ref.read(citiesCatalogProvider).value ?? const [];
+        final query = cityName.trim().toLowerCase();
+        for (final c in cities) {
+          if (c.name.trim().toLowerCase() == query) {
+            _city = c;
+            break;
+          }
+        }
       }
     });
   }
 
-  void _save() {
+  Future<bool> _confirmSaveWithoutCoordinates() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        surfaceTintColor: AppColors.surface,
+        title: const Text('Endereço fora do mapa'),
+        content: const Text(
+          'Não conseguimos localizar esse endereço no mapa. Salvar assim '
+          'mesmo? Vamos tentar localizá-lo automaticamente depois.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Voltar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Salvar assim mesmo'),
+          ),
+        ],
+      ),
+    );
+    return confirmed == true;
+  }
+
+  Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_marker == null) {
+      final confirmed = await _confirmSaveWithoutCoordinates();
+      if (!confirmed || !mounted) return;
+    }
     Navigator.of(context).pop(
       ChildAddress(
         street: _streetCtrl.text.trim(),
@@ -728,6 +768,11 @@ class _AddressFormSheetState extends ConsumerState<_AddressFormSheet> {
             ? null
             : _complementCtrl.text.trim(),
         zipCode: _zipCodeCtrl.text.trim(),
+        district: _districtCtrl.text.trim().isEmpty
+            ? null
+            : _districtCtrl.text.trim(),
+        city: _city?.name,
+        state: _stateUf,
         latitude: _marker?.latitude,
         longitude: _marker?.longitude,
       ),
@@ -736,6 +781,8 @@ class _AddressFormSheetState extends ConsumerState<_AddressFormSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final citiesAsync = ref.watch(citiesCatalogProvider);
+
     return Padding(
       padding: EdgeInsets.fromLTRB(
         AppSpacing.lg,
@@ -757,6 +804,53 @@ class _AddressFormSheetState extends ConsumerState<_AddressFormSheet> {
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: AppSpacing.lg),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: CitySelectField(
+                      citiesAsync: citiesAsync,
+                      value: _city,
+                      onChanged: (v) => setState(() => _city = v),
+                      onRetry: () => ref.invalidate(citiesCatalogProvider),
+                      validator: (v) =>
+                          v == null ? 'Selecione a cidade.' : null,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  SizedBox(
+                    width: 118,
+                    child: UfSelectField(
+                      value: _stateUf,
+                      onChanged: (v) => setState(() => _stateUf = v),
+                      validator: (v) => v == null ? 'Selecione.' : null,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.md),
+              if (_cityBias == null)
+                const AppInfoBanner(
+                  message:
+                      'Selecione cidade e UF para localizar o endereço no mapa.',
+                  icon: Icons.map_outlined,
+                  color: AppColors.slate,
+                )
+              else
+                AddressMapPicker(
+                  cityBias: _cityBias,
+                  initialPosition: _marker,
+                  initialLabel: _resolvedLabel,
+                  height: 260,
+                  onPositionChanged: (p) => setState(() => _marker = p),
+                  onAddressResolved: _applySuggestion,
+                  onError: (message) => showAppSnackBar(
+                    context,
+                    message: message,
+                    type: AppFeedbackType.error,
+                  ),
+                ),
+              const SizedBox(height: AppSpacing.md),
               TextFormField(
                 controller: _streetCtrl,
                 decoration: const InputDecoration(
@@ -790,6 +884,15 @@ class _AddressFormSheetState extends ConsumerState<_AddressFormSheet> {
               ),
               const SizedBox(height: AppSpacing.md),
               TextFormField(
+                controller: _districtCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Bairro (opcional)',
+                  prefixIcon: Icon(Icons.holiday_village_outlined),
+                ),
+                textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              TextFormField(
                 controller: _zipCodeCtrl,
                 decoration: const InputDecoration(
                   labelText: 'CEP',
@@ -804,24 +907,6 @@ class _AddressFormSheetState extends ConsumerState<_AddressFormSheet> {
                 validator: (v) =>
                     v == null || v.trim().isEmpty ? 'CEP e obrigatorio.' : null,
               ),
-              if (_geocoding) ...[
-                const SizedBox(height: AppSpacing.sm),
-                const LinearProgressIndicator(minHeight: 2),
-              ],
-              if (_marker != null) ...[
-                const SizedBox(height: AppSpacing.md),
-                AddressMapPicker(
-                  position: _marker!,
-                  onChanged: (p) => setState(() => _marker = p),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  _resolvedLabel != null
-                      ? 'Local aproximado: $_resolvedLabel. Arraste o marcador para ajustar.'
-                      : 'Arraste o marcador para ajustar a localizacao.',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
               const SizedBox(height: AppSpacing.lg),
               FilledButton.icon(
                 onPressed: _save,
@@ -858,7 +943,7 @@ class _EnrollmentSection extends StatelessWidget {
           child: Center(child: CircularProgressIndicator()),
         ),
         error: (error, _) => AppInfoBanner(
-          message: 'Erro ao carregar matrícula: $error',
+          message: AppErrorReporter.messageFor(error),
           icon: Icons.error_outline_rounded,
           color: AppColors.danger,
         ),
@@ -926,10 +1011,7 @@ class _EnrollmentSection extends StatelessWidget {
 }
 
 class _ActionButtons extends StatelessWidget {
-  const _ActionButtons({
-    required this.onEdit,
-    required this.onDelete,
-  });
+  const _ActionButtons({required this.onEdit, required this.onDelete});
 
   final VoidCallback onEdit;
   final VoidCallback onDelete;

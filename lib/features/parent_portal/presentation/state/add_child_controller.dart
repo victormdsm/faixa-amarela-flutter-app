@@ -14,6 +14,7 @@ class AddChildFormData {
     required this.schoolId,
     required this.shiftId,
     required this.address,
+    this.originalAddress,
     this.photoLocalPath,
   });
 
@@ -22,6 +23,10 @@ class AddChildFormData {
   final int? schoolId;
   final int? shiftId;
   final ChildAddress address;
+
+  /// Endereço default carregado na edição (antes das alterações do pai).
+  /// Usado para decidir se o endereço precisa ser regravado.
+  final ChildAddress? originalAddress;
   final String? photoLocalPath;
 }
 
@@ -29,6 +34,34 @@ class AddChildController extends AsyncNotifier<void> {
   @override
   Future<void> build() async {
     return Future.value();
+  }
+
+  /// Compara o endereço editado com o original para decidir se regrava.
+  ///
+  /// Sem original (endereço não carregado / criança sem endereço) considera
+  /// que mudou — o fluxo de salvar segue o comportamento anterior
+  /// (create-or-update). Coordenadas usam epsilon para absorver ruído de
+  /// ponto flutuante do parse JSON.
+  static bool addressChanged(ChildAddress? before, ChildAddress after) {
+    if (before == null) return true;
+
+    String norm(String? s) => (s ?? '').trim();
+    if (norm(before.street) != norm(after.street)) return true;
+    if (norm(before.number) != norm(after.number)) return true;
+    if (norm(before.complement) != norm(after.complement)) return true;
+    if (norm(before.zipCode) != norm(after.zipCode)) return true;
+    if (norm(before.district) != norm(after.district)) return true;
+    if (norm(before.city) != norm(after.city)) return true;
+    if (norm(before.state) != norm(after.state)) return true;
+
+    bool coordChanged(double? a, double? b) {
+      if (a == null && b == null) return false;
+      if (a == null || b == null) return true;
+      return (a - b).abs() > 1e-6;
+    }
+
+    return coordChanged(before.latitude, after.latitude) ||
+        coordChanged(before.longitude, after.longitude);
   }
 
   AppFailure _mapError(Object error, String contextMessage) {
@@ -98,29 +131,42 @@ class AddChildController extends AsyncNotifier<void> {
         shiftId: formData.shiftId,
       );
 
-      final addresses = await repo.getChildAddresses(id);
-      if (addresses.isNotEmpty) {
-        bool isDefault(Map<String, dynamic> a) {
-          final raw = a['isDefault'] ?? a['is_default'];
-          return raw == true || raw == 1;
-        }
+      // Só regrava o endereço default quando algo mudou — antes toda
+      // edição de dados pessoais reescrevia o endereço (e re-geocodificava).
+      if (addressChanged(formData.originalAddress, formData.address)) {
+        final addresses = await repo.getChildAddresses(id);
+        if (addresses.isNotEmpty) {
+          bool isDefault(Map<String, dynamic> a) {
+            final raw = a['isDefault'] ?? a['is_default'];
+            return raw == true || raw == 1;
+          }
 
-        final defaultAddress = addresses.firstWhere(
-          isDefault,
-          orElse: () => addresses.first,
-        );
-        final addressId = (defaultAddress['id'] as num).toInt();
-        await repo.updateChildAddress(
-          childId: id,
-          addressId: addressId,
-          address: formData.address,
-        );
-      } else {
-        await repo.createChildAddress(
-          childId: id,
-          address: formData.address,
-          isDefault: true,
-        );
+          final defaultAddress = addresses.firstWhere(
+            isDefault,
+            orElse: () => addresses.first,
+          );
+          final addressId = (defaultAddress['id'] as num?)?.toInt();
+          if (addressId == null) {
+            // Resposta sem id não deve derrubar o fluxo: loga e segue sem
+            // regravar o endereço (os dados pessoais já foram salvos).
+            debugPrint(
+              '[AddChildController] endereco default sem id; '
+              'atualizacao de endereco ignorada (child $id).',
+            );
+          } else {
+            await repo.updateChildAddress(
+              childId: id,
+              addressId: addressId,
+              address: formData.address,
+            );
+          }
+        } else {
+          await repo.createChildAddress(
+            childId: id,
+            address: formData.address,
+            isDefault: true,
+          );
+        }
       }
 
       final localPath = formData.photoLocalPath;

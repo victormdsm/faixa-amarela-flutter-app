@@ -60,18 +60,22 @@ class ParentChildrenPage extends ConsumerWidget {
           ),
           data: (children) {
             if (children.isEmpty) {
-              return const FaixaEmptyState(
+              return FaixaEmptyState(
                 message: 'Nenhum dependente encontrado.',
                 icon: Icons.child_care_rounded,
                 subtitle: 'Adicione um dependente para começar.',
+                actionLabel: 'Adicionar dependente',
+                onAction: () => context.push(AppRoutes.parentChildrenAdd),
               );
             }
             return ListView.builder(
-              padding: const EdgeInsets.fromLTRB(
+              // Folga inferior para o FAB (56 + margens) respeitando a
+              // gesture bar do aparelho (antes era 100 fixo).
+              padding: EdgeInsets.fromLTRB(
                 AppSpacing.lg,
                 AppSpacing.md,
                 AppSpacing.lg,
-                100,
+                88 + MediaQuery.viewPaddingOf(context).bottom,
               ),
               itemCount: children.length,
               itemBuilder: (context, index) {
@@ -132,7 +136,7 @@ class ParentChildrenPage extends ConsumerWidget {
       if (context.mounted) {
         showAppSnackBar(
           context,
-          message: 'Erro ao verificar vínculos: ${e.toString()}',
+          message: AppErrorReporter.messageFor(e),
           type: AppFeedbackType.error,
         );
       }

@@ -1,3 +1,5 @@
+import '../../core/error/app_failure.dart';
+import '../models/address_suggestion.dart';
 import '../models/child.dart';
 
 abstract interface class ChildrenRepository {
@@ -25,12 +27,27 @@ abstract interface class ChildrenRepository {
 
   Future<List<Map<String, dynamic>>> getChildAddresses(int childId);
 
-  /// Geocoding leve (texto livre) para plotar o endereço no mapa enquanto o
-  /// pai digita. Retorna null quando o endereço não é localizado — nesse caso
-  /// o mapa não aparece e o cadastro segue sem coordenadas, como hoje.
+  /// Geocoding leve (texto livre). Lança [AppFailure] amigável quando o
+  /// endereço não é localizado (404) ou o serviço falha — o chamador decide
+  /// como exibir; nunca é engolido silenciosamente.
   Future<({double latitude, double longitude, String? label})?> geocodeAddress(
     String text,
   );
+
+  /// Autocomplete de endereços (até 5 sugestões), com viés opcional de
+  /// [city]. Lança [AppFailure] amigável em caso de erro.
+  Future<List<AddressSuggestion>> autocompleteAddress(
+    String text, {
+    String? city,
+  });
+
+  /// Reverse geocoding do ponto (lat/lon) — usado quando o pai move o mapa.
+  /// Lança [NotFoundFailure] com mensagem amigável quando o ponto não
+  /// resolve um endereço.
+  Future<AddressSuggestion> reverseAddress({
+    required double latitude,
+    required double longitude,
+  });
 
   Future<void> updateChildAddress({
     required int childId,

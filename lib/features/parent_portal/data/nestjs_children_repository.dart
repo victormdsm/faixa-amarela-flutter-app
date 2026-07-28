@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import '../../../core/error/app_failure.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../data/dto/child_dto.dart';
+import '../../../domain/models/address_suggestion.dart';
 import '../../../domain/models/child.dart';
 import '../../../domain/repositories/children_repository.dart';
 
@@ -151,6 +152,28 @@ class NestjsChildrenRepository implements ChildrenRepository {
     }
   }
 
+  /// Campos de endereço enviados no create/update. city/state/neighborhood
+  /// são opcionais no DTO do backend e só vão quando preenchidos.
+  Map<String, dynamic> _addressPayload(ChildAddress address, bool isDefault) {
+    return <String, dynamic>{
+      'zipcode': (address.zipCode ?? '').trim(),
+      'street': address.street.trim(),
+      'number': address.number.trim(),
+      'reference': address.complement?.trim(),
+      'type': 'home',
+      'isDefault': isDefault,
+      if ((address.district ?? '').trim().isNotEmpty)
+        'neighborhood': address.district!.trim(),
+      if ((address.city ?? '').trim().isNotEmpty) 'city': address.city!.trim(),
+      if ((address.state ?? '').trim().isNotEmpty)
+        'state': address.state!.trim(),
+      if (address.latitude != null && address.longitude != null) ...{
+        'latitude': address.latitude,
+        'longitude': address.longitude,
+      },
+    };
+  }
+
   Future<void> _createAddress(
     int childId,
     ChildAddress address, {
@@ -158,24 +181,14 @@ class NestjsChildrenRepository implements ChildrenRepository {
   }) async {
     await _dio.post<Map<String, dynamic>>(
       '/parent/children/$childId/addresses',
-      data: <String, dynamic>{
-        'zipcode': (address.zipCode ?? '').trim(),
-        'street': address.street.trim(),
-        'number': address.number.trim(),
-        'reference': address.complement?.trim(),
-        'type': 'home',
-        'isDefault': isDefault,
-        if (address.latitude != null && address.longitude != null) ...{
-          'latitude': address.latitude,
-          'longitude': address.longitude,
-        },
-      },
+      data: _addressPayload(address, isDefault),
     );
   }
 
   @override
-  Future<({double latitude, double longitude, String? label})?>
-  geocodeAddress(String text) async {
+  Future<({double latitude, double longitude, String? label})?> geocodeAddress(
+    String text,
+  ) async {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
         '/parent/addresses/geocode',
@@ -191,10 +204,63 @@ class NestjsChildrenRepository implements ChildrenRepository {
         longitude: longitude,
         label: data['label']?.toString(),
       );
-    } catch (_) {
-      // Best-effort: 404 (não localizado) ou ORS fora simplesmente escondem
-      // o mapa; o cadastro segue sem coordenadas, como antes.
-      return null;
+    } catch (e) {
+      // 404 (não localizado) e falhas do geocoder viram AppFailure com a
+      // mensagem amigável do backend — o chamador exibe e oferece retry.
+      throw _mapException(e);
+    }
+  }
+
+  @override
+  Future<List<AddressSuggestion>> autocompleteAddress(
+    String text, {
+    String? city,
+  }) async {
+    try {
+      final response = await _dio.get<dynamic>(
+        '/parent/addresses/autocomplete',
+        queryParameters: <String, dynamic>{
+          'text': text,
+          if ((city ?? '').trim().isNotEmpty) 'city': city!.trim(),
+        },
+      );
+      // O interceptor de unwrap já entrega a lista; o fallback cobre o
+      // envelope cru `{ data: [...] }` caso o contrato chegue intacto.
+      final raw = response.data;
+      final List<dynamic> list = switch (raw) {
+        final List<dynamic> l => l,
+        final Map<String, dynamic> m when m['data'] is List =>
+          m['data'] as List<dynamic>,
+        _ => const <dynamic>[],
+      };
+      return list
+          .whereType<Map<String, dynamic>>()
+          .map(AddressSuggestion.fromJson)
+          .where((s) => s.label.trim().isNotEmpty)
+          .toList(growable: false);
+    } catch (e) {
+      throw _mapException(e);
+    }
+  }
+
+  @override
+  Future<AddressSuggestion> reverseAddress({
+    required double latitude,
+    required double longitude,
+  }) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/parent/addresses/reverse',
+        queryParameters: {'lat': latitude, 'lon': longitude},
+      );
+      final data = response.data;
+      if (data == null) {
+        throw const ServerFailure(message: 'Resposta vazia do servidor.');
+      }
+      return AddressSuggestion.fromJson(data);
+    } catch (e) {
+      if (e is AppFailure) rethrow;
+      throw _mapException(e);
     }
   }
 
@@ -221,18 +287,7 @@ class NestjsChildrenRepository implements ChildrenRepository {
     try {
       await _dio.put<Map<String, dynamic>>(
         '/parent/children/$childId/addresses/$addressId',
-        data: <String, dynamic>{
-          'zipcode': (address.zipCode ?? '').trim(),
-          'street': address.street.trim(),
-          'number': address.number.trim(),
-          'reference': address.complement?.trim(),
-          'type': 'home',
-          'isDefault': true,
-          if (address.latitude != null && address.longitude != null) ...{
-            'latitude': address.latitude,
-            'longitude': address.longitude,
-          },
-        },
+        data: _addressPayload(address, true),
       );
     } catch (e) {
       throw _mapException(e);

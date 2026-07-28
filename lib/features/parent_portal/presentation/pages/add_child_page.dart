@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../../../app/theme/app_theme.dart';
+import '../../../../core/error/app_error_reporter.dart';
 import '../../../../core/models/catalog_option.dart';
 import '../../../../core/presentation/widgets/app_feedback.dart';
 import '../../../../core/presentation/widgets/app_shared_widgets.dart';
@@ -15,11 +14,13 @@ import '../../../../core/presentation/widgets/e2e_keys.dart';
 import '../../../../core/presentation/widgets/faixa_app_bar.dart';
 import '../../../../core/presentation/widgets/faixa_image_picker.dart';
 import '../../../../core/presentation/widgets/faixa_section_card.dart';
+import '../../../../domain/models/address_suggestion.dart';
 import '../../../../domain/models/child.dart';
 import '../../../../features/catalog/data/catalog_repository.dart';
 import '../providers/parent_portal_providers.dart';
 import '../state/add_child_controller.dart';
 import '../widgets/address_map_picker.dart';
+import '../widgets/city_state_fields.dart';
 
 class AddChildPage extends ConsumerStatefulWidget {
   const AddChildPage({super.key, this.childToEdit});
@@ -37,6 +38,7 @@ class _AddChildPageState extends ConsumerState<AddChildPage> {
   late final TextEditingController _streetCtrl;
   late final TextEditingController _numberCtrl;
   late final TextEditingController _complementCtrl;
+  late final TextEditingController _districtCtrl;
   late final TextEditingController _zipCodeCtrl;
 
   final _picker = ImagePicker();
@@ -44,16 +46,25 @@ class _AddChildPageState extends ConsumerState<AddChildPage> {
   CatalogOption? _school;
   String? _photoLocalPath;
 
-  // Mapa do endereço: marcador plotado pelo geocode (debounce de 800ms ao
-  // digitar) e ajustável por arraste. Null = mapa escondido (geocode falhou
-  // ou campos incompletos) e o cadastro segue sem coordenadas, como antes.
-  Timer? _geocodeDebounce;
-  int _geocodeSeq = 0;
-  bool _geocoding = false;
+  // Endereço: cidade/UF (obrigatórios) habilitam o mapa estilo Uber
+  // (pin central + busca + GPS). [_marker] guarda as coordenadas
+  // confirmadas; null quando o ponto nunca foi definido — nesse caso o
+  // salvamento exige consentimento (o backend re-geocodifica).
+  CatalogOption? _city;
+  String? _stateUf;
+  String? _pendingCityName;
   LatLng? _marker;
   String? _resolvedLabel;
+  ChildAddress? _originalAddress;
 
   bool get _isEditing => widget.childToEdit != null;
+
+  String? get _cityBias {
+    final city = _city;
+    final uf = _stateUf;
+    if (city == null || uf == null) return null;
+    return '${city.name}, $uf';
+  }
 
   @override
   void initState() {
@@ -64,58 +75,12 @@ class _AddChildPageState extends ConsumerState<AddChildPage> {
     _streetCtrl = TextEditingController();
     _numberCtrl = TextEditingController();
     _complementCtrl = TextEditingController();
+    _districtCtrl = TextEditingController();
     _zipCodeCtrl = TextEditingController();
 
     if (_isEditing) {
       Future.microtask(() => _loadAddress());
     }
-
-    _streetCtrl.addListener(_scheduleGeocode);
-    _numberCtrl.addListener(_scheduleGeocode);
-    _zipCodeCtrl.addListener(_scheduleGeocode);
-  }
-
-  void _scheduleGeocode() {
-    // Invalida qualquer resposta ainda em voo: os campos mudaram.
-    _geocodeSeq++;
-    _geocodeDebounce?.cancel();
-    final ready =
-        _streetCtrl.text.trim().isNotEmpty &&
-        _numberCtrl.text.trim().isNotEmpty &&
-        _zipCodeCtrl.text.trim().length >= 8;
-    if (!ready) {
-      if (_marker != null || _geocoding) {
-        setState(() {
-          _marker = null;
-          _resolvedLabel = null;
-          _geocoding = false;
-        });
-      }
-      return;
-    }
-    _geocodeDebounce = Timer(const Duration(milliseconds: 800), _runGeocode);
-  }
-
-  Future<void> _runGeocode() async {
-    final seq = ++_geocodeSeq;
-    final text =
-        '${_streetCtrl.text.trim()}, ${_numberCtrl.text.trim()}, '
-        '${_zipCodeCtrl.text.trim()}';
-    setState(() => _geocoding = true);
-    final result = await ref
-        .read(childrenRepositoryProvider)
-        .geocodeAddress(text);
-    if (!mounted || seq != _geocodeSeq) return;
-    setState(() {
-      _geocoding = false;
-      if (result == null) {
-        _marker = null;
-        _resolvedLabel = null;
-      } else {
-        _marker = LatLng(result.latitude, result.longitude);
-        _resolvedLabel = result.label;
-      }
-    });
   }
 
   Future<void> _loadAddress() async {
@@ -134,33 +99,114 @@ class _AddChildPageState extends ConsumerState<AddChildPage> {
           isDefault,
           orElse: () => addresses.first,
         );
-        _streetCtrl.text = (addr['street'] ?? '').toString();
-        _numberCtrl.text = (addr['number'] ?? '').toString();
-        _complementCtrl.text = (addr['reference'] ?? addr['complement'] ?? '')
+        final street = (addr['street'] ?? '').toString();
+        final number = (addr['number'] ?? '').toString();
+        final complement = (addr['reference'] ?? addr['complement'] ?? '')
             .toString();
-        _zipCodeCtrl.text = (addr['zipcode'] ?? addr['zipCode'] ?? '')
+        final district = (addr['neighborhood'] ?? addr['district'] ?? '')
             .toString();
-        // Endereço já salvo com coordenadas: mostra o marcador direto, sem
-        // esperar o debounce do geocode.
+        final zipcode = (addr['zipcode'] ?? addr['zipCode'] ?? '').toString();
+        final city = (addr['city'] ?? '').toString();
+        final state = (addr['state'] ?? '').toString().toUpperCase();
         final lat = (addr['latitude'] as num?)?.toDouble();
         final lng = (addr['longitude'] as num?)?.toDouble();
-        if (lat != null && lng != null) {
-          setState(() => _marker = LatLng(lat, lng));
-        }
+
+        setState(() {
+          _streetCtrl.text = street;
+          _numberCtrl.text = number;
+          _complementCtrl.text = complement;
+          _districtCtrl.text = district;
+          _zipCodeCtrl.text = zipcode;
+          _pendingCityName = city.trim().isEmpty ? null : city.trim();
+          _stateUf = kBrazilStates.contains(state) ? state : null;
+          // Endereço já salvo com coordenadas: mostra o pin direto.
+          if (lat != null && lng != null) {
+            _marker = LatLng(lat, lng);
+            _resolvedLabel = _composeLabel(
+              street: street,
+              number: number,
+              district: district,
+              city: city,
+              state: state,
+            );
+          }
+          _originalAddress = ChildAddress(
+            street: street,
+            number: number,
+            complement: complement.trim().isEmpty ? null : complement.trim(),
+            zipCode: zipcode,
+            district: district.trim().isEmpty ? null : district.trim(),
+            city: city.trim().isEmpty ? null : city.trim(),
+            state: kBrazilStates.contains(state) ? state : null,
+            latitude: lat,
+            longitude: lng,
+          );
+        });
       }
     } catch (_) {
       // Endereco nao e bloqueante para edicao dos dados pessoais.
     }
   }
 
+  static String _composeLabel({
+    required String street,
+    required String number,
+    required String district,
+    required String city,
+    required String state,
+  }) {
+    final parts = <String>[
+      if (street.trim().isNotEmpty)
+        number.trim().isNotEmpty ? '$street, $number' : street,
+      if (district.trim().isNotEmpty) district,
+      if (city.trim().isNotEmpty)
+        state.trim().isNotEmpty ? '$city/$state' : city,
+    ];
+    final label = parts.join(' - ').trim();
+    return label.isEmpty ? 'Endereço salvo' : label;
+  }
+
+  /// Preenche os campos com o endereço resolvido pelo mapa (reverse ou
+  /// autocomplete). Só sobrescreve o que veio preenchido — nunca apaga
+  /// algo que o pai digitou.
+  void _applySuggestion(AddressSuggestion suggestion) {
+    setState(() {
+      _resolvedLabel = suggestion.label;
+      if ((suggestion.street ?? '').isNotEmpty) {
+        _streetCtrl.text = suggestion.street!;
+      }
+      if ((suggestion.number ?? '').isNotEmpty) {
+        _numberCtrl.text = suggestion.number!;
+      }
+      if ((suggestion.district ?? '').isNotEmpty) {
+        _districtCtrl.text = suggestion.district!;
+      }
+      final uf = suggestion.state?.toUpperCase();
+      if (uf != null && kBrazilStates.contains(uf)) {
+        _stateUf = uf;
+      }
+      final cityName = suggestion.city;
+      if (cityName != null && cityName.trim().isNotEmpty) {
+        final cities = ref.read(citiesCatalogProvider).value ?? const [];
+        final query = cityName.trim().toLowerCase();
+        for (final c in cities) {
+          if (c.name.trim().toLowerCase() == query) {
+            _city = c;
+            break;
+          }
+        }
+      }
+    });
+  }
+
   @override
   void dispose() {
-    _geocodeDebounce?.cancel();
     _nameCtrl.dispose();
     _cpfCtrl.dispose();
     _streetCtrl.dispose();
     _numberCtrl.dispose();
     _complementCtrl.dispose();
+    _districtCtrl.dispose();
     _zipCodeCtrl.dispose();
     super.dispose();
   }
@@ -201,7 +247,35 @@ class _AddChildPageState extends ConsumerState<AddChildPage> {
     setState(() => _photoLocalPath = file.path);
   }
 
-  void _submit() {
+  /// Salvar sem coordenadas só com consentimento: o backend re-geocodifica
+  /// o endereço automaticamente depois.
+  Future<bool> _confirmSaveWithoutCoordinates() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        surfaceTintColor: AppColors.surface,
+        title: const Text('Endereco fora do mapa'),
+        content: const Text(
+          'Nao conseguimos localizar esse endereco no mapa. Salvar assim '
+          'mesmo? Vamos tentar localiza-lo automaticamente depois.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Voltar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Salvar assim mesmo'),
+          ),
+        ],
+      ),
+    );
+    return confirmed == true;
+  }
+
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_shift == null && !_isEditing) {
       showAppSnackBar(
@@ -220,6 +294,11 @@ class _AddChildPageState extends ConsumerState<AddChildPage> {
       return;
     }
 
+    if (_marker == null) {
+      final confirmed = await _confirmSaveWithoutCoordinates();
+      if (!confirmed || !mounted) return;
+    }
+
     final formData = AddChildFormData(
       name: _nameCtrl.text.trim(),
       cpf: _cpfCtrl.text.trim(),
@@ -232,9 +311,15 @@ class _AddChildPageState extends ConsumerState<AddChildPage> {
             ? null
             : _complementCtrl.text.trim(),
         zipCode: _zipCodeCtrl.text.trim(),
+        district: _districtCtrl.text.trim().isEmpty
+            ? null
+            : _districtCtrl.text.trim(),
+        city: _city?.name,
+        state: _stateUf,
         latitude: _marker?.latitude,
         longitude: _marker?.longitude,
       ),
+      originalAddress: _originalAddress,
       photoLocalPath: _photoLocalPath,
     );
 
@@ -258,6 +343,7 @@ class _AddChildPageState extends ConsumerState<AddChildPage> {
   Widget build(BuildContext context) {
     final shiftsAsync = ref.watch(shiftsCatalogProvider);
     final schoolsAsync = ref.watch(schoolsCatalogProvider);
+    final citiesAsync = ref.watch(citiesCatalogProvider);
     final addState = ref.watch(addChildControllerProvider);
 
     // Auto-select shift/school when editing and catalog loads
@@ -281,11 +367,57 @@ class _AddChildPageState extends ConsumerState<AddChildPage> {
         }
       }
     }
+    // Auto-select cidade quando o catálogo carrega (edição).
+    final pendingCity = _pendingCityName;
+    if (_city == null && pendingCity != null && citiesAsync.hasValue) {
+      final cities = citiesAsync.value ?? const [];
+      final query = pendingCity.toLowerCase();
+      for (final c in cities) {
+        if (c.name.trim().toLowerCase() == query) {
+          _city = c;
+          _pendingCityName = null;
+          break;
+        }
+      }
+    }
 
     return Scaffold(
       backgroundColor: AppColors.surfaceSoft,
       appBar: FaixaAppBar.screen(
         title: _isEditing ? 'Editar dependente' : 'Novo dependente',
+      ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        // Mesmo padrão do driver_settings: alguns aparelhos (MIUI/gesture
+        // bar custom) reportam inset bottom 0 — o piso garante respiro.
+        minimum: const EdgeInsets.only(bottom: AppSpacing.md),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.md,
+            AppSpacing.lg,
+            AppSpacing.lg,
+          ),
+          decoration: const BoxDecoration(
+            color: AppColors.surface,
+            border: Border(
+              top: BorderSide(color: AppColors.border, width: 0.5),
+            ),
+          ),
+          child: FilledButton(
+            key: E2EKeys.childSaveButton,
+            onPressed: addState.isLoading ? null : _submit,
+            child: addState.isLoading
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Text(
+                    _isEditing ? 'Salvar alteracoes' : 'Cadastrar dependente',
+                  ),
+          ),
+        ),
       ),
       body: Form(
         key: _formKey,
@@ -366,6 +498,52 @@ class _AddChildPageState extends ConsumerState<AddChildPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: CitySelectField(
+                          citiesAsync: citiesAsync,
+                          value: _city,
+                          onChanged: (v) => setState(() => _city = v),
+                          onRetry: () => ref.invalidate(citiesCatalogProvider),
+                          validator: (v) =>
+                              v == null ? 'Selecione a cidade.' : null,
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      SizedBox(
+                        width: 118,
+                        child: UfSelectField(
+                          value: _stateUf,
+                          onChanged: (v) => setState(() => _stateUf = v),
+                          validator: (v) => v == null ? 'Selecione.' : null,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  if (_cityBias == null)
+                    const AppInfoBanner(
+                      message:
+                          'Selecione cidade e UF para localizar o endereco no mapa.',
+                      icon: Icons.map_outlined,
+                      color: AppColors.slate,
+                    )
+                  else
+                    AddressMapPicker(
+                      cityBias: _cityBias,
+                      initialPosition: _marker,
+                      initialLabel: _resolvedLabel,
+                      onPositionChanged: (p) => setState(() => _marker = p),
+                      onAddressResolved: _applySuggestion,
+                      onError: (message) => showAppSnackBar(
+                        context,
+                        message: message,
+                        type: AppFeedbackType.error,
+                      ),
+                    ),
+                  const SizedBox(height: AppSpacing.md),
                   TextFormField(
                     key: E2EKeys.addressStreetInput,
                     controller: _streetCtrl,
@@ -403,6 +581,15 @@ class _AddChildPageState extends ConsumerState<AddChildPage> {
                   ),
                   const SizedBox(height: AppSpacing.md),
                   TextFormField(
+                    controller: _districtCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Bairro (opcional)',
+                      prefixIcon: Icon(Icons.holiday_village_outlined),
+                    ),
+                    textInputAction: TextInputAction.next,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  TextFormField(
                     key: E2EKeys.addressZipCodeInput,
                     controller: _zipCodeCtrl,
                     decoration: const InputDecoration(
@@ -419,24 +606,6 @@ class _AddChildPageState extends ConsumerState<AddChildPage> {
                         ? 'CEP e obrigatorio.'
                         : null,
                   ),
-                  if (_geocoding) ...[
-                    const SizedBox(height: AppSpacing.sm),
-                    const LinearProgressIndicator(minHeight: 2),
-                  ],
-                  if (_marker != null) ...[
-                    const SizedBox(height: AppSpacing.md),
-                    AddressMapPicker(
-                      position: _marker!,
-                      onChanged: (p) => setState(() => _marker = p),
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    Text(
-                      _resolvedLabel != null
-                          ? 'Local aproximado: $_resolvedLabel. Arraste o marcador para ajustar.'
-                          : 'Arraste o marcador para ajustar a localizacao.',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -445,22 +614,11 @@ class _AddChildPageState extends ConsumerState<AddChildPage> {
               Padding(
                 padding: const EdgeInsets.only(bottom: AppSpacing.md),
                 child: AppInfoBanner(
-                  message: addState.error.toString(),
+                  message: AppErrorReporter.messageFor(addState.error!),
                   icon: Icons.error_outline_rounded,
                   color: AppColors.danger,
                 ),
               ),
-            FilledButton(
-              key: E2EKeys.childSaveButton,
-              onPressed: addState.isLoading ? null : _submit,
-              child: Text(
-                addState.isLoading
-                    ? 'Salvando...'
-                    : (_isEditing
-                          ? 'Salvar alteracoes'
-                          : 'Cadastrar dependente'),
-              ),
-            ),
             const SizedBox(height: AppSpacing.lg),
           ],
         ),

@@ -1,3 +1,4 @@
+import 'package:app_faixa_amarela/domain/models/address_suggestion.dart';
 import 'package:app_faixa_amarela/domain/models/child.dart';
 import 'package:app_faixa_amarela/domain/repositories/children_repository.dart';
 
@@ -82,6 +83,24 @@ class FakeChildrenRepository implements ChildrenRepository {
   geocodeAddress(String text) async {
     // Fake: sem geocoder — o mapa simplesmente não aparece nos testes.
     return null;
+  }
+
+  @override
+  Future<List<AddressSuggestion>> autocompleteAddress(
+    String text, {
+    String? city,
+  }) async {
+    // Fake: sem autocomplete nos testes.
+    return const [];
+  }
+
+  @override
+  Future<AddressSuggestion> reverseAddress({
+    required double latitude,
+    required double longitude,
+  }) async {
+    // Fake: reverse sempre resolve um endereço fixo.
+    return const AddressSuggestion(label: 'Endereço de teste');
   }
 
   @override

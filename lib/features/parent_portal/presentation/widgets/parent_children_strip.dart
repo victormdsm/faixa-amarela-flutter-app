@@ -4,11 +4,7 @@ import '../../../../app/theme/app_theme.dart';
 import '../../../../domain/models/child.dart';
 
 /// Status simplificado de um dependente na dashboard.
-enum _ChildStatus {
-  boarded,
-  waiting,
-  notBoarded,
-}
+enum _ChildStatus { boarded, waiting, notBoarded }
 
 /// Lista horizontal compacta de dependentes do responsavel.
 class ParentChildrenStrip extends StatelessWidget {
@@ -30,7 +26,9 @@ class ParentChildrenStrip extends StatelessWidget {
     }
 
     return SizedBox(
-      height: 92,
+      // Altura com folga para padding + avatar + nome + linha de status
+      // (conteúdo ~97px); antes 92 estourava em aparelhos com fonte maior.
+      height: 104,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: children.length,
@@ -56,8 +54,7 @@ class ParentChildrenStrip extends StatelessWidget {
       final bChildId = boarding['childId'];
       final bName = boarding['childName']?.toString().toLowerCase().trim();
       final matches =
-          (bChildId == childId) ||
-          (childName.isNotEmpty && bName == childName);
+          (bChildId == childId) || (childName.isNotEmpty && bName == childName);
       if (!matches) continue;
 
       final status = boarding['status']?.toString().toLowerCase() ?? '';
@@ -73,11 +70,7 @@ class ParentChildrenStrip extends StatelessWidget {
 }
 
 class _ChildChip extends StatelessWidget {
-  const _ChildChip({
-    required this.name,
-    required this.status,
-    this.onTap,
-  });
+  const _ChildChip({required this.name, required this.status, this.onTap});
 
   final String name;
   final _ChildStatus status;
@@ -86,9 +79,21 @@ class _ChildChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (label, color, icon) = switch (status) {
-      _ChildStatus.boarded => ('Embarcou', AppColors.success, Icons.check_rounded),
-      _ChildStatus.notBoarded => ('Nao embarcou', AppColors.danger, Icons.close_rounded),
-      _ChildStatus.waiting => ('Aguardando embarque', AppColors.warning, Icons.schedule_rounded),
+      _ChildStatus.boarded => (
+        'Embarcou',
+        AppColors.success,
+        Icons.check_rounded,
+      ),
+      _ChildStatus.notBoarded => (
+        'Nao embarcou',
+        AppColors.danger,
+        Icons.close_rounded,
+      ),
+      _ChildStatus.waiting => (
+        'Aguardando',
+        AppColors.warning,
+        Icons.schedule_rounded,
+      ),
     };
 
     return InkWell(
@@ -141,12 +146,16 @@ class _ChildChip extends StatelessWidget {
               children: [
                 Icon(icon, size: 10, color: color),
                 const SizedBox(width: 2),
-                Text(
-                  label,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: color,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 9,
+                Flexible(
+                  child: Text(
+                    label,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: color,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 9,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
@@ -182,9 +191,9 @@ class _EmptyChildren extends StatelessWidget {
             Expanded(
               child: Text(
                 'Nenhum dependente cadastrado.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppColors.slate,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: AppColors.slate),
               ),
             ),
           ],
