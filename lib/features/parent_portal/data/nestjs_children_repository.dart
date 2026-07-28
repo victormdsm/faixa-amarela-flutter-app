@@ -13,7 +13,20 @@ class NestjsChildrenRepository implements ChildrenRepository {
 
   final Dio _dio;
 
-  String _cleanCpf(String cpf) => cpf.replaceAll(RegExp(r'[^0-9]'), '');
+  /// CPF vai só com dígitos; RG vai como digitado (trim), pois pode conter
+  /// letra (dígito verificador) e pontuação — o backend valida 5-14 chars.
+  String _cleanDocument(String document, String documentType) {
+    if (documentType == ChildDocumentType.rg) return document.trim();
+    return document.replaceAll(RegExp(r'[^0-9]'), '');
+  }
+
+  /// `documentState` só entra no payload quando o tipo é RG — o backend o
+  /// rejeita para CPF.
+  String? _rgState(String documentType, String? documentState) {
+    if (documentType != ChildDocumentType.rg) return null;
+    final state = (documentState ?? '').trim().toUpperCase();
+    return state.isEmpty ? null : state;
+  }
 
   AppFailure _mapException(Object error) {
     final apiException = error is ApiException
@@ -80,17 +93,22 @@ class NestjsChildrenRepository implements ChildrenRepository {
   @override
   Future<Child> createChild({
     required String name,
-    required String cpf,
+    required String document,
+    String documentType = ChildDocumentType.cpf,
+    String? documentState,
     required int? schoolId,
     required int? shiftId,
     required ChildAddress address,
   }) async {
     try {
+      final rgState = _rgState(documentType, documentState);
       final response = await _dio.post<Map<String, dynamic>>(
         '/parent/children',
         data: <String, dynamic>{
           'name': name.trim(),
-          'cpf': _cleanCpf(cpf),
+          'document': _cleanDocument(document, documentType),
+          'documentType': documentType,
+          'documentState': ?rgState,
           if (schoolId != null && schoolId > 0) 'schoolId': schoolId,
           if (shiftId != null && shiftId > 0) 'shiftId': shiftId,
         },
@@ -113,14 +131,24 @@ class NestjsChildrenRepository implements ChildrenRepository {
   Future<Child> updateChild({
     required int id,
     String? name,
-    String? cpf,
+    String? document,
+    String? documentType,
+    String? documentState,
     int? schoolId,
     int? shiftId,
   }) async {
     try {
       final payload = <String, dynamic>{};
       if (name != null) payload['name'] = name.trim();
-      if (cpf != null) payload['cpf'] = _cleanCpf(cpf);
+      if (document != null) {
+        payload['document'] = _cleanDocument(
+          document,
+          documentType ?? ChildDocumentType.cpf,
+        );
+      }
+      if (documentType != null) payload['documentType'] = documentType;
+      final rgState = _rgState(documentType ?? '', documentState);
+      if (rgState != null) payload['documentState'] = rgState;
       if (schoolId != null) {
         payload['schoolId'] = schoolId > 0 ? schoolId : null;
       }

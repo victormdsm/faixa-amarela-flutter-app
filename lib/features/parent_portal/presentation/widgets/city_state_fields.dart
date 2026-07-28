@@ -328,11 +328,15 @@ class UfSelectField extends StatelessWidget {
     required this.value,
     required this.onChanged,
     this.validator,
+    this.enabled = true,
   });
 
   final String? value;
   final ValueChanged<String?> onChanged;
   final String? Function(String?)? validator;
+
+  /// Quando false, o dropdown fica desabilitado (valor apenas exibido).
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -346,7 +350,7 @@ class UfSelectField extends StatelessWidget {
       items: kBrazilStates
           .map((uf) => DropdownMenuItem(value: uf, child: Text(uf)))
           .toList(growable: false),
-      onChanged: onChanged,
+      onChanged: enabled ? onChanged : null,
       validator: validator,
     );
   }

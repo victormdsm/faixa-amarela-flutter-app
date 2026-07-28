@@ -10,16 +10,27 @@ import '../providers/parent_portal_providers.dart';
 class AddChildFormData {
   const AddChildFormData({
     required this.name,
-    required this.cpf,
+    required this.document,
     required this.schoolId,
     required this.shiftId,
     required this.address,
+    this.documentType = ChildDocumentType.cpf,
+    this.documentState,
     this.originalAddress,
     this.photoLocalPath,
   });
 
   final String name;
-  final String cpf;
+
+  /// Número do documento (CPF ou RG, conforme [documentType]).
+  final String document;
+
+  /// Tipo do documento ('cpf' default | 'rg').
+  final String documentType;
+
+  /// UF emissora — obrigatória quando RG, sempre null quando CPF.
+  final String? documentState;
+
   final int? schoolId;
   final int? shiftId;
   final ChildAddress address;
@@ -87,7 +98,9 @@ class AddChildController extends AsyncNotifier<void> {
     state = await AsyncValue.guard(() async {
       child = await repo.createChild(
         name: formData.name,
-        cpf: formData.cpf,
+        document: formData.document,
+        documentType: formData.documentType,
+        documentState: formData.documentState,
         schoolId: formData.schoolId,
         shiftId: formData.shiftId,
         address: formData.address,
@@ -126,7 +139,9 @@ class AddChildController extends AsyncNotifier<void> {
       child = await repo.updateChild(
         id: id,
         name: formData.name,
-        cpf: formData.cpf,
+        document: formData.document,
+        documentType: formData.documentType,
+        documentState: formData.documentState,
         schoolId: formData.schoolId,
         shiftId: formData.shiftId,
       );

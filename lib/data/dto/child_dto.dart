@@ -5,6 +5,8 @@ class ChildDto {
     required this.id,
     required this.name,
     required this.cpf,
+    this.documentType = ChildDocumentType.cpf,
+    this.documentState,
     this.uuid,
     this.schoolId,
     this.shiftId,
@@ -16,6 +18,8 @@ class ChildDto {
   final int id;
   final String name;
   final String cpf;
+  final String documentType;
+  final String? documentState;
   final String? uuid;
   final int? schoolId;
   final int? shiftId;
@@ -30,7 +34,10 @@ class ChildDto {
     return ChildDto(
       id: _toInt(json['id']) ?? 0,
       name: (json['name'] ?? '').toString(),
-      cpf: (json['cpf'] ?? '').toString(),
+      // Contrato novo manda `document`; respostas antigas mandam `cpf`.
+      cpf: (json['document'] ?? json['cpf'] ?? '').toString(),
+      documentType: ChildDocumentType.parse(json['documentType']),
+      documentState: json['documentState']?.toString(),
       uuid: json['uuid']?.toString(),
       schoolId: _toInt(json['schoolId']),
       shiftId: _toInt(json['shiftId']),
@@ -47,6 +54,8 @@ class ChildDto {
       'id': id,
       'name': name,
       'cpf': cpf,
+      'documentType': documentType,
+      if (documentState != null) 'documentState': documentState,
       if (uuid != null) 'uuid': uuid,
       if (schoolId != null) 'schoolId': schoolId,
       if (shiftId != null) 'shiftId': shiftId,
@@ -61,6 +70,8 @@ class ChildDto {
       id: id,
       name: name,
       cpf: cpf,
+      documentType: documentType,
+      documentState: documentState,
       uuid: uuid,
       schoolId: schoolId,
       shiftId: shiftId,
@@ -75,6 +86,8 @@ class ChildDto {
       id: child.id,
       name: child.name,
       cpf: child.cpf,
+      documentType: child.documentType,
+      documentState: child.documentState,
       uuid: child.uuid,
       schoolId: child.schoolId,
       shiftId: child.shiftId,

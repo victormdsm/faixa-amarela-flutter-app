@@ -354,4 +354,173 @@ void main() {
       expect(payload.containsKey('longitude'), isFalse);
     });
   });
+
+  group('createChild/updateChild document payload', () {
+    const childBody = <String, dynamic>{
+      'id': 7,
+      'name': 'Ana Silva',
+      'document': '12345678901',
+      'documentType': 'cpf',
+    };
+
+    void stubCreate() {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/parent/children',
+          data: any(named: 'data'),
+        ),
+      ).thenAnswer(
+        (_) async => Response<Map<String, dynamic>>(
+          data: childBody,
+          statusCode: 201,
+          requestOptions: RequestOptions(path: '/parent/children'),
+        ),
+      );
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/parent/children/7/addresses',
+          data: any(named: 'data'),
+        ),
+      ).thenAnswer(
+        (_) async => Response<Map<String, dynamic>>(
+          data: const <String, dynamic>{},
+          statusCode: 201,
+          requestOptions: RequestOptions(path: '/parent/children/7/addresses'),
+        ),
+      );
+    }
+
+    Future<Map<String, dynamic>> captureCreatePayload() async {
+      final captured = verify(
+        () => dio.post<Map<String, dynamic>>(
+          '/parent/children',
+          data: captureAny(named: 'data'),
+        ),
+      ).captured;
+      return captured.single as Map<String, dynamic>;
+    }
+
+    test('cpf: strips non-digits, sends documentType and omits documentState', () async {
+      stubCreate();
+
+      await repository.createChild(
+        name: 'Ana Silva',
+        document: '123.456.789-01',
+        // Mesmo que a UI nunca mande UF com CPF, o repository garante o
+        // contrato (backend rejeita documentState com cpf).
+        documentState: 'PR',
+        schoolId: null,
+        shiftId: null,
+        address: const ChildAddress(street: 'Rua X', number: '10'),
+      );
+
+      final payload = await captureCreatePayload();
+      expect(payload['document'], '12345678901');
+      expect(payload['documentType'], 'cpf');
+      expect(payload.containsKey('cpf'), isFalse);
+      expect(payload.containsKey('documentState'), isFalse);
+    });
+
+    test('rg: keeps the number as typed and sends uppercased documentState', () async {
+      stubCreate();
+
+      await repository.createChild(
+        name: 'Ana Silva',
+        document: ' 12.345.678-x ',
+        documentType: 'rg',
+        documentState: 'pr',
+        schoolId: null,
+        shiftId: null,
+        address: const ChildAddress(street: 'Rua X', number: '10'),
+      );
+
+      final payload = await captureCreatePayload();
+      expect(payload['document'], '12.345.678-x');
+      expect(payload['documentType'], 'rg');
+      expect(payload['documentState'], 'PR');
+    });
+
+    test('rg without state omits documentState', () async {
+      stubCreate();
+
+      await repository.createChild(
+        name: 'Ana Silva',
+        document: '123456789',
+        documentType: 'rg',
+        schoolId: null,
+        shiftId: null,
+        address: const ChildAddress(street: 'Rua X', number: '10'),
+      );
+
+      final payload = await captureCreatePayload();
+      expect(payload['documentType'], 'rg');
+      expect(payload.containsKey('documentState'), isFalse);
+    });
+
+    test('updateChild sends documentType/documentState when rg', () async {
+      when(
+        () => dio.put<Map<String, dynamic>>(
+          '/parent/children/7',
+          data: any(named: 'data'),
+        ),
+      ).thenAnswer(
+        (_) async => Response<Map<String, dynamic>>(
+          data: childBody,
+          statusCode: 200,
+          requestOptions: RequestOptions(path: '/parent/children/7'),
+        ),
+      );
+
+      await repository.updateChild(
+        id: 7,
+        document: '123456789',
+        documentType: 'rg',
+        documentState: 'PR',
+      );
+
+      final captured = verify(
+        () => dio.put<Map<String, dynamic>>(
+          '/parent/children/7',
+          data: captureAny(named: 'data'),
+        ),
+      ).captured;
+      final payload = captured.single as Map<String, dynamic>;
+      expect(payload['document'], '123456789');
+      expect(payload['documentType'], 'rg');
+      expect(payload['documentState'], 'PR');
+    });
+
+    test('updateChild omits documentState when cpf', () async {
+      when(
+        () => dio.put<Map<String, dynamic>>(
+          '/parent/children/7',
+          data: any(named: 'data'),
+        ),
+      ).thenAnswer(
+        (_) async => Response<Map<String, dynamic>>(
+          data: childBody,
+          statusCode: 200,
+          requestOptions: RequestOptions(path: '/parent/children/7'),
+        ),
+      );
+
+      await repository.updateChild(
+        id: 7,
+        document: '123.456.789-01',
+        documentType: 'cpf',
+        documentState: 'PR',
+      );
+
+      final captured = verify(
+        () => dio.put<Map<String, dynamic>>(
+          '/parent/children/7',
+          data: captureAny(named: 'data'),
+        ),
+      ).captured;
+      final payload = captured.single as Map<String, dynamic>;
+      expect(payload['document'], '12345678901');
+      expect(payload['documentType'], 'cpf');
+      expect(payload.containsKey('documentState'), isFalse);
+    });
+  });
 }

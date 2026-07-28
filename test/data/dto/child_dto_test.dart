@@ -130,4 +130,87 @@ void main() {
       expect(dto.toJson().containsKey('uuid'), isFalse);
     });
   });
+
+  group('ChildDto documentType/documentState', () {
+    test('defaults documentType to cpf when absent (legacy payload)', () {
+      final dto = ChildDto.fromJson(const <String, dynamic>{
+        'id': 1,
+        'name': 'Ana Silva',
+        'cpf': '12345678901',
+      });
+
+      expect(dto.documentType, ChildDocumentType.cpf);
+      expect(dto.documentState, isNull);
+      expect(dto.toDomain().documentType, ChildDocumentType.cpf);
+      expect(dto.toJson().containsKey('documentState'), isFalse);
+    });
+
+    test('parses rg documentType and documentState', () {
+      final dto = ChildDto.fromJson(const <String, dynamic>{
+        'id': 1,
+        'name': 'Ana Silva',
+        'document': '123456789',
+        'documentType': 'rg',
+        'documentState': 'PR',
+      });
+
+      expect(dto.cpf, '123456789');
+      expect(dto.documentType, ChildDocumentType.rg);
+      expect(dto.documentState, 'PR');
+
+      final domain = dto.toDomain();
+      expect(domain.documentType, ChildDocumentType.rg);
+      expect(domain.documentState, 'PR');
+      expect(dto.toJson()['documentState'], 'PR');
+    });
+
+    test('prefers the new `document` key over the legacy `cpf` key', () {
+      final dto = ChildDto.fromJson(const <String, dynamic>{
+        'id': 1,
+        'name': 'Ana Silva',
+        'document': '11122233344',
+        'cpf': '99988877766',
+      });
+
+      expect(dto.cpf, '11122233344');
+    });
+
+    test('normalizes unknown documentType to cpf', () {
+      final dto = ChildDto.fromJson(const <String, dynamic>{
+        'id': 1,
+        'name': 'Ana Silva',
+        'cpf': '12345678901',
+        'documentType': 'CNH',
+      });
+
+      expect(dto.documentType, ChildDocumentType.cpf);
+    });
+  });
+
+  group('Child.fromJson document fields', () {
+    test('defaults documentType to cpf when absent', () {
+      final child = Child.fromJson(const <String, dynamic>{
+        'id': 1,
+        'name': 'Ana Silva',
+        'cpf': '12345678901',
+      });
+
+      expect(child.documentType, ChildDocumentType.cpf);
+      expect(child.documentState, isNull);
+    });
+
+    test('parses rg with documentState and `document` key', () {
+      final child = Child.fromJson(const <String, dynamic>{
+        'id': 1,
+        'name': 'Ana Silva',
+        'document': '12.345.678-9',
+        'documentType': 'RG',
+        'documentState': 'pr',
+      });
+
+      expect(child.cpf, '12.345.678-9');
+      expect(child.documentType, ChildDocumentType.rg);
+      expect(child.documentState, 'pr');
+    });
+  });
 }

@@ -14,6 +14,7 @@ abstract final class E2EKeys {
   static const childCreateButton = Key('child_create_button');
   static const childNameInput = Key('child_name_input');
   static const childCpfInput = Key('child_cpf_input');
+  static const childDocumentUfSelect = Key('child_document_uf_select');
   static const childSchoolDropdown = Key('child_school_dropdown');
   static const childShiftDropdown = Key('child_shift_dropdown');
   static const childSaveButton = Key('child_save_button');

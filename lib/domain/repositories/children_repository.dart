@@ -7,9 +7,14 @@ abstract interface class ChildrenRepository {
 
   Future<Child?> getChildById(int id);
 
+  /// Cria a criança. [document] é o número do CPF ou RG (conforme
+  /// [documentType]); [documentState] (UF) só é enviado quando RG — o
+  /// backend o rejeita para CPF.
   Future<Child> createChild({
     required String name,
-    required String cpf,
+    required String document,
+    String documentType = ChildDocumentType.cpf,
+    String? documentState,
     required int? schoolId,
     required int? shiftId,
     required ChildAddress address,
@@ -18,7 +23,9 @@ abstract interface class ChildrenRepository {
   Future<Child> updateChild({
     required int id,
     String? name,
-    String? cpf,
+    String? document,
+    String? documentType,
+    String? documentState,
     int? schoolId,
     int? shiftId,
   });

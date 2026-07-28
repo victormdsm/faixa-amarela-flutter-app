@@ -13,6 +13,7 @@ import '../../../../core/presentation/widgets/app_shared_widgets.dart';
 import '../../../../core/presentation/widgets/faixa_app_bar.dart';
 import '../../../../core/presentation/widgets/faixa_delete_child_dialog.dart';
 import '../../../../core/presentation/widgets/faixa_section_card.dart';
+import '../../../../core/security/masking.dart';
 import '../../../../domain/models/address_suggestion.dart';
 import '../../../../domain/models/child.dart';
 import '../../../../domain/models/enrollment.dart';
@@ -238,6 +239,17 @@ class _HeaderCard extends StatelessWidget {
   final String schoolName;
   final String shiftName;
 
+  /// CPF segue a regra de máscara atual (LGPD); RG é exibido como
+  /// cadastrado, com a UF emissora quando presente.
+  static String _documentLabel(Child child) {
+    if (child.documentType == ChildDocumentType.rg) {
+      final uf = (child.documentState ?? '').trim();
+      final prefix = uf.isEmpty ? 'RG' : 'RG $uf';
+      return '$prefix • ${child.cpf}';
+    }
+    return 'CPF • ${Masking.cpf(child.cpf)}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -271,6 +283,14 @@ class _HeaderCard extends StatelessWidget {
             label: 'Turno',
             value: shiftName,
           ),
+          if (child.cpf.trim().isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.sm),
+            _InfoRow(
+              icon: Icons.badge_outlined,
+              label: 'Documento',
+              value: _documentLabel(child),
+            ),
+          ],
           if (child.isInDebt) ...[
             const SizedBox(height: AppSpacing.md),
             const StatusPill(label: 'Inadimplente', color: AppColors.danger),

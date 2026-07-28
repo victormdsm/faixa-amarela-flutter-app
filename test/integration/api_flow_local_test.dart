@@ -182,7 +182,7 @@ void main() {
           final uniqueCpf = _generateCpf();
           final createdChild = await childrenRepo.createChild(
             name: 'Criança Integração',
-            cpf: uniqueCpf,
+            document: uniqueCpf,
             schoolId: null,
             shiftId: shift.id,
             address: const ChildAddress(
@@ -311,7 +311,7 @@ void main() {
           final uniqueCpf = _generateCpf();
           final createdChild = await childrenRepo.createChild(
             name: 'Rota Child',
-            cpf: uniqueCpf,
+            document: uniqueCpf,
             schoolId: null,
             shiftId: shift.id,
             address: const ChildAddress(
@@ -585,7 +585,7 @@ void main() {
           final cpf1 = _generateCpf();
           final child1 = await childrenRepo.createChild(
             name: 'Aluno Bulk 1',
-            cpf: cpf1,
+            document: cpf1,
             schoolId: school!.id,
             shiftId: shift.id,
             address: const ChildAddress(
@@ -599,7 +599,7 @@ void main() {
           final cpf2 = _generateCpf();
           final child2 = await childrenRepo.createChild(
             name: 'Aluno Bulk 2',
-            cpf: cpf2,
+            document: cpf2,
             schoolId: school.id,
             shiftId: shift.id,
             address: const ChildAddress(

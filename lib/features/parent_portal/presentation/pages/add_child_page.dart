@@ -33,8 +33,11 @@ class AddChildPage extends ConsumerStatefulWidget {
 
 class _AddChildPageState extends ConsumerState<AddChildPage> {
   final _formKey = GlobalKey<FormState>();
+  final _documentFieldKey = GlobalKey<FormFieldState<String>>(
+    debugLabel: 'childDocument',
+  );
   late final TextEditingController _nameCtrl;
-  late final TextEditingController _cpfCtrl;
+  late final TextEditingController _documentCtrl;
   late final TextEditingController _streetCtrl;
   late final TextEditingController _numberCtrl;
   late final TextEditingController _complementCtrl;
@@ -45,6 +48,12 @@ class _AddChildPageState extends ConsumerState<AddChildPage> {
   CatalogOption? _shift;
   CatalogOption? _school;
   String? _photoLocalPath;
+
+  // Documento: CPF (default) ou RG. RG exige UF emissora
+  // ([_documentStateUf]); ao voltar para CPF a UF é descartada — o
+  // backend rejeita `documentState` com CPF.
+  String _documentType = ChildDocumentType.cpf;
+  String? _documentStateUf;
 
   // Endereço: cidade/UF (obrigatórios) habilitam o mapa estilo Uber
   // (pin central + busca + GPS). [_marker] guarda as coordenadas
@@ -59,6 +68,8 @@ class _AddChildPageState extends ConsumerState<AddChildPage> {
 
   bool get _isEditing => widget.childToEdit != null;
 
+  bool get _isRg => _documentType == ChildDocumentType.rg;
+
   String? get _cityBias {
     final city = _city;
     final uf = _stateUf;
@@ -71,7 +82,12 @@ class _AddChildPageState extends ConsumerState<AddChildPage> {
     super.initState();
     final c = widget.childToEdit;
     _nameCtrl = TextEditingController(text: c?.name ?? '');
-    _cpfCtrl = TextEditingController(text: c?.cpf ?? '');
+    _documentCtrl = TextEditingController(text: c?.cpf ?? '');
+    _documentType = ChildDocumentType.parse(c?.documentType);
+    final docState = c?.documentState?.toUpperCase();
+    _documentStateUf = docState != null && kBrazilStates.contains(docState)
+        ? docState
+        : null;
     _streetCtrl = TextEditingController();
     _numberCtrl = TextEditingController();
     _complementCtrl = TextEditingController();
@@ -202,7 +218,7 @@ class _AddChildPageState extends ConsumerState<AddChildPage> {
   @override
   void dispose() {
     _nameCtrl.dispose();
-    _cpfCtrl.dispose();
+    _documentCtrl.dispose();
     _streetCtrl.dispose();
     _numberCtrl.dispose();
     _complementCtrl.dispose();
@@ -211,11 +227,34 @@ class _AddChildPageState extends ConsumerState<AddChildPage> {
     super.dispose();
   }
 
-  String? _validateCpf(String? value) {
-    if (value == null || value.trim().isEmpty) {
+  /// Troca CPF ↔ RG: limpa o número (muda máscara/validação) e descarta a
+  /// UF ao voltar para CPF. O [reset] no campo remove erros de validação
+  /// exibidos antes da troca.
+  void _onDocumentTypeChanged(String type) {
+    if (type == _documentType) return;
+    setState(() {
+      _documentType = type;
+      _documentCtrl.clear();
+      _documentFieldKey.currentState?.reset();
+      if (type == ChildDocumentType.cpf) _documentStateUf = null;
+    });
+  }
+
+  String? _validateDocument(String? value) {
+    final text = value?.trim() ?? '';
+    if (_documentType == ChildDocumentType.rg) {
+      if (text.isEmpty) {
+        return 'RG e obrigatorio.';
+      }
+      if (text.length < 5 || text.length > 14) {
+        return 'RG deve ter entre 5 e 14 caracteres.';
+      }
+      return null;
+    }
+    if (text.isEmpty) {
       return 'CPF e obrigatorio.';
     }
-    final digits = value.replaceAll(RegExp(r'[^0-9]'), '');
+    final digits = text.replaceAll(RegExp(r'[^0-9]'), '');
     if (digits.length != 11) {
       return 'CPF deve ter 11 digitos.';
     }
@@ -301,7 +340,11 @@ class _AddChildPageState extends ConsumerState<AddChildPage> {
 
     final formData = AddChildFormData(
       name: _nameCtrl.text.trim(),
-      cpf: _cpfCtrl.text.trim(),
+      document: _documentCtrl.text.trim(),
+      documentType: _documentType,
+      documentState: _documentType == ChildDocumentType.rg
+          ? _documentStateUf
+          : null,
       schoolId: _school?.id ?? widget.childToEdit?.schoolId,
       shiftId: _shift?.id ?? widget.childToEdit?.shiftId,
       address: ChildAddress(
@@ -450,23 +493,74 @@ class _AddChildPageState extends ConsumerState<AddChildPage> {
                         : null,
                   ),
                   const SizedBox(height: AppSpacing.md),
-                  TextFormField(
-                    key: E2EKeys.childCpfInput,
-                    controller: _cpfCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'CPF',
-                      hintText: 'Apenas numeros',
-                      prefixIcon: Icon(Icons.badge_outlined),
+                  SizedBox(
+                    width: double.infinity,
+                    child: SegmentedButton<String>(
+                      segments: const [
+                        ButtonSegment<String>(
+                          value: ChildDocumentType.cpf,
+                          label: Text('CPF'),
+                          icon: Icon(Icons.badge_outlined),
+                        ),
+                        ButtonSegment<String>(
+                          value: ChildDocumentType.rg,
+                          label: Text('RG'),
+                          icon: Icon(Icons.contact_page_outlined),
+                        ),
+                      ],
+                      selected: {_documentType},
+                      // Documento é imutável na edição — o seletor acompanha
+                      // o campo (desabilitado), exibindo o tipo carregado.
+                      onSelectionChanged: _isEditing
+                          ? null
+                          : (selection) =>
+                                _onDocumentTypeChanged(selection.first),
                     ),
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                      LengthLimitingTextInputFormatter(11),
-                    ],
-                    textInputAction: TextInputAction.next,
-                    validator: _validateCpf,
-                    enabled: !_isEditing,
                   ),
+                  const SizedBox(height: AppSpacing.md),
+                  // A KeyedSubtree preserva a E2E key histórica (o campo do
+                  // documento usa GlobalKey própria para reset na troca de
+                  // tipo).
+                  KeyedSubtree(
+                    key: E2EKeys.childCpfInput,
+                    child: TextFormField(
+                      key: _documentFieldKey,
+                      controller: _documentCtrl,
+                      decoration: InputDecoration(
+                        labelText: _isRg ? 'RG da criança' : 'CPF da criança',
+                        hintText: _isRg
+                            ? 'Como consta no documento'
+                            : 'Apenas numeros',
+                        prefixIcon: const Icon(Icons.badge_outlined),
+                      ),
+                      keyboardType: _isRg
+                          ? TextInputType.text
+                          : TextInputType.number,
+                      textCapitalization: _isRg
+                          ? TextCapitalization.characters
+                          : TextCapitalization.none,
+                      inputFormatters: _isRg
+                          ? [LengthLimitingTextInputFormatter(14)]
+                          : [
+                              FilteringTextInputFormatter.digitsOnly,
+                              LengthLimitingTextInputFormatter(11),
+                            ],
+                      textInputAction: TextInputAction.next,
+                      validator: _validateDocument,
+                      enabled: !_isEditing,
+                    ),
+                  ),
+                  if (_isRg) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    UfSelectField(
+                      key: E2EKeys.childDocumentUfSelect,
+                      value: _documentStateUf,
+                      enabled: !_isEditing,
+                      onChanged: (v) => setState(() => _documentStateUf = v),
+                      validator: (v) =>
+                          v == null ? 'Selecione a UF do RG.' : null,
+                    ),
+                  ],
                   const SizedBox(height: AppSpacing.md),
                   _CatalogDropdown(
                     key: E2EKeys.childSchoolDropdown,

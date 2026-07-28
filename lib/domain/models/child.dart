@@ -1,3 +1,16 @@
+/// Tipos de documento aceitos no cadastro da criança (contrato do backend).
+abstract final class ChildDocumentType {
+  static const cpf = 'cpf';
+  static const rg = 'rg';
+
+  /// Normaliza valores vindos da API: ausente/desconhecido vira CPF
+  /// (compat com respostas antigas, que não traziam `documentType`).
+  static String parse(dynamic raw) {
+    final value = (raw ?? '').toString().trim().toLowerCase();
+    return value == rg ? rg : cpf;
+  }
+}
+
 class Child {
   const Child({
     required this.id,
@@ -5,6 +18,8 @@ class Child {
     required this.cpf,
     required this.schoolId,
     required this.shiftId,
+    this.documentType = ChildDocumentType.cpf,
+    this.documentState,
     this.uuid,
     this.isInDebt = false,
     this.createdAt,
@@ -13,7 +28,19 @@ class Child {
 
   final int id;
   final String name;
+
+  /// Número do documento da criança (CPF ou RG, conforme [documentType]).
+  /// Mantido com o nome histórico `cpf` para minimizar o impacto da
+  /// mudança de contrato (`cpf` → `document` no backend).
   final String cpf;
+
+  /// Tipo do documento: [ChildDocumentType.cpf] (default) ou
+  /// [ChildDocumentType.rg].
+  final String documentType;
+
+  /// UF emissora do RG (2 letras). Obrigatória quando [documentType] é RG;
+  /// sempre null para CPF (o backend rejeita `documentState` com CPF).
+  final String? documentState;
 
   /// Identificador público estável (LGPD): o responsável compartilha este
   /// código com o motorista em vez do CPF da criança.
@@ -28,7 +55,10 @@ class Child {
     return Child(
       id: (json['id'] as num?)?.toInt() ?? 0,
       name: (json['name'] ?? '').toString(),
-      cpf: (json['cpf'] ?? '').toString(),
+      // Contrato novo manda `document`; respostas antigas mandam `cpf`.
+      cpf: (json['document'] ?? json['cpf'] ?? '').toString(),
+      documentType: ChildDocumentType.parse(json['documentType']),
+      documentState: json['documentState']?.toString(),
       uuid: json['uuid']?.toString(),
       schoolId: (json['schoolId'] as num?)?.toInt(),
       shiftId: (json['shiftId'] as num?)?.toInt(),

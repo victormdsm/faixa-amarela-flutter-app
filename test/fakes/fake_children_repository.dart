@@ -23,7 +23,9 @@ class FakeChildrenRepository implements ChildrenRepository {
   @override
   Future<Child> createChild({
     required String name,
-    required String cpf,
+    required String document,
+    String documentType = ChildDocumentType.cpf,
+    String? documentState,
     required int? schoolId,
     required int? shiftId,
     required ChildAddress address,
@@ -31,7 +33,9 @@ class FakeChildrenRepository implements ChildrenRepository {
     final child = Child(
       id: _children.length + 1,
       name: name,
-      cpf: cpf,
+      cpf: document,
+      documentType: documentType,
+      documentState: documentState,
       schoolId: schoolId,
       shiftId: shiftId,
     );
@@ -44,7 +48,9 @@ class FakeChildrenRepository implements ChildrenRepository {
   Future<Child> updateChild({
     required int id,
     String? name,
-    String? cpf,
+    String? document,
+    String? documentType,
+    String? documentState,
     int? schoolId,
     int? shiftId,
   }) async {
@@ -56,7 +62,9 @@ class FakeChildrenRepository implements ChildrenRepository {
     _children[index] = Child(
       id: existing.id,
       name: name ?? existing.name,
-      cpf: cpf ?? existing.cpf,
+      cpf: document ?? existing.cpf,
+      documentType: documentType ?? existing.documentType,
+      documentState: documentState ?? existing.documentState,
       schoolId: schoolId ?? existing.schoolId,
       shiftId: shiftId ?? existing.shiftId,
       isInDebt: existing.isInDebt,
