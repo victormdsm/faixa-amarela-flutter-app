@@ -19,6 +19,11 @@ android {
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
+    buildFeatures {
+        // Preserva o comportamento anterior (flag global removida no AGP 9).
+        buildConfig = true
+    }
+
     compileOptions {
         // Required by flutter_local_notifications.
         isCoreLibraryDesugaringEnabled = true
