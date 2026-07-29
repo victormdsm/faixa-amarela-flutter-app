@@ -87,7 +87,6 @@ void main() {
             body: ChildSummaryCard(
               child: child,
               onEdit: () {},
-              onDelete: () {},
             ),
           ),
         ),
@@ -97,7 +96,8 @@ void main() {
       // (largura mínima infinita) ele overflow sem o style local.
       expect(tester.takeException(), isNull);
       expect(find.text('Editar'), findsOneWidget);
-      expect(find.text('Excluir'), findsOneWidget);
+      // Pai não desvincula o dependente pelo app: ação de excluir removida.
+      expect(find.text('Excluir'), findsNothing);
     },
   );
 }

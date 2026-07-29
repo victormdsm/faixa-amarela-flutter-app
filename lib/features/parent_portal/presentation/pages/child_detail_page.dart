@@ -11,7 +11,6 @@ import '../../../../core/models/catalog_option.dart';
 import '../../../../core/presentation/widgets/app_feedback.dart';
 import '../../../../core/presentation/widgets/app_shared_widgets.dart';
 import '../../../../core/presentation/widgets/faixa_app_bar.dart';
-import '../../../../core/presentation/widgets/faixa_delete_child_dialog.dart';
 import '../../../../core/presentation/widgets/faixa_section_card.dart';
 import '../../../../core/security/masking.dart';
 import '../../../../domain/models/address_suggestion.dart';
@@ -100,9 +99,10 @@ class ChildDetailPage extends ConsumerWidget {
                 top: BorderSide(color: AppColors.border, width: 0.5),
               ),
             ),
-            child: _ActionButtons(
-              onEdit: () => _editChild(context),
-              onDelete: () => _confirmDelete(context, ref),
+            child: FilledButton.icon(
+              onPressed: () => _editChild(context),
+              icon: const Icon(Icons.edit_rounded),
+              label: const Text('Editar'),
             ),
           ),
         ),
@@ -135,39 +135,6 @@ class ChildDetailPage extends ConsumerWidget {
 
   void _editChild(BuildContext context) {
     context.push(AppRoutes.parentChildrenAdd, extra: child);
-  }
-
-  Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
-    try {
-      final confirmed = await showDeleteChildConfirmation(
-        context,
-        child: child,
-        loadActiveEnrollment: () => ref
-            .read(childrenControllerProvider.notifier)
-            .findActiveEnrollmentForChild(child.id),
-      );
-
-      if (!confirmed || !context.mounted) return;
-
-      await ref.read(childrenControllerProvider.notifier).delete(child.id);
-
-      if (context.mounted) {
-        showAppSnackBar(
-          context,
-          message: '${child.name} removido(a).',
-          type: AppFeedbackType.warning,
-        );
-        context.pop();
-      }
-    } catch (e) {
-      if (context.mounted) {
-        showAppSnackBar(
-          context,
-          message: AppErrorReporter.messageFor(e),
-          type: AppFeedbackType.error,
-        );
-      }
-    }
   }
 
   Future<void> _confirmCancelEnrollment(
@@ -1123,40 +1090,6 @@ class _EnrollmentSection extends StatelessWidget {
           );
         },
       ),
-    );
-  }
-}
-
-class _ActionButtons extends StatelessWidget {
-  const _ActionButtons({required this.onEdit, required this.onDelete});
-
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: OutlinedButton.icon(
-            onPressed: onEdit,
-            icon: const Icon(Icons.edit_rounded),
-            label: const Text('Editar'),
-          ),
-        ),
-        const SizedBox(width: AppSpacing.md),
-        Expanded(
-          child: FilledButton.icon(
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.danger,
-              foregroundColor: AppColors.surface,
-            ),
-            onPressed: onDelete,
-            icon: const Icon(Icons.delete_outline_rounded),
-            label: const Text('Excluir'),
-          ),
-        ),
-      ],
     );
   }
 }

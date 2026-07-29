@@ -6,11 +6,9 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/router/app_router.dart';
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/error/app_error_reporter.dart';
-import '../../../../core/presentation/widgets/app_feedback.dart';
 import '../../../../core/presentation/widgets/app_shared_widgets.dart';
 import '../../../../core/presentation/widgets/e2e_keys.dart';
 import '../../../../core/presentation/widgets/faixa_app_bar.dart';
-import '../../../../core/presentation/widgets/faixa_delete_child_dialog.dart';
 import '../../../../domain/models/child.dart';
 import '../../../../features/catalog/data/catalog_repository.dart';
 import '../../../../ui/core/widgets/child_summary_card.dart';
@@ -88,7 +86,6 @@ class ParentChildrenPage extends ConsumerWidget {
                     hasRoute: null,
                     onTap: () => _openChildDetail(context, child),
                     onEdit: () => _editChild(context, child),
-                    onDelete: () => _confirmDelete(context, ref, child),
                   ),
                 );
               },
@@ -105,41 +102,5 @@ class ParentChildrenPage extends ConsumerWidget {
 
   void _openChildDetail(BuildContext context, Child child) {
     context.push(AppRoutes.parentChildDetail, extra: child);
-  }
-
-  Future<void> _confirmDelete(
-    BuildContext context,
-    WidgetRef ref,
-    Child child,
-  ) async {
-    try {
-      final confirmed = await showDeleteChildConfirmation(
-        context,
-        child: child,
-        loadActiveEnrollment: () => ref
-            .read(childrenControllerProvider.notifier)
-            .findActiveEnrollmentForChild(child.id),
-      );
-
-      if (!confirmed || !context.mounted) return;
-
-      await ref.read(childrenControllerProvider.notifier).delete(child.id);
-
-      if (context.mounted) {
-        showAppSnackBar(
-          context,
-          message: '${child.name} removido(a).',
-          type: AppFeedbackType.warning,
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        showAppSnackBar(
-          context,
-          message: AppErrorReporter.messageFor(e),
-          type: AppFeedbackType.error,
-        );
-      }
-    }
   }
 }

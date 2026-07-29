@@ -13,7 +13,6 @@ class ChildSummaryCard extends StatelessWidget {
     this.schoolName,
     this.hasRoute,
     this.onEdit,
-    this.onDelete,
     this.onTap,
   });
 
@@ -21,7 +20,6 @@ class ChildSummaryCard extends StatelessWidget {
   final String? schoolName;
   final bool? hasRoute;
   final VoidCallback? onEdit;
-  final VoidCallback? onDelete;
   final VoidCallback? onTap;
 
   @override
@@ -104,36 +102,24 @@ class ChildSummaryCard extends StatelessWidget {
                   ],
                 ),
               ],
-              if (onEdit != null || onDelete != null) ...[
+              if (onEdit != null) ...[
                 const SizedBox(height: AppSpacing.md),
                 const Divider(height: 1),
                 const SizedBox(height: AppSpacing.md),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    if (onDelete != null)
-                      TextButton.icon(
-                        onPressed: onDelete,
-                        icon: const Icon(
-                          Icons.delete_outline_rounded,
-                          size: 18,
-                        ),
-                        label: const Text('Excluir'),
+                    FilledButton.icon(
+                      // O tema global define largura mínima infinita nos
+                      // FilledButtons; dentro deste Row (filho não-flex) o
+                      // botão precisa de largura mínima finita.
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(0, 48),
                       ),
-                    if (onEdit != null) ...[
-                      const SizedBox(width: AppSpacing.sm),
-                      FilledButton.icon(
-                        // O tema global define largura mínima infinita nos
-                        // FilledButtons; dentro deste Row (filho não-flex) o
-                        // botão precisa de largura mínima finita.
-                        style: FilledButton.styleFrom(
-                          minimumSize: const Size(0, 48),
-                        ),
-                        onPressed: onEdit,
-                        icon: const Icon(Icons.edit_outlined, size: 18),
-                        label: const Text('Editar'),
-                      ),
-                    ],
+                      onPressed: onEdit,
+                      icon: const Icon(Icons.edit_outlined, size: 18),
+                      label: const Text('Editar'),
+                    ),
                   ],
                 ),
               ],
