@@ -14,7 +14,7 @@ class RouteStatusChip extends StatelessWidget {
     final (label, color, surfaceColor) = switch (status) {
       RouteStatus.active => (
         'Ativa',
-        AppColors.success,
+        AppColors.statusBoarded,
         AppColors.successSurface,
       ),
       RouteStatus.finished => (

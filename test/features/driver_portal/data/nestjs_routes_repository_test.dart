@@ -80,6 +80,43 @@ void main() {
 
       expect(captured[0], equals(const <String, dynamic>{}));
     });
+
+    test('sends childIds when the driver changed the default selection',
+        () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/driver/routes/start',
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer(
+        (_) async => Response<Map<String, dynamic>>(
+          data: const <String, dynamic>{
+            'manifest': <String, dynamic>{},
+          },
+          statusCode: 200,
+          requestOptions: RequestOptions(path: '/driver/routes/start'),
+        ),
+      );
+
+      await repository.startRoute(period: 'manha_volta', childIds: [7, 9]);
+
+      final captured = verify(
+        () => dio.post<Map<String, dynamic>>(
+          '/driver/routes/start',
+          data: captureAny(named: 'data'),
+          options: captureAny(named: 'options'),
+        ),
+      ).captured;
+
+      expect(
+        captured[0],
+        equals(const <String, dynamic>{
+          'period': 'manha_volta',
+          'childIds': [7, 9],
+        }),
+      );
+    });
   });
 
   group('markAbsent', () {

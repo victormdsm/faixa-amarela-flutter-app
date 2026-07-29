@@ -8,7 +8,14 @@ abstract interface class RoutesRepository {
 
   Future<List<Map<String, dynamic>>> listDriverRoutes();
 
-  Future<RouteManifest> startRoute({int? shiftId, String? period});
+  /// [childIds] restringe a rota às crianças selecionadas no planejamento
+  /// (ver `PlanningChild.selectedByDefault`). Quando nulo, o backend usa
+  /// todas as crianças elegíveis do período — comportamento anterior.
+  Future<RouteManifest> startRoute({
+    int? shiftId,
+    String? period,
+    List<int>? childIds,
+  });
 
   Future<void> finishRoute(int id);
 
@@ -95,16 +102,25 @@ class PlanningChild {
     required this.name,
     required this.schoolName,
     required this.address,
+    this.schoolId,
     this.shiftId,
     this.shiftName,
+    this.selectedByDefault = true,
   });
 
   final int id;
   final String name;
   final String schoolName;
   final String address;
+  final int? schoolId;
   final int? shiftId;
   final String? shiftName;
+
+  /// Indica se a criança entra marcada na seleção da rota (planning).
+  /// O backend envia `false` apenas para casos excepcionais (ex.: integrais
+  /// em manhã_volta); quando o campo não existe na resposta (backend
+  /// antigo), o padrão é `true` para manter o comportamento anterior.
+  final bool selectedByDefault;
 
   factory PlanningChild.fromJson(Map<String, dynamic> json) {
     final address = [
@@ -112,13 +128,17 @@ class PlanningChild {
       json['number']?.toString(),
     ].where((value) => value != null && value.trim().isNotEmpty).join(', ');
 
+    final selectedRaw = json['selectedByDefault'];
+
     return PlanningChild(
       id: ((json['id'] ?? json['childId']) as num?)?.toInt() ?? 0,
       name: (json['name'] ?? json['childName'] ?? '').toString(),
       schoolName: (json['schoolName'] ?? '').toString(),
       address: (json['address'] ?? address).toString(),
+      schoolId: (json['schoolId'] as num?)?.toInt(),
       shiftId: (json['shiftId'] as num?)?.toInt(),
       shiftName: json['shiftName']?.toString(),
+      selectedByDefault: selectedRaw is bool ? selectedRaw : true,
     );
   }
 }

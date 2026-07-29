@@ -190,7 +190,7 @@ class _SheetHeader extends StatelessWidget {
                 '${students.length}',
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   fontWeight: FontWeight.w800,
-                  color: AppColors.yellowDark,
+                  color: AppColors.ink,
                 ),
               ),
             ),
@@ -460,7 +460,7 @@ class _StatusPill extends StatelessWidget {
       child: Text(
         label,
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-          color: active ? AppColors.success : AppColors.danger,
+          color: active ? AppColors.statusBoarded : AppColors.dangerInk,
           fontWeight: FontWeight.w700,
         ),
       ),

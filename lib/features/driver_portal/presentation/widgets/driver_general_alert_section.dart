@@ -23,15 +23,20 @@ class _DriverGeneralAlertSectionState
   bool _sending = false;
 
   static const _alertTypes = <(String, String, IconData, Color)>[
-    ('breakdown', 'Van quebrou', Icons.car_crash_rounded, AppColors.danger),
+    ('breakdown', 'Van quebrou', Icons.car_crash_rounded, AppColors.dangerInk),
     (
       'flat_tire',
       'Pneu furou',
       Icons.tire_repair_rounded,
-      AppColors.warning,
+      AppColors.warningInk,
     ),
-    ('accident', 'Acidente', Icons.warning_amber_rounded, AppColors.danger),
-    ('general', 'Atraso geral', Icons.schedule_rounded, AppColors.warning),
+    (
+      'accident',
+      'Acidente',
+      Icons.warning_amber_rounded,
+      AppColors.dangerInk,
+    ),
+    ('general', 'Atraso geral', Icons.schedule_rounded, AppColors.warningInk),
   ];
 
   @override
@@ -52,7 +57,7 @@ class _DriverGeneralAlertSectionState
               const Icon(
                 Icons.campaign_rounded,
                 size: 20,
-                color: AppColors.warning,
+                color: AppColors.warningInk,
               ),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
@@ -60,7 +65,7 @@ class _DriverGeneralAlertSectionState
                   'Alerta geral para todos os responsáveis',
                   style: Theme.of(context).textTheme.labelMedium?.copyWith(
                     fontWeight: FontWeight.w700,
-                    color: AppColors.warning,
+                    color: AppColors.warningInk,
                   ),
                 ),
               ),
@@ -101,7 +106,10 @@ class _DriverGeneralAlertSectionState
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.danger,
+              foregroundColor: AppColors.surface,
+            ),
             child: const Text('Enviar alerta'),
           ),
         ],

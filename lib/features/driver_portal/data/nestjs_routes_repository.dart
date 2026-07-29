@@ -56,13 +56,21 @@ class NestjsRoutesRepository implements RoutesRepository {
   }
 
   @override
-  Future<RouteManifest> startRoute({int? shiftId, String? period}) async {
+  Future<RouteManifest> startRoute({
+    int? shiftId,
+    String? period,
+    List<int>? childIds,
+  }) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
         '/driver/routes/start',
         data: <String, dynamic>{
           'shiftId': ?shiftId,
           'period': ?period,
+          // Enviado apenas quando o motorista alterou a seleção padrão —
+          // backends anteriores ao contrato rejeitam campos desconhecidos
+          // (ValidationPipe com forbidNonWhitelisted).
+          'childIds': ?childIds,
         },
       );
       final routeData = _unwrapData(response.data) ?? const <String, dynamic>{};

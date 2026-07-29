@@ -221,7 +221,7 @@ class _RoutePassengerTileState extends State<RoutePassengerTile> {
                         child: DriverActionChip(
                           icon: Icons.schedule_rounded,
                           label: 'Vou atrasar',
-                          color: AppColors.warning,
+                          color: AppColors.warningInk,
                           enabled: !widget.submitting && widget.routeActive,
                           onTap: widget.onNotifyDelayed,
                         ),

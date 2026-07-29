@@ -145,7 +145,10 @@ class _RoutePassengersListState extends ConsumerState<RoutePassengersList> {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.danger,
+              foregroundColor: AppColors.surface,
+            ),
             child: const Text('Remover'),
           ),
         ],

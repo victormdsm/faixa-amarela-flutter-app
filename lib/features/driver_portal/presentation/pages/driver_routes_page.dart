@@ -244,6 +244,7 @@ const _routePeriodOptions = <(String, String)>[
   ('tarde_ida', 'Tarde Ida'),
   ('tarde_volta', 'Tarde Volta'),
   ('noite_ida', 'Noite Ida'),
+  ('noite_volta', 'Noite Volta'),
 ];
 
 Future<void> _openAdhocPlanner(BuildContext context, WidgetRef ref) async {
@@ -254,10 +255,13 @@ Future<void> _openAdhocPlanner(BuildContext context, WidgetRef ref) async {
     isScrollControlled: true,
     useSafeArea: true,
     showDragHandle: true,
-    builder: (ctx) => _AdhocPlannerContent(
+    builder: (ctx) => AdhocPlannerContent(
       repo: repo,
-      onStart: (period) async {
-        final response = await repo.startRoute(period: period);
+      onStart: (period, childIds) async {
+        final response = await repo.startRoute(
+          period: period,
+          childIds: childIds,
+        );
         if (!context.mounted) return;
         await startTrackingFromResponse(context, ref, response);
         if (!context.mounted) return;
@@ -267,21 +271,39 @@ Future<void> _openAdhocPlanner(BuildContext context, WidgetRef ref) async {
   );
 }
 
-class _AdhocPlannerContent extends StatefulWidget {
-  const _AdhocPlannerContent({required this.repo, required this.onStart});
+/// Conteúdo do bottom sheet de geração de rota: seletor de período e lista
+/// de crianças elegíveis com seleção individual.
+///
+/// A seleção inicial vem de [PlanningChild.selectedByDefault] — o backend
+/// desmarca apenas exceções (ex.: integrais em manhã_volta) e o motorista
+/// pode marcá-las manualmente. A lista é exibida na ordem recebida, com
+/// cabeçalho de escola sempre que a escola muda entre crianças
+/// consecutivas (o backend ordena por escola + nome).
+class AdhocPlannerContent extends StatefulWidget {
+  const AdhocPlannerContent({
+    super.key,
+    required this.repo,
+    required this.onStart,
+  });
 
   final RoutesRepository repo;
-  final Future<void> Function(String? period) onStart;
+  final Future<void> Function(String? period, List<int>? childIds) onStart;
 
   @override
-  State<_AdhocPlannerContent> createState() => _AdhocPlannerContentState();
+  State<AdhocPlannerContent> createState() => _AdhocPlannerContentState();
 }
 
-class _AdhocPlannerContentState extends State<_AdhocPlannerContent> {
+class _AdhocPlannerContentState extends State<AdhocPlannerContent> {
   bool _busy = false;
   String? _error;
   String? _period;
   late Future<RoutePlanningOptions> _optionsFuture;
+
+  /// Seleção atual de crianças. Nula até o primeiro carregamento — é
+  /// inicializada a partir de [PlanningChild.selectedByDefault] e
+  /// reinicializada sempre que o período (e a lista) muda.
+  Set<int>? _selectedChildIds;
+  List<PlanningChild> _lastChildren = const [];
 
   @override
   void initState() {
@@ -293,8 +315,29 @@ class _AdhocPlannerContentState extends State<_AdhocPlannerContent> {
     setState(() {
       _period = period;
       _optionsFuture = widget.repo.getPlanningOptions(period: period);
+      _selectedChildIds = null;
       _error = null;
     });
+  }
+
+  void _toggleChild(PlanningChild child, bool selected) {
+    setState(() {
+      final current = _selectedChildIds ??= {
+        for (final c in _lastChildren)
+          if (c.selectedByDefault) c.id,
+      };
+      if (selected) {
+        current.add(child.id);
+      } else {
+        current.remove(child.id);
+      }
+    });
+  }
+
+  bool _isSelected(PlanningChild child) {
+    final selected = _selectedChildIds;
+    if (selected == null) return child.selectedByDefault;
+    return selected.contains(child.id);
   }
 
   @override
@@ -364,6 +407,12 @@ class _AdhocPlannerContentState extends State<_AdhocPlannerContent> {
                 }
                 final children =
                     snapshot.data?.children ?? const <PlanningChild>[];
+                _lastChildren = children;
+                // Inicializa a seleção a partir do contrato do backend.
+                _selectedChildIds ??= {
+                  for (final child in children)
+                    if (child.selectedByDefault) child.id,
+                };
                 if (children.isEmpty) {
                   return FaixaEmptyState(
                     message: _period == null
@@ -375,12 +424,18 @@ class _AdhocPlannerContentState extends State<_AdhocPlannerContent> {
                         : 'Selecione outro período ou verifique o turno das crianças.',
                   );
                 }
-                return ListView.separated(
-                  shrinkWrap: true,
-                  itemCount: children.length,
-                  separatorBuilder: (_, _) =>
-                      const SizedBox(height: AppSpacing.sm),
-                  itemBuilder: (context, i) => _buildChildItem(children[i]),
+                return ListView(
+                  children: [
+                    Text(
+                      '${_selectedChildIds!.length} de ${children.length} '
+                      'alunos na rota',
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: AppColors.slate),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    ..._buildGroupedChildren(children),
+                  ],
                 );
               },
             ),
@@ -394,7 +449,7 @@ class _AdhocPlannerContentState extends State<_AdhocPlannerContent> {
           ],
           const SizedBox(height: AppSpacing.md),
           FilledButton.icon(
-            onPressed: _busy ? null : _submit,
+            onPressed: _canSubmit ? _submit : null,
             icon: _busy
                 ? const SizedBox(
                     width: 16,
@@ -409,92 +464,146 @@ class _AdhocPlannerContentState extends State<_AdhocPlannerContent> {
     );
   }
 
-  Widget _buildChildItem(PlanningChild child) {
+  /// Só bloqueia quando a lista carregou e o motorista desmarcou todo mundo.
+  bool get _canSubmit {
+    if (_busy) return false;
+    final selected = _selectedChildIds;
+    if (selected == null) return true;
+    return _lastChildren.isEmpty || selected.isNotEmpty;
+  }
+
+  /// Monta a lista na ordem recebida do backend, inserindo um cabeçalho de
+  /// escola sempre que a escola muda entre crianças consecutivas.
+  List<Widget> _buildGroupedChildren(List<PlanningChild> children) {
+    final items = <Widget>[];
+    String? lastGroup;
+    for (final child in children) {
+      final group = _schoolGroupKey(child);
+      if (group != lastGroup) {
+        lastGroup = group;
+        if (items.isNotEmpty) {
+          items.add(const SizedBox(height: AppSpacing.md));
+        }
+        items.add(
+          _SchoolGroupHeader(
+            name: child.schoolName.trim().isNotEmpty
+                ? child.schoolName
+                : 'Sem escola vinculada',
+          ),
+        );
+        items.add(const SizedBox(height: AppSpacing.sm));
+      } else {
+        items.add(const SizedBox(height: AppSpacing.sm));
+      }
+      items.add(_buildChildItem(child, _isSelected(child)));
+    }
+    return items;
+  }
+
+  /// Chave de agrupamento: schoolId quando disponível; senão o nome
+  /// normalizado (crianças sem escola caem no mesmo grupo).
+  String _schoolGroupKey(PlanningChild child) {
+    final schoolId = child.schoolId;
+    if (schoolId != null && schoolId > 0) return 'id:$schoolId';
+    return 'name:${child.schoolName.trim().toLowerCase()}';
+  }
+
+  Widget _buildChildItem(PlanningChild child, bool selected) {
     final shiftName = child.shiftName;
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
-        boxShadow: const [
-          BoxShadow(
-            color: AppColors.shadowSubtle,
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 18,
-                backgroundColor: AppColors.yellowLight,
-                child: Text(
-                  child.name.trim().isNotEmpty
-                      ? child.name.trim().characters.first.toUpperCase()
-                      : '?',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.ink,
-                  ),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Text(
-                  child.name,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.ink,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          if (child.schoolName.isNotEmpty ||
-              child.address.isNotEmpty ||
-              (shiftName != null && shiftName.isNotEmpty)) ...[
-            const SizedBox(height: AppSpacing.md),
-            Container(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceSoft,
-                borderRadius: BorderRadius.circular(AppRadius.md),
-              ),
+    return Opacity(
+      opacity: selected ? 1 : 0.55,
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+          boxShadow: const [
+            BoxShadow(
+              color: AppColors.shadowSubtle,
+              blurRadius: 8,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            onTap: _busy ? null : () => _toggleChild(child, !selected),
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.lg),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (child.schoolName.isNotEmpty)
-                    AppIconTextRow(
-                      icon: Icons.school_outlined,
-                      text: 'Escola: ${child.schoolName}',
-                    ),
-                  if (shiftName != null && shiftName.isNotEmpty) ...[
-                    if (child.schoolName.isNotEmpty)
-                      const SizedBox(height: AppSpacing.xs),
-                    AppIconTextRow(
-                      icon: Icons.access_time_rounded,
-                      text: 'Turno: $shiftName',
-                    ),
-                  ],
-                  if (child.address.isNotEmpty) ...[
-                    if (child.schoolName.isNotEmpty ||
-                        (shiftName != null && shiftName.isNotEmpty))
-                      const SizedBox(height: AppSpacing.xs),
-                    AppIconTextRow(
-                      icon: Icons.location_on_rounded,
-                      text: 'Endereço: ${child.address}',
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 18,
+                        backgroundColor: AppColors.yellowLight,
+                        child: Text(
+                          child.name.trim().isNotEmpty
+                              ? child.name.trim().characters.first.toUpperCase()
+                              : '?',
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.ink,
+                              ),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: Text(
+                          child.name,
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.ink,
+                              ),
+                        ),
+                      ),
+                      Checkbox(
+                        value: selected,
+                        onChanged: _busy
+                            ? null
+                            : (value) => _toggleChild(child, value ?? false),
+                      ),
+                    ],
+                  ),
+                  if (child.address.isNotEmpty ||
+                      (shiftName != null && shiftName.isNotEmpty)) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    Container(
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceSoft,
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (shiftName != null && shiftName.isNotEmpty)
+                            AppIconTextRow(
+                              icon: Icons.access_time_rounded,
+                              text: 'Turno: $shiftName',
+                            ),
+                          if (child.address.isNotEmpty) ...[
+                            if (shiftName != null && shiftName.isNotEmpty)
+                              const SizedBox(height: AppSpacing.xs),
+                            AppIconTextRow(
+                              icon: Icons.location_on_rounded,
+                              text: 'Endereço: ${child.address}',
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
                   ],
                 ],
               ),
             ),
-          ],
-        ],
+          ),
+        ),
       ),
     );
   }
@@ -505,7 +614,15 @@ class _AdhocPlannerContentState extends State<_AdhocPlannerContent> {
       _error = null;
     });
     try {
-      await widget.onStart(_period);
+      final children = _lastChildren;
+      final selected = _selectedChildIds ?? const <int>{};
+      // Seleção completa equivale ao comportamento padrão do backend; só
+      // enviamos childIds quando o motorista removeu alguém da rota
+      // (backends anteriores ao contrato rejeitam o campo).
+      final childIds = selected.length == children.length
+          ? null
+          : selected.toList(growable: false);
+      await widget.onStart(_period, childIds);
       if (!mounted) return;
       Navigator.of(context).pop();
       showAppSnackBar(
@@ -519,5 +636,31 @@ class _AdhocPlannerContentState extends State<_AdhocPlannerContent> {
         _error = e.toString();
       });
     }
+  }
+}
+
+/// Cabeçalho de grupo de escola na lista de planejamento.
+class _SchoolGroupHeader extends StatelessWidget {
+  const _SchoolGroupHeader({required this.name});
+
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const Icon(Icons.school_rounded, size: 16, color: AppColors.ink),
+        const SizedBox(width: AppSpacing.sm - 2),
+        Expanded(
+          child: Text(
+            name,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: AppColors.ink,
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }

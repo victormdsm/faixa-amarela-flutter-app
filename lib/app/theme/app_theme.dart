@@ -18,6 +18,14 @@ abstract final class AppColors {
   static const infoSurface = Color(0xFFEAF2FF);
   static const warning = Color(0xFFD97706);
   static const warningSurface = Color(0xFFFFF7E6);
+
+  /// Âmbar escuro para texto/ícones sobre superfícies claras ou tintadas de
+  /// warning (warning/yellowDark sobre branco não atingem contraste AA).
+  static const warningInk = Color(0xFF92400E);
+
+  /// Vermelho escuro para texto/ícones sobre superfícies claras ou tintadas
+  /// de danger (danger puro sobre branco fica abaixo do contraste AA).
+  static const dangerInk = Color(0xFFB91C1C);
   static const statusOnTheWay = Color(0xFF1565C0);
   static const statusBoarded = Color(0xFF0A7E52);
   static const mapBackground = Color(0xFF8BA0B0);
@@ -56,7 +64,9 @@ abstract final class AppTheme {
           brightness: Brightness.light,
         ).copyWith(
           primary: AppColors.yellow,
-          onPrimary: AppColors.surface,
+          // Conteúdo sobre o amarelo da marca é sempre ink (nunca branco —
+          // branco sobre #FF9E1B fica abaixo de 3:1 de contraste).
+          onPrimary: AppColors.ink,
           primaryContainer: Color(0xFF895100),
           onPrimaryContainer: AppColors.surface,
           secondary: AppColors.yellowDark,
@@ -206,7 +216,8 @@ abstract final class AppTheme {
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           backgroundColor: AppColors.yellow,
-          foregroundColor: AppColors.surface,
+          // Texto ink sobre amarelo (7.9:1); branco tinha contraste 2.2:1.
+          foregroundColor: AppColors.ink,
           minimumSize: const Size.fromHeight(48),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.md),
@@ -220,7 +231,9 @@ abstract final class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.yellow,
+          // Texto amarelo sobre fundo branco tinha contraste 2.2:1; a borda
+          // segue amarela e o texto passa a ser ink (padrão do TextButton).
+          foregroundColor: AppColors.ink,
           side: const BorderSide(color: AppColors.yellow, width: 1.2),
           minimumSize: const Size.fromHeight(48),
           shape: RoundedRectangleBorder(
@@ -254,7 +267,8 @@ abstract final class AppTheme {
       ),
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: AppColors.yellow,
-        foregroundColor: AppColors.surface,
+        // Ícone/texto ink sobre amarelo (branco tinha contraste 2.2:1).
+        foregroundColor: AppColors.ink,
         elevation: 0,
         focusElevation: 0,
         hoverElevation: 0,

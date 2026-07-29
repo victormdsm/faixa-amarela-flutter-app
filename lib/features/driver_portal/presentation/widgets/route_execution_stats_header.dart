@@ -29,13 +29,13 @@ class RouteExecutionStatsHeader extends StatelessWidget {
           _StatCard(
             label: 'Embarcados',
             value: '$boardedCount',
-            color: AppColors.success,
+            color: AppColors.statusBoarded,
           ),
           const SizedBox(width: AppSpacing.md),
           _StatCard(
             label: 'Pendentes',
             value: '$pendingCount',
-            color: AppColors.yellowDark,
+            color: AppColors.warningInk,
           ),
         ],
       ),

@@ -197,12 +197,12 @@ class _RouteExecutionStopCardState
     return switch (status) {
       StopStatus.pending => (
         'Pendente',
-        AppColors.yellowDark,
+        AppColors.warningInk,
         AppColors.warningSurface,
       ),
       StopStatus.boarded => (
         'Embarcado',
-        AppColors.success,
+        AppColors.statusBoarded,
         AppColors.successSurface,
       ),
       StopStatus.disembarked => (
@@ -212,8 +212,8 @@ class _RouteExecutionStopCardState
       ),
       StopStatus.absent => (
         'Ausente',
-        AppColors.danger,
-        AppColors.danger.withValues(alpha: 0.08),
+        AppColors.dangerInk,
+        AppColors.dangerInk.withValues(alpha: 0.08),
       ),
       StopStatus.removed => (
         'Removido',
