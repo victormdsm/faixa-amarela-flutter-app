@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app/theme/app_theme.dart';
 import '../../../features/notifications/data/app_notification.dart';
+import '../../../features/notifications/presentation/widgets/notification_type_visual.dart';
 
 /// Tile de notificação padronizado.
 ///
@@ -81,7 +82,7 @@ class FaixaNotificationTile extends StatelessWidget {
                     ? AppColors.yellow
                     : AppColors.surfaceSoft,
                 foregroundColor: AppColors.ink,
-                child: Icon(_iconFor(_type), size: 20),
+                child: Icon(notificationTypeVisual(_type).icon, size: 20),
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
@@ -131,20 +132,6 @@ class FaixaNotificationTile extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  IconData _iconFor(String type) {
-    return switch (type) {
-      'boarded' => Icons.directions_bus_rounded,
-      'disembarked' => Icons.home_rounded,
-      'arrived' => Icons.location_on_rounded,
-      'delayed' => Icons.schedule_rounded,
-      'breakdown' || 'flat_tire' || 'accident' => Icons.warning_rounded,
-      'driver_profile_change_reviewed' => Icons.verified_user_rounded,
-      'payment' || 'billing' || 'invoice' => Icons.receipt_long_rounded,
-      'system' => Icons.info_outline_rounded,
-      _ => Icons.notifications_rounded,
-    };
   }
 
   String _formatDate(DateTime? date) {

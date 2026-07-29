@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,6 +12,7 @@ import '../../../../core/presentation/widgets/faixa_notification_tile.dart';
 import '../../../auth/presentation/state/app_session_controller.dart';
 import '../../data/app_notification.dart';
 import '../providers/notification_providers.dart';
+import '../widgets/notification_detail_sheet.dart';
 
 class NotificationsPage extends ConsumerWidget {
   const NotificationsPage({super.key});
@@ -71,7 +74,7 @@ class NotificationsPage extends ConsumerWidget {
                   final item = page.items[index];
                   return FaixaNotificationTile(
                     notification: item,
-                    onTap: () => _markAsRead(context, ref, item),
+                    onTap: () => _openNotification(context, ref, item),
                   );
                 },
               );
@@ -87,6 +90,22 @@ class NotificationsPage extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+
+  /// Abre o detalhe da notificação em bottom sheet e a marca como lida.
+  void _openNotification(
+    BuildContext context,
+    WidgetRef ref,
+    AppNotification notification,
+  ) {
+    unawaited(_markAsRead(context, ref, notification));
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (_) => NotificationDetailSheet(notification: notification),
     );
   }
 
