@@ -92,4 +92,30 @@ class NestjsDriverRepository implements DriverRepository {
       throw ApiException.fromDio(error);
     }
   }
+
+  @override
+  Future<Map<String, dynamic>> updateMyVehicle({
+    required String plate,
+    String? brand,
+    String? color,
+    String? year,
+  }) async {
+    try {
+      // A placa e obrigatoria no backend (UpdateVehicleDto.placa); os demais
+      // campos so sao enviados quando informados (editados pelo motorista),
+      // para nao sobrescrever dados que nao foram tocados.
+      final response = await _dio.put<Map<String, dynamic>>(
+        '/drivers/me/vehicle',
+        data: <String, dynamic>{
+          'placa': plate,
+          'marca': ?brand,
+          'cor': ?color,
+          'ano': ?year,
+        },
+      );
+      return response.data ?? const <String, dynamic>{};
+    } catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
 }

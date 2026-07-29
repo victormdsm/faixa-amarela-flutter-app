@@ -132,4 +132,14 @@ class DriverProfile {
     if (raw is! List) return const [];
     return raw.whereType<Map>().map(Map<String, dynamic>.from).toList();
   }
+
+  /// Normaliza o id da van vindo do servidor ou do cache local: ids ausentes
+  /// ou inválidos (`<= 0`, ex.: van inexistente serializada como 0) viram
+  /// `null` para nunca serem enviados ao backend — o validador `@Min(1)`
+  /// rejeitaria a requisição com 400.
+  static int? normalizeVanId(num? raw) {
+    final value = raw?.toInt();
+    if (value == null || value <= 0) return null;
+    return value;
+  }
 }

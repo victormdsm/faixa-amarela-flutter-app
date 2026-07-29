@@ -98,8 +98,6 @@ class DriverVehicleSection extends StatelessWidget {
             labelText: 'Marca / Modelo',
             prefixIcon: Icon(Icons.directions_bus_outlined),
           ),
-          validator: (v) =>
-              (v ?? '').trim().isEmpty ? 'Informe a marca/modelo.' : null,
         ),
         const SizedBox(height: 12),
         Row(
@@ -127,7 +125,12 @@ class DriverVehicleSection extends StatelessWidget {
                   prefixIcon: Icon(Icons.calendar_today_outlined),
                 ),
                 validator: (v) {
-                  final year = int.tryParse(v ?? '');
+                  // Valida apenas em modo de edição e quando preenchido:
+                  // ano é opcional no backend (UpdateVehicleDto.ano).
+                  if (!editMode) return null;
+                  final text = (v ?? '').trim();
+                  if (text.isEmpty) return null;
+                  final year = int.tryParse(text);
                   final currentYear = DateTime.now().year + 1;
                   if (year == null || year < 1900 || year > currentYear) {
                     return 'Ano invalido.';
@@ -149,8 +152,12 @@ class DriverVehicleSection extends StatelessWidget {
             prefixIcon: Icon(Icons.pin_outlined),
           ),
           validator: (v) {
+            // Formato validado apenas em modo de edição; a obrigatoriedade
+            // é checada no _save (mensagem "Informe a placa do veículo.")
+            // para não bloquear o salvamento de quem ainda não tem van.
+            if (!editMode) return null;
             final plate = (v ?? '').trim().toUpperCase();
-            if (plate.isEmpty) return 'Placa e obrigatoria.';
+            if (plate.isEmpty) return null;
             // Aceita placa antiga (ABC1234) ou Mercosul (ABC1D23).
             final regex = RegExp(r'^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$');
             if (!regex.hasMatch(plate)) return 'Placa invalida.';

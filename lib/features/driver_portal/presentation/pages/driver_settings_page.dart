@@ -71,6 +71,13 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
   final Map<int, Set<int>> _districtShiftMap = <int, Set<int>>{};
   Set<int> _originalSelectedSchoolIds = <int>{};
   Map<int, Set<int>> _originalDistrictShiftMap = <int, Set<int>>{};
+  // Valores carregados do servidor: base para detectar edições do motorista
+  // e não enviar campos intocados (CNH) ou incompletos (veículo sem placa).
+  String _originalCnh = '';
+  String _originalVehicleBrand = '';
+  String _originalVehicleColor = '';
+  String _originalVehicleYear = '';
+  String _originalVehiclePlate = '';
 
   @override
   void dispose() {
@@ -415,6 +422,7 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
     _passwordConfirmController.clear();
     _infoController.text = (data['information'] ?? '').toString();
     _cnhController.text = (data['cnh'] ?? '').toString();
+    _originalCnh = _cnhController.text.trim();
     _avatarImageUrl = data['avatarUrl']?.toString();
     _avatarImageLocalPath = null;
     _coverageChangeRequest = _map(data['coverageChangeRequest']);
@@ -426,13 +434,19 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
     ).map(_toChangeRequest).toList(growable: false);
 
     final van = _map(data['van']);
-    _vehicleId = (van['id'] as num?)?.toInt();
+    // van inexistente é serializada com id 0 (DriverProfile.toJson): coage
+    // para null para nunca enviar vehicleId 0 ao backend (@Min(1) → 400).
+    _vehicleId = DriverProfile.normalizeVanId(van['id'] as num?);
     _vehicleBrandController.text = (van['model'] ?? '').toString();
     _vehicleColorController.text = (van['color'] ?? '').toString();
     _vehicleYearController.text = (van['year'] ?? '').toString();
     _vehiclePlateController.text = (van['plate'] ?? '').toString();
     _vehicleImageUrl = van['imageUrl']?.toString();
     _vehicleImageLocalPath = null;
+    _originalVehicleBrand = _vehicleBrandController.text.trim();
+    _originalVehicleColor = _vehicleColorController.text.trim();
+    _originalVehicleYear = _vehicleYearController.text.trim();
+    _originalVehiclePlate = _vehiclePlateController.text.trim();
 
     _selectedSchoolIds
       ..clear()
@@ -472,7 +486,7 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
     }
 
     final van = _map(data['van']);
-    _vehicleId = (van['id'] as num?)?.toInt();
+    _vehicleId = DriverProfile.normalizeVanId(van['id'] as num?);
     if (_vehicleImageLocalPath == null) {
       _vehicleImageUrl = van['imageUrl']?.toString();
     }
@@ -640,6 +654,31 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
       }
     }
 
+    // Detecta edições nos dados do veículo comparando com os valores
+    // carregados do servidor. A placa é obrigatória para persistir
+    // qualquer alteração do veículo (UpdateVehicleDto.placa no backend).
+    final vehicleBrand = _vehicleBrandController.text.trim();
+    final vehicleColor = _vehicleColorController.text.trim();
+    final vehicleYear = _vehicleYearController.text.trim();
+    final vehiclePlate = _vehiclePlateController.text.trim();
+    final brandChanged = vehicleBrand != _originalVehicleBrand;
+    final colorChanged = vehicleColor != _originalVehicleColor;
+    final yearChanged = vehicleYear != _originalVehicleYear;
+    final plateChanged = vehiclePlate != _originalVehiclePlate;
+    final hasVehicleChanges =
+        brandChanged || colorChanged || yearChanged || plateChanged;
+    if (hasVehicleChanges && vehiclePlate.isEmpty) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Informe a placa do veículo.')),
+      );
+      return;
+    }
+
+    // CNH só é enviada quando o motorista editou o campo — reenviar o valor
+    // intocado (ou vazio) poderia sobrescrever o dado no servidor.
+    final cnh = _cnhController.text.trim();
+    final cnhChanged = cnh != _originalCnh;
+
     final hasCoverageChanges = _hasCoverageChanges();
 
     setState(() => _isSaving = true);
@@ -677,6 +716,20 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
         coverageRequestSubmitted = true;
       }
 
+      if (hasVehicleChanges) {
+        // Persistido antes do updateBasicProfile: o PUT/GET /drivers/me
+        // seguinte já retorna a van atualizada (DriverResponseDto.van) e o
+        // _applyProfile reescreve os controllers com os dados do servidor.
+        await ref
+            .read(driverProfileRepositoryProvider)
+            .updateMyVehicle(
+              plate: vehiclePlate,
+              brand: brandChanged ? vehicleBrand : null,
+              color: colorChanged ? vehicleColor : null,
+              year: yearChanged ? vehicleYear : null,
+            );
+      }
+
       updatedProfile = await ref
           .read(driverProfileRepositoryProvider)
           .updateBasicProfile(
@@ -684,7 +737,7 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
             email: isAdminAppUser ? _emailController.text.trim() : null,
             cellPhone: _phoneController.text.trim(),
             information: _infoController.text.trim(),
-            cnh: _cnhController.text.trim(),
+            cnh: cnhChanged ? cnh : null,
           );
 
       _applyProfile(updatedProfile.toJson());
