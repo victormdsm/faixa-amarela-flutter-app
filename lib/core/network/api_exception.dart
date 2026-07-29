@@ -162,6 +162,10 @@ class ApiException implements Exception {
         .hasMatch(text)) {
       return _invalidDataMessage;
     }
+    // App desatualizado enviando formato antigo (array vs JSON string etc.).
+    if (RegExp(r'must be a json string', caseSensitive: false).hasMatch(text)) {
+      return 'Dados em formato desatualizado. Atualize o aplicativo e tente novamente.';
+    }
     // Demais mensagens do class-validator (whitelist de validação do NestJS).
     if (RegExp(
       r'should not be empty|should not be null|must be a string|'
