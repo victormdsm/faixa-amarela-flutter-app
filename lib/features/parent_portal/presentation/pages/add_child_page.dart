@@ -19,6 +19,8 @@ import '../../../../domain/models/child.dart';
 import '../../../../features/catalog/data/catalog_repository.dart';
 import '../providers/parent_portal_providers.dart';
 import '../state/add_child_controller.dart';
+import '../../data/address_forward_locator.dart';
+import '../widgets/address_autofill.dart';
 import '../widgets/address_map_picker.dart';
 import '../widgets/city_state_fields.dart';
 
@@ -65,6 +67,11 @@ class _AddChildPageState extends ConsumerState<AddChildPage> {
   LatLng? _marker;
   String? _resolvedLabel;
   ChildAddress? _originalAddress;
+
+  // "Localizar no mapa": geocode forward do endereço digitado (rua + número
+  // + cidade/UF) move o mapa para o ponto exato via controller do picker.
+  final _mapPickerController = AddressMapPickerController();
+  bool _locatingAddress = false;
 
   bool get _isEditing => widget.childToEdit != null;
 
@@ -182,37 +189,108 @@ class _AddChildPageState extends ConsumerState<AddChildPage> {
     return label.isEmpty ? 'Endereço salvo' : label;
   }
 
-  /// Preenche os campos com o endereço resolvido pelo mapa (reverse ou
-  /// autocomplete). Só sobrescreve o que veio preenchido — nunca apaga
-  /// algo que o pai digitou.
-  void _applySuggestion(AddressSuggestion suggestion) {
+  /// Endereço resolvido pelo mapa, com preenchimento conforme a origem:
+  /// - reverse (o mapa parou de mover): preenche SOMENTE campos vazios —
+  ///   nunca sobrescreve o que o pai digitou/selecionou.
+  /// - search (escolha explícita na busca): preenche o que a sugestão
+  ///   trouxer; o que ela não trouxer (ex.: número ausente numa venue) é
+  ///   preservado como o pai digitou.
+  void _onAddressResolved(
+    AddressSuggestion suggestion,
+    AddressResolveSource source,
+  ) {
+    final cities = ref.read(citiesCatalogProvider).value ?? const [];
     setState(() {
       _resolvedLabel = suggestion.label;
-      if ((suggestion.street ?? '').isNotEmpty) {
-        _streetCtrl.text = suggestion.street!;
-      }
-      if ((suggestion.number ?? '').isNotEmpty) {
-        _numberCtrl.text = suggestion.number!;
-      }
-      if ((suggestion.district ?? '').isNotEmpty) {
-        _districtCtrl.text = suggestion.district!;
-      }
-      final uf = suggestion.state?.toUpperCase();
-      if (uf != null && kBrazilStates.contains(uf)) {
-        _stateUf = uf;
-      }
-      final cityName = suggestion.city;
-      if (cityName != null && cityName.trim().isNotEmpty) {
-        final cities = ref.read(citiesCatalogProvider).value ?? const [];
-        final query = cityName.trim().toLowerCase();
-        for (final c in cities) {
-          if (c.name.trim().toLowerCase() == query) {
-            _city = c;
-            break;
-          }
-        }
-      }
+      _streetCtrl.text = autofillTextValue(
+        current: _streetCtrl.text,
+        incoming: suggestion.street,
+        source: source,
+      );
+      _numberCtrl.text = autofillTextValue(
+        current: _numberCtrl.text,
+        incoming: suggestion.number,
+        source: source,
+      );
+      _districtCtrl.text = autofillTextValue(
+        current: _districtCtrl.text,
+        incoming: suggestion.district,
+        source: source,
+      );
+      _stateUf = autofillStateUf(
+        currentUf: _stateUf,
+        incomingState: suggestion.state,
+        source: source,
+      );
+      _city = autofillCity(
+        currentCity: _city,
+        incomingCityName: suggestion.city,
+        catalog: cities,
+        source: source,
+      );
     });
+  }
+
+  /// Fluxo principal: o pai digita rua + número e toca em "Localizar no
+  /// mapa" — geocode forward com cidade/UF dos selects move o mapa para o
+  /// ponto exato (com o número). Se o número não for achado, cai no
+  /// fallback só com a rua e avisa para ajustar o pin; sem nenhum
+  /// resultado, mostra mensagem amigável. Nunca toca nos campos digitados.
+  Future<void> _locateTypedAddress() async {
+    final cityBias = _cityBias;
+    final street = _streetCtrl.text.trim();
+    if (cityBias == null || _locatingAddress) return;
+    if (street.isEmpty) {
+      showAppSnackBar(
+        context,
+        message: 'Preencha a rua para localizar o endereço no mapa.',
+        type: AppFeedbackType.warning,
+      );
+      return;
+    }
+    setState(() => _locatingAddress = true);
+    try {
+      final result = await forwardLocateAddress(
+        ref.read(childrenRepositoryProvider),
+        street: street,
+        number: _numberCtrl.text,
+        cityBias: cityBias,
+      );
+      if (!mounted) return;
+      if (result == null) {
+        showAppSnackBar(
+          context,
+          message:
+              'Não encontramos esse endereço. Confira rua, número e cidade, '
+              'ou posicione o pin manualmente no mapa.',
+          type: AppFeedbackType.warning,
+        );
+        return;
+      }
+      final point = LatLng(result.point.latitude, result.point.longitude);
+      final label = result.point.label;
+      setState(() {
+        _marker = point;
+        if ((label ?? '').trim().isNotEmpty) _resolvedLabel = label;
+      });
+      _mapPickerController.moveTo(point, label: label);
+      if (!result.numberMatched) {
+        showAppSnackBar(
+          context,
+          message: 'Não achamos o número exato — ajuste o pin no mapa.',
+          type: AppFeedbackType.warning,
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: AppErrorReporter.messageFor(e),
+        type: AppFeedbackType.error,
+      );
+    } finally {
+      if (mounted) setState(() => _locatingAddress = false);
+    }
   }
 
   @override
@@ -626,11 +704,12 @@ class _AddChildPageState extends ConsumerState<AddChildPage> {
                     )
                   else
                     AddressMapPicker(
+                      controller: _mapPickerController,
                       cityBias: _cityBias,
                       initialPosition: _marker,
                       initialLabel: _resolvedLabel,
                       onPositionChanged: (p) => setState(() => _marker = p),
-                      onAddressResolved: _applySuggestion,
+                      onAddressResolved: _onAddressResolved,
                       onError: (message) => showAppSnackBar(
                         context,
                         message: message,
@@ -662,6 +741,24 @@ class _AddChildPageState extends ConsumerState<AddChildPage> {
                     validator: (v) => v == null || v.trim().isEmpty
                         ? 'Numero e obrigatorio.'
                         : null,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: OutlinedButton.icon(
+                      key: E2EKeys.addressLocateButton,
+                      onPressed: (_cityBias != null && !_locatingAddress)
+                          ? _locateTypedAddress
+                          : null,
+                      icon: _locatingAddress
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.travel_explore_rounded, size: 18),
+                      label: const Text('Localizar no mapa'),
+                    ),
                   ),
                   const SizedBox(height: AppSpacing.md),
                   TextFormField(

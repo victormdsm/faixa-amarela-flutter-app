@@ -10,6 +10,34 @@ import '../../../../core/utils/debouncer.dart';
 import '../../../../domain/models/address_suggestion.dart';
 import '../providers/parent_portal_providers.dart';
 
+/// Origem da resolução de endereço entregue pelo [AddressMapPicker]:
+/// - [reverse]: reverse geocoding disparado ao parar de mover o mapa (ou
+///   pelo GPS) — efeito colateral, então o consumidor preenche SOMENTE
+///   campos vazios, nunca sobrescreve o que o usuário digitou.
+/// - [search]: sugestão escolhida explicitamente na busca — ação do usuário,
+///   o consumidor pode preencher todos os campos que a sugestão trouxer.
+enum AddressResolveSource { reverse, search }
+
+/// Handle imperativo para o consumidor mover o mapa do [AddressMapPicker]
+/// (ex.: após o geocode forward do endereço digitado com rua + número).
+/// Opcional: o picker funciona normalmente sem ele.
+class AddressMapPickerController {
+  _AddressMapPickerState? _state;
+
+  void _attach(_AddressMapPickerState state) => _state = state;
+
+  void _detach(_AddressMapPickerState state) {
+    if (identical(_state, state)) _state = null;
+  }
+
+  /// Move a câmera para [point] (zoom de rua), marca o ponto como definido
+  /// pelo usuário e atualiza o label do overlay quando informado. Movimento
+  /// programático: NÃO dispara reverse geocoding.
+  void moveTo(LatLng point, {String? label}) {
+    _state?._moveToAddress(point, label: label);
+  }
+}
+
 /// Mapa de endereço estilo Uber: o pin fica FIXO no centro e o mapa desliza
 /// sob ele. Ao parar de mover (debounce de 500ms) o centro é resolvido via
 /// reverse geocoding; a busca no topo usa autocomplete (debounce de 400ms) e
@@ -17,14 +45,18 @@ import '../providers/parent_portal_providers.dart';
 ///
 /// O widget é semicondutor de estado:
 /// - [onPositionChanged]: centro do pin sempre que o usuário define um ponto
-///   (gesto, GPS ou escolha na busca). Movimentos programáticos (ex.:
-///   recentralizar na cidade) NÃO disparam o callback.
-/// - [onAddressResolved]: endereço estruturado resolvido (reverse) ou
-///   escolhido (autocomplete) — o consumidor decide se preenche os campos.
+///   (gesto, GPS, escolha na busca ou [AddressMapPickerController.moveTo]).
+///   Movimentos programáticos (ex.: recentralizar na cidade) NÃO disparam o
+///   callback.
+/// - [onAddressResolved]: endereço estruturado resolvido ou escolhido, com a
+///   [AddressResolveSource] indicando a origem — reverse (mapa parou, o
+///   consumidor preenche só campos vazios) ou search (escolha explícita na
+///   busca, o consumidor pode preencher tudo). Quem preenche é o consumidor.
 /// - [onError]: mensagens amigáveis PT-BR para o consumidor exibir.
 class AddressMapPicker extends ConsumerStatefulWidget {
   const AddressMapPicker({
     super.key,
+    this.controller,
     this.initialPosition,
     this.initialLabel,
     this.cityBias,
@@ -33,6 +65,10 @@ class AddressMapPicker extends ConsumerStatefulWidget {
     required this.onAddressResolved,
     this.onError,
   });
+
+  /// Handle imperativo opcional para o consumidor mover o mapa (ex.: após o
+  /// geocode forward do endereço digitado com número).
+  final AddressMapPickerController? controller;
 
   /// Posição inicial do pin (ex.: endereço já salvo na edição). Quando nula,
   /// o mapa recentraliza na [cityBias] via geocode ao ficar pronto.
@@ -48,7 +84,15 @@ class AddressMapPicker extends ConsumerStatefulWidget {
   final double height;
 
   final ValueChanged<LatLng> onPositionChanged;
-  final ValueChanged<AddressSuggestion> onAddressResolved;
+
+  /// Chamado com a sugestão e a origem da resolução: reverse (o mapa parou
+  /// de mover — preencher somente campos vazios) ou search (o usuário
+  /// escolheu uma sugestão na busca — preenchimento completo é bem-vindo).
+  final void Function(
+    AddressSuggestion suggestion,
+    AddressResolveSource source,
+  )
+  onAddressResolved;
   final ValueChanged<String>? onError;
 
   @override
@@ -88,14 +132,19 @@ class _AddressMapPickerState extends ConsumerState<AddressMapPicker>
   LatLng? _lastResolvedCenter;
   LatLng? _userDefinedCenter;
 
+  /// moveTo recebido antes do mapa ficar pronto — aplicado no _onMapReady.
+  ({LatLng point, String? label})? _pendingMoveTo;
+
   @override
   void initState() {
     super.initState();
     _overlayLabel = widget.initialLabel;
+    widget.controller?._attach(this);
   }
 
   @override
   void dispose() {
+    widget.controller?._detach(this);
     _reverseDebounce.dispose();
     _searchDebounce.dispose();
     _searchCtrl.dispose();
@@ -107,6 +156,10 @@ class _AddressMapPickerState extends ConsumerState<AddressMapPicker>
   @override
   void didUpdateWidget(covariant AddressMapPicker oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.controller, widget.controller)) {
+      oldWidget.controller?._detach(this);
+      widget.controller?._attach(this);
+    }
     if (oldWidget.cityBias != widget.cityBias &&
         (widget.cityBias ?? '').trim().isNotEmpty) {
       _recenterOnCity();
@@ -127,6 +180,14 @@ class _AddressMapPickerState extends ConsumerState<AddressMapPicker>
 
   void _onMapReady() {
     _mapReady = true;
+    // moveTo chamado antes do mapa ficar pronto (ex.: geocode forward muito
+    // rápido): aplica agora e não recentraliza na cidade.
+    final pending = _pendingMoveTo;
+    if (pending != null) {
+      _pendingMoveTo = null;
+      _moveToAddress(pending.point, label: pending.label);
+      return;
+    }
     if (widget.initialPosition == null &&
         (widget.cityBias ?? '').trim().isNotEmpty) {
       _recenterOnCity();
@@ -177,7 +238,7 @@ class _AddressMapPickerState extends ConsumerState<AddressMapPicker>
         _reverseLoading = false;
         _overlayLabel = result.label;
       });
-      widget.onAddressResolved(result);
+      widget.onAddressResolved(result, AddressResolveSource.reverse);
     } catch (e) {
       if (!mounted || seq != _reverseSeq) return;
       setState(() {
@@ -248,7 +309,7 @@ class _AddressMapPickerState extends ConsumerState<AddressMapPicker>
       _searchNoResults = false;
       _overlayLabel = suggestion.label;
     });
-    widget.onAddressResolved(suggestion);
+    widget.onAddressResolved(suggestion, AddressResolveSource.search);
     final lat = suggestion.latitude;
     final lng = suggestion.longitude;
     if (lat != null && lng != null) {
@@ -338,6 +399,28 @@ class _AddressMapPickerState extends ConsumerState<AddressMapPicker>
     if (open == true) {
       await Geolocator.openAppSettings();
     }
+  }
+
+  // -------------------------------------------------------------------------
+  // Movimento imperativo (geocode forward do endereço digitado)
+  // -------------------------------------------------------------------------
+
+  /// Chamado via [AddressMapPickerController.moveTo]: o consumidor já
+  /// resolveu o ponto (geocode forward com rua + número), então aqui só
+  /// movemos a câmera — sem reverse (movimento programático) e sem tocar
+  /// nos campos de texto.
+  void _moveToAddress(LatLng point, {String? label}) {
+    if (!_mapReady) {
+      _pendingMoveTo = (point: point, label: label);
+      return;
+    }
+    _userDefinedCenter = point;
+    _lastResolvedCenter = point;
+    if ((label ?? '').trim().isNotEmpty) {
+      setState(() => _overlayLabel = label);
+    }
+    widget.onPositionChanged(point);
+    _animatedMove(point, 17);
   }
 
   // -------------------------------------------------------------------------

@@ -20,6 +20,7 @@ abstract final class E2EKeys {
   static const childSaveButton = Key('child_save_button');
   static const addressStreetInput = Key('address_street_input');
   static const addressNumberInput = Key('address_number_input');
+  static const addressLocateButton = Key('address_locate_button');
   static const addressComplementInput = Key('address_complement_input');
   static const addressZipCodeInput = Key('address_zip_code_input');
   static const parentEnrollmentsTab = Key('parent_enrollments_tab');

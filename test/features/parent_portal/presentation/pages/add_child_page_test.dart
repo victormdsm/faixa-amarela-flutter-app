@@ -10,19 +10,43 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../../../fakes/fake_children_repository.dart';
 
+/// Registra os textos de geocode e só resolve a "Rua das Flores" — o
+/// geocode de recentralização da cidade retorna null (sem movimento).
+class _GeocodeStubRepository extends FakeChildrenRepository {
+  final List<String> geocodeTexts = [];
+
+  @override
+  Future<({double latitude, double longitude, String? label})?>
+  geocodeAddress(String text) async {
+    geocodeTexts.add(text);
+    if (text.startsWith('Rua das Flores')) {
+      return (
+        latitude: -25.5163,
+        longitude: -54.5854,
+        label: 'Rua das Flores, 123 - Centro, Foz do Iguaçu/PR',
+      );
+    }
+    return null;
+  }
+}
+
 void main() {
   const school = CatalogOption(id: 1, name: 'Escola A');
   const shift = CatalogOption(id: 2, name: 'Manhã');
 
-  Widget buildPage({Child? childToEdit}) {
+  Widget buildPage({
+    Child? childToEdit,
+    FakeChildrenRepository? repository,
+    List<CatalogOption> cities = const [],
+  }) {
     return ProviderScope(
       overrides: [
         childrenRepositoryProvider.overrideWithValue(
-          FakeChildrenRepository(),
+          repository ?? FakeChildrenRepository(),
         ),
         schoolsCatalogProvider.overrideWith((ref) async => [school]),
         shiftsCatalogProvider.overrideWith((ref) async => [shift]),
-        citiesCatalogProvider.overrideWith((ref) async => const []),
+        citiesCatalogProvider.overrideWith((ref) async => cities),
       ],
       child: MaterialApp(home: AddChildPage(childToEdit: childToEdit)),
     );
@@ -173,4 +197,72 @@ void main() {
     expect(documentUfField(), findsNothing);
     expect(documentWidget(tester).controller!.text, '12345678901');
   });
+
+  testWidgets(
+    'Localizar no mapa: geocode forward com rua+número+cidade/UF plota o ponto',
+    (tester) async {
+      useTallViewport(tester);
+      final repository = _GeocodeStubRepository();
+      await tester.pumpWidget(
+        buildPage(
+          repository: repository,
+          cities: const [CatalogOption(id: 9, name: 'Foz do Iguaçu')],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Cidade (bottom sheet de seleção).
+      await tester.ensureVisible(find.text('Selecione a cidade'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Selecione a cidade'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Foz do Iguaçu'));
+      await tester.pumpAndSettle();
+
+      // UF do endereço.
+      await tester.tap(
+        find.widgetWithText(DropdownButtonFormField<String>, 'UF'),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('PR').last);
+      await tester.pumpAndSettle();
+
+      // Rua + número digitados pelo pai.
+      await tester.enterText(
+        find.byKey(E2EKeys.addressStreetInput),
+        'Rua das Flores',
+      );
+      await tester.enterText(find.byKey(E2EKeys.addressNumberInput), '123');
+
+      await tester.tap(find.byKey(E2EKeys.addressLocateButton));
+      await tester.pumpAndSettle();
+
+      // O texto vai com número e cidade/UF dos selects — é o que plota o
+      // ponto exato (e não o meio da rua).
+      expect(
+        repository.geocodeTexts.last,
+        'Rua das Flores, 123, Foz do Iguaçu, PR',
+      );
+      // Overlay do mapa mostra o label do ponto plotado.
+      expect(
+        find.text('Rua das Flores, 123 - Centro, Foz do Iguaçu/PR'),
+        findsOneWidget,
+      );
+      // Campos digitados NÃO são tocados pelo geocode forward.
+      expect(
+        tester
+            .widget<TextFormField>(find.byKey(E2EKeys.addressStreetInput))
+            .controller!
+            .text,
+        'Rua das Flores',
+      );
+      expect(
+        tester
+            .widget<TextFormField>(find.byKey(E2EKeys.addressNumberInput))
+            .controller!
+            .text,
+        '123',
+      );
+    },
+  );
 }

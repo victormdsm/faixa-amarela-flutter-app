@@ -54,8 +54,9 @@ void main() {
   });
 
   Widget buildPicker({
+    AddressMapPickerController? controller,
     ValueChanged<LatLng>? onPositionChanged,
-    ValueChanged<AddressSuggestion>? onAddressResolved,
+    void Function(AddressSuggestion, AddressResolveSource)? onAddressResolved,
     ValueChanged<String>? onError,
   }) {
     return ProviderScope(
@@ -63,9 +64,10 @@ void main() {
       child: MaterialApp(
         home: Scaffold(
           body: AddressMapPicker(
+            controller: controller,
             cityBias: 'Curitiba, PR',
             onPositionChanged: onPositionChanged ?? (_) {},
-            onAddressResolved: onAddressResolved ?? (_) {},
+            onAddressResolved: onAddressResolved ?? (_, _) {},
             onError: onError,
           ),
         ),
@@ -91,10 +93,14 @@ void main() {
 
     LatLng? position;
     AddressSuggestion? resolved;
+    AddressResolveSource? resolvedSource;
     await tester.pumpWidget(
       buildPicker(
         onPositionChanged: (p) => position = p,
-        onAddressResolved: (s) => resolved = s,
+        onAddressResolved: (s, source) {
+          resolved = s;
+          resolvedSource = source;
+        },
       ),
     );
     await tester.pumpAndSettle();
@@ -116,6 +122,8 @@ void main() {
 
     expect(resolved?.city, 'Curitiba');
     expect(resolved?.state, 'PR');
+    // Escolha explícita na busca: origem search (pode preencher tudo).
+    expect(resolvedSource, AddressResolveSource.search);
     expect(position?.latitude, -25.43);
     expect(position?.longitude, -49.27);
     // A escolha na busca NÃO dispara reverse extra (o endereço já veio
@@ -128,10 +136,14 @@ void main() {
   ) async {
     LatLng? position;
     AddressSuggestion? resolved;
+    AddressResolveSource? resolvedSource;
     await tester.pumpWidget(
       buildPicker(
         onPositionChanged: (p) => position = p,
-        onAddressResolved: (s) => resolved = s,
+        onAddressResolved: (s, source) {
+          resolved = s;
+          resolvedSource = source;
+        },
       ),
     );
     await tester.pumpAndSettle();
@@ -149,6 +161,35 @@ void main() {
     expect(repository.reverseCalls, 1);
     expect(position, isNotNull);
     expect(resolved?.label, 'Rua Nova, 50 - Centro, Curitiba/PR');
+    // Reverse é efeito colateral do gesto: o consumidor só preenche vazios.
+    expect(resolvedSource, AddressResolveSource.reverse);
     expect(find.text('Rua Nova, 50 - Centro, Curitiba/PR'), findsOneWidget);
   });
+
+  testWidgets(
+    'controller.moveTo (geocode forward) centraliza sem disparar reverse',
+    (tester) async {
+      final controller = AddressMapPickerController();
+      LatLng? position;
+      await tester.pumpWidget(
+        buildPicker(
+          controller: controller,
+          onPositionChanged: (p) => position = p,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      controller.moveTo(
+        const LatLng(-25.43, -49.27),
+        label: 'Rua Digitada, 123 - Curitiba/PR',
+      );
+      await tester.pumpAndSettle();
+
+      expect(position?.latitude, -25.43);
+      expect(position?.longitude, -49.27);
+      expect(find.text('Rua Digitada, 123 - Curitiba/PR'), findsOneWidget);
+      // Movimento programático: não chama reverse nem gasta request.
+      expect(repository.reverseCalls, 0);
+    },
+  );
 }
