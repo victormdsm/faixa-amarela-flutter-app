@@ -1,4 +1,3 @@
-import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -24,6 +23,7 @@ import '../providers/driver_portal_providers.dart';
 import '../widgets/driver_coverage_section.dart';
 import '../widgets/driver_password_section.dart';
 import '../widgets/driver_vehicle_section.dart';
+import 'driver_settings_change_detection.dart';
 
 class DriverSettingsPage extends ConsumerStatefulWidget {
   const DriverSettingsPage({super.key});
@@ -57,6 +57,7 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
 
   bool _hydrated = false;
   bool _isSaving = false;
+  bool _isSyncing = false;
   bool _vehicleEditMode = false;
   int? _vehicleId;
   String? _avatarImageUrl;
@@ -71,6 +72,8 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
   final Map<int, Set<int>> _districtShiftMap = <int, Set<int>>{};
   Set<int> _originalSelectedSchoolIds = <int>{};
   Map<int, Set<int>> _originalDistrictShiftMap = <int, Set<int>>{};
+  late final ProviderSubscription<AsyncValue<Map<String, dynamic>>>
+  _profileSubscription;
   // Valores carregados do servidor: base para detectar edições do motorista
   // e não enviar campos intocados (CNH) ou incompletos (veículo sem placa).
   String _originalCnh = '';
@@ -80,7 +83,33 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
   String _originalVehiclePlate = '';
 
   @override
+  void initState() {
+    super.initState();
+    // Binding do form fora do build: com fireImmediately, dados JÁ presentes
+    // (cache do Hive ou provider keepAlive de visita anterior) preenchem os
+    // controllers na abertura — corrige o bug do formulário abrir vazio
+    // quando os dados existiam mas nenhuma transição de estado ocorria após
+    // o primeiro build. Dados que chegarem depois seguem a mesma regra:
+    // primeira carga hidrata o form; cargas seguintes sincronizam sem
+    // sobrescrever edições em andamento.
+    _profileSubscription = ref.listenManual(
+      driverProfileProvider,
+      fireImmediately: true,
+      (previous, next) {
+        next.whenData((data) {
+          if (!_hydrated) {
+            _applyProfile(data);
+          } else {
+            _syncRemoteState(data);
+          }
+        });
+      },
+    );
+  }
+
+  @override
   void dispose() {
+    _profileSubscription.close();
     _nameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
@@ -110,19 +139,6 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
         ? _fallbackShiftOptions
         : shiftOptions;
 
-    ref.listen(driverProfileProvider, (previous, next) {
-      next.whenData((data) {
-        if (!_hydrated) {
-          _applyProfile(data);
-        } else {
-          // Perfil já hidratado (ex.: push driver_profile_change_reviewed
-          // invalidou o provider): sincroniza apenas o que veio do servidor
-          // sem sobrescrever edições em andamento nos campos de texto.
-          _syncRemoteState(data);
-        }
-      });
-    });
-
     // Status bar coerente com o tema (ícones ink sobre fundo claro), mesmo
     // quando esta página é empilhada sobre telas com outro overlay style.
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -133,9 +149,15 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
         title: 'Perfil e conta',
         actions: [
           IconButton(
-            tooltip: 'Atualizar',
-            onPressed: _isSaving ? null : _refreshProfile,
-            icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'Sincronizar',
+            onPressed: (_isSaving || _isSyncing) ? null : _syncProfile,
+            icon: _isSyncing
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.sync_rounded),
           ),
         ],
       ),
@@ -178,7 +200,7 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => FaixaErrorState(
           message: error.toString(),
-          onRetry: _refreshProfile,
+          onRetry: _syncProfile,
         ),
         data: (_) => Form(
           key: _formKey,
@@ -570,9 +592,41 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
     });
   }
 
-  void _refreshProfile() {
-    setState(() => _hydrated = false);
-    ref.read(driverProfileProvider.notifier).refresh();
+  /// Sincronização manual e explícita (única fonte de fetch além da primeira
+  /// carga sem cache e do push de aprovação). Enquanto sincroniza, mostra um
+  /// indicador sutil no AppBar e mantém os dados atuais na tela; se falhar
+  /// com cache presente, avisa em snackbar e NÃO zera o formulário.
+  Future<void> _syncProfile() async {
+    if (_isSyncing) return;
+    setState(() => _isSyncing = true);
+    final hadData = ref.read(driverProfileProvider).hasValue;
+    final wasHydrated = _hydrated;
+    // Pedido explícito do usuário: quando os dados frescos chegarem, o form
+    // é re-vinculado por completo (ver _profileSubscription no initState).
+    _hydrated = false;
+    try {
+      await ref.read(driverProfileProvider.notifier).refresh();
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: 'Perfil sincronizado com o servidor.',
+        type: AppFeedbackType.success,
+      );
+    } catch (_) {
+      // Falhou: o controller manteve os dados anteriores no estado; volta ao
+      // modo não-destrutivo para não clobberar edições no próximo sync/push.
+      _hydrated = wasHydrated;
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: hadData
+            ? 'Não foi possível sincronizar agora. Mantendo os dados salvos neste aparelho.'
+            : 'Não foi possível carregar o perfil. Tente novamente.',
+        type: AppFeedbackType.warning,
+      );
+    } finally {
+      if (mounted) setState(() => _isSyncing = false);
+    }
   }
 
   Future<void> _confirmSignOut() async {
@@ -600,24 +654,33 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
     }
   }
 
+  /// Edição nos dados da van (placa/marca/cor/ano) comparada aos valores
+  /// carregados do servidor. Desde que os dados da van passaram a exigir
+  /// aprovação do admin, essa detecção alimenta tanto a validação da placa
+  /// quanto o envio dos campos na solicitação.
+  bool _hasVehicleDataChanges() {
+    return hasVehicleDataChanges(
+      brand: _vehicleBrandController.text.trim(),
+      color: _vehicleColorController.text.trim(),
+      year: _vehicleYearController.text.trim(),
+      plate: _vehiclePlateController.text.trim(),
+      originalBrand: _originalVehicleBrand,
+      originalColor: _originalVehicleColor,
+      originalYear: _originalVehicleYear,
+      originalPlate: _originalVehiclePlate,
+    );
+  }
+
   bool _hasCoverageChanges() {
-    if (!const SetEquality<int>().equals(
-      _selectedSchoolIds,
-      _originalSelectedSchoolIds,
-    )) {
-      return true;
-    }
-    if (_districtShiftMap.length != _originalDistrictShiftMap.length) {
-      return true;
-    }
-    for (final entry in _districtShiftMap.entries) {
-      final original = _originalDistrictShiftMap[entry.key];
-      if (original == null) return true;
-      if (!const SetEquality<int>().equals(entry.value, original)) return true;
-    }
-    if (_avatarImageLocalPath != null) return true;
-    if (_vehicleImageLocalPath != null) return true;
-    return false;
+    return hasCoverageChanges(
+      selectedSchoolIds: _selectedSchoolIds,
+      originalSelectedSchoolIds: _originalSelectedSchoolIds,
+      districtShiftMap: _districtShiftMap,
+      originalDistrictShiftMap: _originalDistrictShiftMap,
+      hasNewAvatarImage: _avatarImageLocalPath != null,
+      hasNewVehicleImage: _vehicleImageLocalPath != null,
+      hasVehicleDataChanges: _hasVehicleDataChanges(),
+    );
   }
 
   Future<void> _save(BuildContext context) async {
@@ -655,18 +718,14 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
     }
 
     // Detecta edições nos dados do veículo comparando com os valores
-    // carregados do servidor. A placa é obrigatória para persistir
-    // qualquer alteração do veículo (UpdateVehicleDto.placa no backend).
+    // carregados do servidor. Dados da van (e foto da van) não são mais
+    // persistidos direto: seguem na solicitação de aprovação do admin.
+    // A placa continua obrigatória para enviar qualquer alteração da van.
     final vehicleBrand = _vehicleBrandController.text.trim();
     final vehicleColor = _vehicleColorController.text.trim();
     final vehicleYear = _vehicleYearController.text.trim();
     final vehiclePlate = _vehiclePlateController.text.trim();
-    final brandChanged = vehicleBrand != _originalVehicleBrand;
-    final colorChanged = vehicleColor != _originalVehicleColor;
-    final yearChanged = vehicleYear != _originalVehicleYear;
-    final plateChanged = vehiclePlate != _originalVehiclePlate;
-    final hasVehicleChanges =
-        brandChanged || colorChanged || yearChanged || plateChanged;
+    final hasVehicleChanges = _hasVehicleDataChanges();
     if (hasVehicleChanges && vehiclePlate.isEmpty) {
       messenger.showSnackBar(
         const SnackBar(content: Text('Informe a placa do veículo.')),
@@ -712,22 +771,14 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
           vehicleImagePath: vehicleImageUrl,
           vehicleId: _vehicleId,
           requestNote: null,
+          // Dados da van trafegam na solicitação de aprovação (contrato
+          // congelado do backend): enviados apenas quando editados.
+          requestedVehiclePlaca: hasVehicleChanges ? vehiclePlate : null,
+          requestedVehicleMarca: hasVehicleChanges ? vehicleBrand : null,
+          requestedVehicleCor: hasVehicleChanges ? vehicleColor : null,
+          requestedVehicleAno: hasVehicleChanges ? vehicleYear : null,
         );
         coverageRequestSubmitted = true;
-      }
-
-      if (hasVehicleChanges) {
-        // Persistido antes do updateBasicProfile: o PUT/GET /drivers/me
-        // seguinte já retorna a van atualizada (DriverResponseDto.van) e o
-        // _applyProfile reescreve os controllers com os dados do servidor.
-        await ref
-            .read(driverProfileRepositoryProvider)
-            .updateMyVehicle(
-              plate: vehiclePlate,
-              brand: brandChanged ? vehicleBrand : null,
-              color: colorChanged ? vehicleColor : null,
-              year: yearChanged ? vehicleYear : null,
-            );
       }
 
       updatedProfile = await ref
@@ -741,14 +792,18 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
           );
 
       _applyProfile(updatedProfile.toJson());
-      await ref.read(driverProfileProvider.notifier).refresh();
+      try {
+        await ref.read(driverProfileProvider.notifier).refresh();
+      } catch (_) {
+        // O save já foi persistido e aplicado ao form acima; a resync do
+        // provider é best-effort — falha de rede aqui não desfaz o save.
+      }
 
       if (context.mounted) {
         if (coverageRequestSubmitted) {
           showAppSnackBar(
             context,
-            message:
-                'Perfil atualizado. As alterações que precisam de aprovação foram enviadas ao admin.',
+            message: 'Alterações enviadas para aprovação do administrador.',
             type: AppFeedbackType.warning,
           );
         } else {

@@ -1,7 +1,13 @@
 import 'dart:io';
 
+import 'package:app_faixa_amarela/core/network/api_exception.dart';
 import 'package:app_faixa_amarela/domain/models/driver_profile.dart';
 import 'package:app_faixa_amarela/domain/repositories/driver_repository.dart';
+import 'package:app_faixa_amarela/features/auth/domain/entities/auth_session.dart';
+import 'package:app_faixa_amarela/features/auth/domain/entities/auth_user.dart';
+import 'package:app_faixa_amarela/features/auth/domain/entities/user_role.dart';
+import 'package:app_faixa_amarela/features/auth/presentation/state/app_session_controller.dart';
+import 'package:app_faixa_amarela/features/auth/presentation/state/app_session_state.dart';
 import 'package:app_faixa_amarela/features/driver_portal/data/driver_profile_storage.dart';
 import 'package:app_faixa_amarela/features/driver_portal/presentation/providers/driver_portal_providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -44,10 +50,34 @@ class _FakeDriverRepository implements DriverRepository {
   void setProfile(DriverProfile? profile) => _profile = profile;
 }
 
-DriverProfile _minimalProfile({required int id, required String name}) {
+class _FakeAppSessionController extends AppSessionController {
+  _FakeAppSessionController(this.userId);
+
+  final int userId;
+
+  @override
+  AppSessionState build() {
+    return AppSessionState(
+      session: AuthSession(
+        accessToken: 'tok',
+        tokenType: 'Bearer',
+        user: AuthUser(
+          id: userId,
+          name: 'Motorista',
+          email: null,
+          roles: const ['driver'],
+        ),
+      ),
+      isLoading: false,
+      loginRole: UserRole.driver,
+    );
+  }
+}
+
+DriverProfile _minimalProfile({required int userId, required String name}) {
   return DriverProfile(
-    id: id,
-    userId: id * 10,
+    id: userId,
+    userId: userId,
     name: name,
     cpf: '12345678900',
     licenseNumber: '123456789',
@@ -60,6 +90,7 @@ DriverProfile _minimalProfile({required int id, required String name}) {
 }
 
 void main() {
+  const userId = 10;
   late Directory tempDir;
 
   setUpAll(() async {
@@ -83,130 +114,191 @@ void main() {
     return ProviderContainer(
       overrides: [
         driverProfileRepositoryProvider.overrideWithValue(repo),
+        appSessionControllerProvider.overrideWith(
+          () => _FakeAppSessionController(userId),
+        ),
       ],
     );
   }
 
-  test(
-      'build loads from API and caches when there is no local cache',
+  test('first build without cache fetches from API and writes the cache',
       () async {
-    final repo = _FakeDriverRepository(_minimalProfile(id: 1, name: 'Joao'));
+    final repo = _FakeDriverRepository(
+      _minimalProfile(userId: userId, name: 'Joao'),
+    );
     final container = createContainer(repo);
     addTearDown(container.dispose);
 
-    final states = <AsyncValue<Map<String, dynamic>>>[];
-    container.listen(
-      driverProfileProvider,
-      (previous, next) => states.add(next),
-      fireImmediately: true,
-    );
-
+    container.listen(driverProfileProvider, (previous, next) {});
     await pumpEventQueue();
-    await Future.delayed(const Duration(milliseconds: 50));
 
-    expect(states, hasLength(2));
-    expect(states.first.isLoading, isTrue);
-    expect(states.last.hasValue, isTrue);
-    expect(states.last.value!['name'], 'Joao');
-
+    final state = container.read(driverProfileProvider);
+    expect(state.hasValue, isTrue);
+    expect(state.value!['name'], 'Joao');
     expect(repo.callCount, 1);
 
-    final storage = DriverProfileStorage();
-    final cached = storage.load();
+    final cached = DriverProfileStorage().load(userId);
     expect(cached, isNotNull);
     expect(cached!['name'], 'Joao');
   });
 
-  test(
-      'build emits cached data immediately then refreshes from API silently',
+  test('build with cache shows cached data immediately WITHOUT calling the API',
       () async {
     final storage = DriverProfileStorage();
     await storage.save(
-      _minimalProfile(id: 2, name: 'Cache').toJson(),
+      userId,
+      _minimalProfile(userId: userId, name: 'Cache').toJson(),
     );
 
-    final repo = _FakeDriverRepository(_minimalProfile(id: 2, name: 'API'));
+    final repo = _FakeDriverRepository(
+      _minimalProfile(userId: userId, name: 'API'),
+    );
     final container = createContainer(repo);
     addTearDown(container.dispose);
 
-    final states = <AsyncValue<Map<String, dynamic>>>[];
-    container.listen(
-      driverProfileProvider,
-      (previous, next) => states.add(next),
-      fireImmediately: true,
-    );
-
-    // Aguarda o build concluir e o refresh silencioso terminar.
+    container.listen(driverProfileProvider, (previous, next) {});
     await pumpEventQueue();
-    await Future.delayed(const Duration(milliseconds: 100));
+    // Garante que nenhum fetch assíncrono tardio foi disparado.
+    await Future<void>.delayed(const Duration(milliseconds: 100));
 
-    final controller = container.read(driverProfileProvider.notifier);
+    final state = container.read(driverProfileProvider);
+    expect(state.hasValue, isTrue);
+    expect(state.value!['name'], 'Cache');
+    // Sem auto-refetch: a API não pode ser chamada na abertura com cache.
+    expect(repo.callCount, 0);
 
-    // Estado final deve refletir a API.
-    expect(controller.state.hasValue, isTrue);
-    expect(controller.state.value!['name'], 'API');
-
-    // Deve haver pelo menos uma transição que passou pelo cache.
-    expect(
-      states.any(
-        (s) => s.hasValue && s.value!['name'] == 'Cache',
-      ),
-      isTrue,
-    );
-    expect(repo.callCount, 1);
+    final guard = container.read(driverProfileSessionGuardProvider);
+    expect(guard.loadedUserId, userId);
   });
 
-  test('refresh forces a new API call and updates cache', () async {
+  test('manual refresh calls the API and updates state and cache', () async {
     final storage = DriverProfileStorage();
     await storage.save(
-      _minimalProfile(id: 3, name: 'Antigo').toJson(),
+      userId,
+      _minimalProfile(userId: userId, name: 'Antigo').toJson(),
     );
 
-    final repo = _FakeDriverRepository(_minimalProfile(id: 3, name: 'Novo'));
+    final repo = _FakeDriverRepository(
+      _minimalProfile(userId: userId, name: 'Novo'),
+    );
     final container = createContainer(repo);
     addTearDown(container.dispose);
 
-    final controller = container.read(driverProfileProvider.notifier);
+    container.listen(driverProfileProvider, (previous, next) {});
     await pumpEventQueue();
+    expect(repo.callCount, 0); // abertura servida pelo cache
 
+    final controller = container.read(driverProfileProvider.notifier);
     await controller.refresh();
 
+    expect(repo.callCount, 1);
     expect(controller.state.hasValue, isTrue);
     expect(controller.state.value!['name'], 'Novo');
-    expect(repo.callCount, 2); // build + refresh
 
-    final cached = storage.load();
+    final cached = storage.load(userId);
     expect(cached, isNotNull);
     expect(cached!['name'], 'Novo');
   });
 
-  test('silent refresh keeps cache when API fails', () async {
+  test('failed manual refresh keeps cached data on screen and rethrows',
+      () async {
     final storage = DriverProfileStorage();
     await storage.save(
-      _minimalProfile(id: 4, name: 'Local').toJson(),
+      userId,
+      _minimalProfile(userId: userId, name: 'Local').toJson(),
     );
 
     final repo = _FakeDriverRepository(null);
     final container = createContainer(repo);
     addTearDown(container.dispose);
 
-    // Mantém listener ativo para impedir dispose do provider durante o teste.
     container.listen(driverProfileProvider, (previous, next) {});
+    await pumpEventQueue();
 
     final controller = container.read(driverProfileProvider.notifier);
-
-    // Aguarda o build concluir com o cache.
-    await pumpEventQueue();
-
-    // Cache imediato.
-    expect(controller.state.hasValue, isTrue);
     expect(controller.state.value!['name'], 'Local');
 
-    // Aguarda o refresh silencioso falhar sem alterar o estado.
-    await pumpEventQueue();
-    await Future.delayed(const Duration(milliseconds: 100));
+    await expectLater(
+      controller.refresh(),
+      throwsA(isA<ApiException>()),
+    );
 
+    // Estado intocado: o cache segue visível (requisito: não zerar o form).
     expect(controller.state.hasValue, isTrue);
     expect(controller.state.value!['name'], 'Local');
+    expect(repo.callCount, 1);
+  });
+
+  test('invalidation after load (push event) refetches from the API',
+      () async {
+    final storage = DriverProfileStorage();
+    await storage.save(
+      userId,
+      _minimalProfile(userId: userId, name: 'Cache').toJson(),
+    );
+
+    final repo = _FakeDriverRepository(
+      _minimalProfile(userId: userId, name: 'API'),
+    );
+    final container = createContainer(repo);
+    addTearDown(container.dispose);
+
+    container.listen(driverProfileProvider, (previous, next) {});
+    await pumpEventQueue();
+    expect(repo.callCount, 0);
+
+    // Simula o push driver_profile_change_reviewed (app.dart invalida o
+    // provider): é evento explícito, então busca dados frescos.
+    container.refresh(driverProfileProvider);
+    final value = await container.read(driverProfileProvider.future);
+
+    expect(repo.callCount, 1);
+    expect(value['name'], 'API');
+  });
+
+  test('invalidation falling back to cache when the API fails', () async {
+    final storage = DriverProfileStorage();
+    await storage.save(
+      userId,
+      _minimalProfile(userId: userId, name: 'Local').toJson(),
+    );
+
+    final repo = _FakeDriverRepository(null);
+    final container = createContainer(repo);
+    addTearDown(container.dispose);
+
+    container.listen(driverProfileProvider, (previous, next) {});
+    await pumpEventQueue();
+    expect(repo.callCount, 0);
+
+    container.refresh(driverProfileProvider);
+    final value = await container.read(driverProfileProvider.future);
+
+    expect(repo.callCount, 1);
+    expect(value['name'], 'Local');
+  });
+
+  test('cache of another user is ignored', () async {
+    final storage = DriverProfileStorage();
+    await storage.save(
+      999,
+      _minimalProfile(userId: 999, name: 'Outro Usuario').toJson(),
+    );
+
+    final repo = _FakeDriverRepository(
+      _minimalProfile(userId: userId, name: 'Da API'),
+    );
+    final container = createContainer(repo);
+    addTearDown(container.dispose);
+
+    container.listen(driverProfileProvider, (previous, next) {});
+    await pumpEventQueue();
+
+    final state = container.read(driverProfileProvider);
+    expect(state.value!['name'], 'Da API');
+    expect(repo.callCount, 1);
+    expect(storage.load(userId)!['name'], 'Da API');
+    // Cache do outro usuário permanece intacto.
+    expect(storage.load(999)!['name'], 'Outro Usuario');
   });
 }

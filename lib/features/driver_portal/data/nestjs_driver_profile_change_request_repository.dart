@@ -39,6 +39,10 @@ class NestjsDriverProfileChangeRequestRepository {
     String? vehicleImagePath,
     int? vehicleId,
     String? requestNote,
+    String? requestedVehiclePlaca,
+    String? requestedVehicleMarca,
+    String? requestedVehicleCor,
+    String? requestedVehicleAno,
   }) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
@@ -54,6 +58,13 @@ class NestjsDriverProfileChangeRequestRepository {
           'requestedVehicleImagePath': vehicleImagePath,
           'vehicleId': vehicleId,
           'requestNote': requestNote,
+          // Dados da van trafegam apenas quando editados: a aplicação deles
+          // passa a depender da aprovação do admin (não são persistidos
+          // direto no perfil). Ausentes = sem alteração de veículo.
+          'requestedVehiclePlaca': ?requestedVehiclePlaca,
+          'requestedVehicleMarca': ?requestedVehicleMarca,
+          'requestedVehicleCor': ?requestedVehicleCor,
+          'requestedVehicleAno': ?requestedVehicleAno,
         },
       );
       return response.data ?? const <String, dynamic>{};
