@@ -173,4 +173,53 @@ void main() {
       );
     });
   });
+
+  group('AddChildController.complementChanged (APP-01)', () {
+    const original = ChildAddress(
+      street: 'Rua A',
+      number: '100',
+      complement: 'Apto 12',
+    );
+
+    test('untouched complement is not changed', () {
+      const after = ChildAddress(
+        street: 'Rua B', // outro campo editado não liga o envio de reference
+        number: '100',
+        complement: 'Apto 12',
+      );
+      expect(AddChildController.complementChanged(original, after), isFalse);
+    });
+
+    test('edited complement is changed', () {
+      const after = ChildAddress(
+        street: 'Rua A',
+        number: '100',
+        complement: 'Casa 2',
+      );
+      expect(AddChildController.complementChanged(original, after), isTrue);
+    });
+
+    test('cleared complement is changed (envia reference null para limpar)', () {
+      const after = ChildAddress(street: 'Rua A', number: '100');
+      expect(AddChildController.complementChanged(original, after), isTrue);
+    });
+
+    test('whitespace-only difference is ignored', () {
+      const after = ChildAddress(
+        street: 'Rua A',
+        number: '100',
+        complement: '  Apto 12  ',
+      );
+      expect(AddChildController.complementChanged(original, after), isFalse);
+    });
+
+    test('null original with filled complement counts as changed', () {
+      expect(AddChildController.complementChanged(null, original), isTrue);
+    });
+
+    test('null original with empty complement is not changed', () {
+      const after = ChildAddress(street: 'Rua A', number: '100');
+      expect(AddChildController.complementChanged(null, after), isFalse);
+    });
+  });
 }

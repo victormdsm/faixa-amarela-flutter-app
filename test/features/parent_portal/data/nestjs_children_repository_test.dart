@@ -355,6 +355,140 @@ void main() {
     });
   });
 
+  group('updateChildAddress reference handling (APP-01)', () {
+    void stubUpdate() {
+      when(
+        () => dio.put<Map<String, dynamic>>(
+          '/parent/children/7/addresses/11',
+          data: any(named: 'data'),
+        ),
+      ).thenAnswer(
+        (_) async => Response<Map<String, dynamic>>(
+          data: const <String, dynamic>{},
+          statusCode: 200,
+          requestOptions: RequestOptions(
+            path: '/parent/children/7/addresses/11',
+          ),
+        ),
+      );
+    }
+
+    Future<Map<String, dynamic>> capturePayload() async {
+      final captured = verify(
+        () => dio.put<Map<String, dynamic>>(
+          '/parent/children/7/addresses/11',
+          data: captureAny(named: 'data'),
+        ),
+      ).captured;
+      return captured.single as Map<String, dynamic>;
+    }
+
+    const address = ChildAddress(
+      street: 'Rua X',
+      number: '10',
+      complement: 'Apto 12',
+      zipCode: '80000000',
+    );
+
+    test('omits the reference key by default (backend preserves the stored value)', () async {
+      stubUpdate();
+
+      await repository.updateChildAddress(
+        childId: 7,
+        addressId: 11,
+        address: address,
+      );
+
+      final payload = await capturePayload();
+      expect(payload.containsKey('reference'), isFalse);
+      expect(payload['street'], 'Rua X');
+    });
+
+    test('sends reference when the complement was edited', () async {
+      stubUpdate();
+
+      await repository.updateChildAddress(
+        childId: 7,
+        addressId: 11,
+        address: address,
+        includeReference: true,
+      );
+
+      final payload = await capturePayload();
+      expect(payload['reference'], 'Apto 12');
+    });
+
+    test('sends reference as null when the complement was cleared on purpose', () async {
+      stubUpdate();
+
+      await repository.updateChildAddress(
+        childId: 7,
+        addressId: 11,
+        address: const ChildAddress(street: 'Rua X', number: '10'),
+        includeReference: true,
+      );
+
+      final payload = await capturePayload();
+      expect(payload.containsKey('reference'), isTrue);
+      expect(payload['reference'], isNull);
+    });
+  });
+
+  group('createChildAddress reference handling (APP-01)', () {
+    void stubCreate() {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/parent/children/7/addresses',
+          data: any(named: 'data'),
+        ),
+      ).thenAnswer(
+        (_) async => Response<Map<String, dynamic>>(
+          data: const <String, dynamic>{},
+          statusCode: 201,
+          requestOptions: RequestOptions(path: '/parent/children/7/addresses'),
+        ),
+      );
+    }
+
+    Future<Map<String, dynamic>> capturePayload() async {
+      final captured = verify(
+        () => dio.post<Map<String, dynamic>>(
+          '/parent/children/7/addresses',
+          data: captureAny(named: 'data'),
+        ),
+      ).captured;
+      return captured.single as Map<String, dynamic>;
+    }
+
+    test('sends reference when the complement was filled', () async {
+      stubCreate();
+
+      await repository.createChildAddress(
+        childId: 7,
+        address: const ChildAddress(
+          street: 'Rua X',
+          number: '10',
+          complement: 'Apto 12',
+        ),
+      );
+
+      final payload = await capturePayload();
+      expect(payload['reference'], 'Apto 12');
+    });
+
+    test('omits the reference key when the complement was left empty', () async {
+      stubCreate();
+
+      await repository.createChildAddress(
+        childId: 7,
+        address: const ChildAddress(street: 'Rua X', number: '10'),
+      );
+
+      final payload = await capturePayload();
+      expect(payload.containsKey('reference'), isFalse);
+    });
+  });
+
   group('createChild/updateChild document payload', () {
     const childBody = <String, dynamic>{
       'id': 7,

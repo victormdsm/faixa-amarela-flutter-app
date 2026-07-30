@@ -22,6 +22,26 @@ bool hasVehicleDataChanges({
       plate != originalPlate;
 }
 
+/// Detecta edição no mapa bairro→turnos comparado ao carregado do servidor.
+///
+/// Extraído para ser testável isoladamente — é o que decide se
+/// `requestedDistrictShiftMap` entra no submit da solicitação (APP-02):
+/// trocar só a foto/avatar NÃO pode reenviar o mapa.
+bool hasDistrictShiftChanges({
+  required Map<int, Set<int>> districtShiftMap,
+  required Map<int, Set<int>> originalDistrictShiftMap,
+}) {
+  if (districtShiftMap.length != originalDistrictShiftMap.length) {
+    return true;
+  }
+  for (final entry in districtShiftMap.entries) {
+    final original = originalDistrictShiftMap[entry.key];
+    if (original == null) return true;
+    if (!const SetEquality<int>().equals(entry.value, original)) return true;
+  }
+  return false;
+}
+
 /// Detecta alterações que exigem solicitação de aprovação do admin:
 /// escolas, mapa bairro→turnos, fotos (perfil/veículo) e dados da van.
 bool hasCoverageChanges({
@@ -39,13 +59,11 @@ bool hasCoverageChanges({
   )) {
     return true;
   }
-  if (districtShiftMap.length != originalDistrictShiftMap.length) {
+  if (hasDistrictShiftChanges(
+    districtShiftMap: districtShiftMap,
+    originalDistrictShiftMap: originalDistrictShiftMap,
+  )) {
     return true;
-  }
-  for (final entry in districtShiftMap.entries) {
-    final original = originalDistrictShiftMap[entry.key];
-    if (original == null) return true;
-    if (!const SetEquality<int>().equals(entry.value, original)) return true;
   }
   if (hasNewAvatarImage) return true;
   if (hasNewVehicleImage) return true;

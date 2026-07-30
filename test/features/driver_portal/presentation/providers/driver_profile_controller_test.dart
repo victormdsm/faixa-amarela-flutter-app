@@ -29,7 +29,6 @@ class _FakeDriverRepository implements DriverRepository {
   @override
   Future<DriverProfile> updateBasicProfile({
     required String name,
-    String? email,
     String? cellPhone,
     String? information,
     String? cnh,

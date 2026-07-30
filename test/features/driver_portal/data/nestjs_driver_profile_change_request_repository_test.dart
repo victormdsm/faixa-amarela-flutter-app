@@ -114,4 +114,43 @@ void main() {
       expect(payload.containsKey('requestedVehicleCor'), isFalse);
     });
   });
+
+  group('submitRequest districtShiftMap (APP-02)', () {
+    test('omits requestedDistrictShiftMap when the driver did not edit districts/shifts', () async {
+      await repository.submitRequest(
+        schoolIds: const [1, 2],
+        districtShiftMap: null,
+        avatarImagePath: 'https://cdn.example.com/avatar.jpg',
+      );
+
+      final payload = capturePayload();
+      expect(payload.containsKey('requestedDistrictShiftMap'), isFalse);
+      // Escolas e foto seguem no payload normalmente.
+      expect(jsonDecode(payload['requestedSchoolIds'] as String), [1, 2]);
+      expect(
+        payload['requestedAvatarPath'],
+        'https://cdn.example.com/avatar.jpg',
+      );
+    });
+
+    test('sends requestedDistrictShiftMap when the driver edited districts/shifts', () async {
+      await repository.submitRequest(
+        schoolIds: const [1],
+        districtShiftMap: const {
+          10: [1, 3],
+        },
+      );
+
+      final payload = capturePayload();
+      expect(
+        jsonDecode(payload['requestedDistrictShiftMap'] as String),
+        [
+          {
+            'districtId': 10,
+            'shiftIds': [1, 3],
+          },
+        ],
+      );
+    });
+  });
 }

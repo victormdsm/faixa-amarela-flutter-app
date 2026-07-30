@@ -23,6 +23,7 @@ class DriverProfileDto {
     this.avatarUrl,
     this.schools = const [],
     this.districts = const [],
+    this.districtShiftMap = const {},
     this.coverageChangeRequest,
     this.coverageChangeRequestsRecent = const [],
   });
@@ -48,6 +49,10 @@ class DriverProfileDto {
   final String? avatarUrl;
   final List<Map<String, dynamic>> schools;
   final List<Map<String, dynamic>> districts;
+
+  /// Mapa real bairro→turnos vindo de `coverage.districtShiftMap` (APP-02).
+  /// Vazio quando o backend não o envia.
+  final Map<int, List<int>> districtShiftMap;
   final Map<String, dynamic>? coverageChangeRequest;
   final List<Map<String, dynamic>> coverageChangeRequestsRecent;
 
@@ -61,11 +66,11 @@ class DriverProfileDto {
 
     final van = _map(json['van']);
 
-    // Novo contrato NestJS: coverage { schools: number[], districts: number[], shifts: number[] }
+    // Novo contrato NestJS: coverage { schools: number[], districts: number[], shifts: number[], districtShiftMap: {...} }
     final coverage = _map(json['coverage']);
     final coverageSchools = toIntList(coverage['schools']);
     final coverageDistricts = toIntList(coverage['districts']);
-    final coverageShifts = toIntList(coverage['shifts']);
+    final districtShiftMap = _toDistrictShiftMap(coverage['districtShiftMap']);
 
     // Fallback para listas de maps em camelCase (ex.: cache ou contratos antigos).
     final legacySchools = _listOfMaps(json['schools']);
@@ -81,10 +86,10 @@ class DriverProfileDto {
             .map(
               (id) => <String, dynamic>{
                 'id': id,
-                // O NestJS retorna turnos globalmente; replicamos em cada
-                // bairro para manter a UI funcional ate haver mapeamento
-                // district->turnos no contrato.
-                'shiftIds': coverageShifts.toList(),
+                // APP-02: usa o mapa real bairro→turnos exposto pelo backend.
+                // Sem ele, o bairro fica sem turnos marcados — nada de
+                // fabricar a união global de turnos replicada por bairro.
+                'shiftIds': districtShiftMap[id] ?? const <int>[],
               },
             )
             .toList();
@@ -137,6 +142,7 @@ class DriverProfileDto {
       avatarUrl: json['avatarUrl']?.toString(),
       schools: schools,
       districts: districts,
+      districtShiftMap: districtShiftMap,
       coverageChangeRequest: json['coverageChangeRequest'] is Map
           ? Map<String, dynamic>.from(json['coverageChangeRequest'] as Map)
           : null,
@@ -227,6 +233,11 @@ class DriverProfileDto {
       avatarUrl: profile.avatarUrl,
       schools: profile.schools,
       districts: profile.districts,
+      districtShiftMap: {
+        for (final district in profile.districts)
+          if (((district['id'] as num?)?.toInt() ?? 0) > 0)
+            (district['id'] as num).toInt(): toIntList(district['shiftIds']),
+      },
       coverageChangeRequest: profile.coverageChangeRequest,
       coverageChangeRequestsRecent: profile.coverageChangeRequestsRecent,
     );
@@ -235,6 +246,39 @@ class DriverProfileDto {
   static List<Map<String, dynamic>> _listOfMaps(dynamic raw) {
     if (raw is! List) return const [];
     return raw.whereType<Map>().map(Map<String, dynamic>.from).toList();
+  }
+
+  /// Converte `coverage.districtShiftMap` para `{districtId: [shiftIds]}`.
+  /// Tolera as duas serializações do contrato: objeto `{"10": [1, 2]}` e
+  /// lista `[{districtId: 10, shiftIds: [1, 2]}]` (a forma que o app envia
+  /// no submit de solicitação de alteração).
+  static Map<int, List<int>> _toDistrictShiftMap(dynamic raw) {
+    final result = <int, List<int>>{};
+
+    int toId(dynamic value) {
+      if (value is num) return value.toInt();
+      if (value is String) return int.tryParse(value) ?? 0;
+      return 0;
+    }
+
+    if (raw is Map) {
+      for (final entry in raw.entries) {
+        final districtId = toId(entry.key);
+        if (districtId <= 0) continue;
+        result[districtId] = toIntList(entry.value);
+      }
+    } else if (raw is List) {
+      for (final item in raw.whereType<Map>()) {
+        final districtId = toId(
+          item['districtId'] ?? item['district_id'] ?? item['id'],
+        );
+        if (districtId <= 0) continue;
+        result[districtId] = toIntList(
+          item['shiftIds'] ?? item['shift_ids'] ?? item['shifts'],
+        );
+      }
+    }
+    return result;
   }
 
   static Map<String, dynamic> _map(dynamic raw) {

@@ -2,7 +2,10 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../ads/presentation/providers/ads_providers.dart';
 import '../../../driver_portal/data/driver_profile_storage.dart';
+import '../../../driver_portal/presentation/providers/driver_portal_providers.dart';
+import '../../../parent_portal/presentation/providers/parent_portal_providers.dart';
 import '../../data/repositories/nestjs_auth_repository.dart';
 import '../../data/session_storage.dart';
 import '../../domain/entities/auth_session.dart';
@@ -88,6 +91,7 @@ class AppSessionController extends Notifier<AppSessionState> {
     state = const AppSessionState(session: null, isLoading: false);
     await ref.read(_sessionStorageProvider).clear();
     await DriverProfileStorage().clear();
+    _invalidateUserDataProviders();
   }
 
   Future<void> signOut({bool allDevices = false}) async {
@@ -100,11 +104,48 @@ class AppSessionController extends Notifier<AppSessionState> {
     state = const AppSessionState(session: null, isLoading: false);
     await storage.clear();
     await DriverProfileStorage().clear();
+    _invalidateUserDataProviders();
 
     try {
       await authRepo.logout(refreshToken: refreshToken, allDevices: allDevices);
     } catch (_) {
       // Local cleanup is the source of truth; remote logout is best-effort.
     }
+  }
+
+  /// Derruba todo provider que guarda dados do usuário logado (APP-07):
+  /// sem isso, providers keepAlive/non-autoDispose sobrevivem ao logout e
+  /// vazam PII (filhos, embarques, perfil) para a próxima conta que entrar
+  /// no mesmo aparelho. Após a invalidação, cada provider é recriado limpo
+  /// no próximo watch.
+  ///
+  /// `driverTrackingControllerProvider` NÃO entra aqui de propósito: ele já
+  /// reage à sessão nula via `syncSession` (para o tracking da rota), e
+  /// invalidá-lo recriaria o notifier sem o `initialize()` — quebrando o
+  /// tracking do próximo login.
+  void _invalidateUserDataProviders() {
+    // Portal do responsável.
+    ref.invalidate(childrenControllerProvider);
+    ref.invalidate(enrollmentsControllerProvider);
+    ref.invalidate(parentChildrenProvider);
+    ref.invalidate(parentRoutesProvider);
+    ref.invalidate(parentBoardingsProvider);
+    ref.invalidate(parentUserProfileProvider);
+
+    // Portal do motorista.
+    ref.invalidate(driverProfileProvider);
+    ref.invalidate(driverProfileSessionGuardProvider);
+    ref.invalidate(driverDashboardControllerProvider);
+    ref.invalidate(driverRouteControllerProvider);
+    ref.invalidate(driverEnrollmentsControllerProvider);
+    // Lookup de criança por CPF/código: guarda PII da criança pesquisada.
+    ref.invalidate(driverLookupControllerProvider);
+    ref.invalidate(driverRoutesProvider);
+    ref.invalidate(driverProfileChangeRequestsProvider);
+
+    // Notificações e anúncios (conteúdo por usuário/papel).
+    ref.invalidate(notificationsProvider);
+    ref.invalidate(unreadNotificationsCountProvider);
+    ref.invalidate(adsProvider);
   }
 }

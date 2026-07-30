@@ -1,8 +1,16 @@
 import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/network/api_exception.dart';
-import '../../../domain/models/user_profile.dart';
-import '../../../domain/repositories/user_repository.dart';
+import '../core/network/api_exception.dart';
+import '../core/network/network_providers.dart';
+import '../domain/models/user_profile.dart';
+import '../domain/repositories/user_repository.dart';
+
+/// Repositório do usuário autenticado (`/users/me`) — compartilhado pelos
+/// portais do responsável e do motorista (ex.: perfil, troca de senha).
+final userRepositoryProvider = Provider<UserRepository>(
+  (ref) => NestjsUserRepository(ref.watch(dioProvider)),
+);
 
 class NestjsUserRepository implements UserRepository {
   NestjsUserRepository(this._dio);

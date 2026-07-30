@@ -5,12 +5,21 @@ import 'package:intl/intl.dart';
 /// Depende de `initializeDateFormatting('pt_BR', null)` chamado no `main.dart`.
 final DateFormat _dateTimeFormatter = DateFormat('dd/MM/yyyy HH:mm', 'pt_BR');
 final DateFormat _dateFormatter = DateFormat('dd/MM/yyyy', 'pt_BR');
+final DateFormat _timeFormatter = DateFormat('HH:mm', 'pt_BR');
 
 /// Formata data e hora no padrão brasileiro: `dd/mm/aaaa hh:mm` (hora local).
 String formatDateTime(DateTime? value) {
   final local = value?.toLocal();
   if (local == null) return 'Data não informada';
   return _dateTimeFormatter.format(local);
+}
+
+/// Formata apenas a hora no padrão brasileiro: `HH:mm` (hora local).
+/// Retorna vazio quando [value] é null (o chamador decide o fallback).
+String formatTime(DateTime? value) {
+  final local = value?.toLocal();
+  if (local == null) return '';
+  return _timeFormatter.format(local);
 }
 
 /// Tempo relativo em pt-BR: `agora mesmo`, `há X min`, `há X h`, `ontem`

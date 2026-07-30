@@ -56,10 +56,15 @@ abstract interface class ChildrenRepository {
     required double longitude,
   });
 
+  /// Atualiza o endereço. [includeReference] controla se a chave `reference`
+  /// (complemento) entra no payload: o backend só toca o campo quando a
+  /// chave vem — omiti-la preserva o valor já gravado. Passe `true` somente
+  /// quando o usuário editou o campo complemento (APP-01).
   Future<void> updateChildAddress({
     required int childId,
     required int addressId,
     required ChildAddress address,
+    bool includeReference = false,
   });
 
   Future<void> createChildAddress({

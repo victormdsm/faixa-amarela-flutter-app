@@ -11,17 +11,18 @@ import '../../../../core/models/catalog_option.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/presentation/widgets/app_feedback.dart';
 import '../../../../core/presentation/widgets/app_shared_widgets.dart';
+import '../../../../core/presentation/widgets/change_password_dialog.dart';
 import '../../../../core/presentation/widgets/faixa_app_bar.dart';
 import '../../../../core/presentation/widgets/faixa_image_picker.dart';
 import '../../../../core/presentation/widgets/faixa_profile_hero.dart';
 import '../../../../core/presentation/widgets/faixa_section_card.dart';
+import '../../../../data/nestjs_user_repository.dart';
 import '../../../../domain/models/driver_profile.dart';
 import '../../../../domain/models/driver_profile_change_request.dart';
 import '../../../auth/presentation/state/app_session_controller.dart';
 import '../../../catalog/data/catalog_repository.dart';
 import '../providers/driver_portal_providers.dart';
 import '../widgets/driver_coverage_section.dart';
-import '../widgets/driver_password_section.dart';
 import '../widgets/driver_vehicle_section.dart';
 import 'driver_settings_change_detection.dart';
 
@@ -45,8 +46,6 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _passwordConfirmController = TextEditingController();
   final _infoController = TextEditingController();
   final _cnhController = TextEditingController();
   final _vehicleBrandController = TextEditingController();
@@ -113,8 +112,6 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
     _nameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
-    _passwordController.dispose();
-    _passwordConfirmController.dispose();
     _infoController.dispose();
     _cnhController.dispose();
     _vehicleBrandController.dispose();
@@ -127,8 +124,6 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
   @override
   Widget build(BuildContext context) {
     final profileAsync = ref.watch(driverProfileProvider);
-    final session = ref.watch(appSessionControllerProvider).session;
-    final isAdminAppUser = session?.user.isAdmin ?? false;
     final schoolsAsync = ref.watch(schoolsCatalogProvider);
     final districtsAsync = ref.watch(districtsCatalogProvider);
     final shiftsAsync = ref.watch(shiftsCatalogProvider);
@@ -267,25 +262,17 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                     const SizedBox(height: AppSpacing.md),
                     TextFormField(
                       controller: _emailController,
-                      enabled: !_isSaving && isAdminAppUser,
+                      // APP-06: troca de e-mail exige verificação fora do app —
+                      // o campo é somente leitura para não dar a ilusão de
+                      // que o "Salvar" persiste um novo e-mail.
+                      readOnly: true,
+                      enabled: !_isSaving,
                       keyboardType: TextInputType.emailAddress,
-                      decoration: InputDecoration(
+                      decoration: const InputDecoration(
                         labelText: 'E-mail',
-                        prefixIcon: const Icon(Icons.mail_outline_rounded),
-                        helperText: isAdminAppUser
-                            ? 'Admin pode atualizar o e-mail de acesso.'
-                            : null,
+                        prefixIcon: Icon(Icons.mail_outline_rounded),
+                        helperText: 'Para alterar o e-mail, fale com o suporte.',
                       ),
-                      validator: (value) {
-                        if (!isAdminAppUser) return null;
-                        final email = (value ?? '').trim();
-                        if (email.isEmpty) return 'Informe o e-mail.';
-                        final regex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
-                        if (!regex.hasMatch(email)) {
-                          return 'Informe um e-mail válido.';
-                        }
-                        return null;
-                      },
                     ),
                     const SizedBox(height: AppSpacing.md),
                     TextFormField(
@@ -351,18 +338,25 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                 ),
               ),
               const SizedBox(height: AppSpacing.lg),
-              if (isAdminAppUser)
-                FaixaSectionCard(
-                  icon: Icons.lock_outline_rounded,
-                  title: 'Alterar senha',
-                  child: DriverPasswordSection(
-                    isSaving: _isSaving,
-                    passwordController: _passwordController,
-                    passwordConfirmController: _passwordConfirmController,
-                    showCurrentPassword: false,
+              FaixaSectionCard(
+                icon: Icons.lock_outline_rounded,
+                title: 'Segurança',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(
+                    Icons.lock_outline_rounded,
+                    color: AppColors.ink,
                   ),
+                  title: const Text('Alterar senha'),
+                  subtitle: const Text('Senha atual + nova senha'),
+                  trailing: const Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppColors.muted,
+                  ),
+                  onTap: _isSaving ? null : () => _changePassword(context),
                 ),
-              if (isAdminAppUser) const SizedBox(height: AppSpacing.lg),
+              ),
+              const SizedBox(height: AppSpacing.lg),
               DriverCoverageSection(
                 schoolsAsync: schoolsAsync,
                 districtsAsync: districtsAsync,
@@ -440,8 +434,6 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
     _nameController.text = (data['name'] ?? '').toString();
     _emailController.text = (_email ?? '');
     _phoneController.text = (data['cellPhone'] ?? '').toString();
-    _passwordController.clear();
-    _passwordConfirmController.clear();
     _infoController.text = (data['information'] ?? '').toString();
     _cnhController.text = (data['cnh'] ?? '').toString();
     _originalCnh = _cnhController.text.trim();
@@ -629,6 +621,46 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
     }
   }
 
+  /// APP-05: troca de senha de verdade — valida os campos no diálogo e
+  /// chama `PUT /users/me/password` (senha atual + nova senha). O backend
+  /// responde 401 com "Senha atual incorreta." quando a atual não confere;
+  /// a mensagem vai direto para o snackbar.
+  Future<void> _changePassword(BuildContext context) async {
+    final result = await showDialog<PasswordResult>(
+      context: context,
+      builder: (_) => const ChangePasswordDialog(),
+    );
+    if (result == null || !context.mounted) return;
+
+    setState(() => _isSaving = true);
+    try {
+      await ref
+          .read(userRepositoryProvider)
+          .changePassword(
+            currentPassword: result.currentPassword,
+            newPassword: result.newPassword,
+          );
+      if (!context.mounted) return;
+      showAppSnackBar(
+        context,
+        message: 'Senha alterada com sucesso.',
+        type: AppFeedbackType.success,
+      );
+    } on ApiException catch (e) {
+      if (!context.mounted) return;
+      showAppSnackBar(context, message: e.message, type: AppFeedbackType.error);
+    } catch (_) {
+      if (!context.mounted) return;
+      showAppSnackBar(
+        context,
+        message: 'Falha ao alterar a senha.',
+        type: AppFeedbackType.error,
+      );
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
   Future<void> _confirmSignOut() async {
     final shouldSignOut = await showDialog<bool>(
       context: context,
@@ -696,27 +728,6 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
       return;
     }
 
-    final isAdminAppUser = session.user.isAdmin;
-    final newPassword = _passwordController.text.trim();
-    final confirmPassword = _passwordConfirmController.text.trim();
-    if (isAdminAppUser &&
-        (newPassword.isNotEmpty || confirmPassword.isNotEmpty)) {
-      if (newPassword.length < 6) {
-        messenger.showSnackBar(
-          const SnackBar(
-            content: Text('A nova senha deve ter pelo menos 6 caracteres.'),
-          ),
-        );
-        return;
-      }
-      if (newPassword != confirmPassword) {
-        messenger.showSnackBar(
-          const SnackBar(content: Text('A confirmação de senha não confere.')),
-        );
-        return;
-      }
-    }
-
     // Detecta edições nos dados do veículo comparando com os valores
     // carregados do servidor. Dados da van (e foto da van) não são mais
     // persistidos direto: seguem na solicitação de aprovação do admin.
@@ -739,6 +750,12 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
     final cnhChanged = cnh != _originalCnh;
 
     final hasCoverageChanges = _hasCoverageChanges();
+    // APP-02: o mapa bairro→turnos só é enviado quando o motorista editou
+    // de fato — antes, uma troca de foto/avatar reenviava o mapa inteiro.
+    final districtShiftEdited = hasDistrictShiftChanges(
+      districtShiftMap: _districtShiftMap,
+      originalDistrictShiftMap: _originalDistrictShiftMap,
+    );
 
     setState(() => _isSaving = true);
     DriverProfile? updatedProfile;
@@ -763,10 +780,12 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
         }
         await repo.submitRequest(
           schoolIds: _selectedSchoolIds.toList()..sort(),
-          districtShiftMap: {
-            for (final entry in _districtShiftMap.entries)
-              entry.key: (entry.value.toList()..sort()),
-          },
+          districtShiftMap: districtShiftEdited
+              ? {
+                  for (final entry in _districtShiftMap.entries)
+                    entry.key: (entry.value.toList()..sort()),
+                }
+              : null,
           avatarImagePath: avatarUrl,
           vehicleImagePath: vehicleImageUrl,
           vehicleId: _vehicleId,
@@ -785,7 +804,6 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
           .read(driverProfileRepositoryProvider)
           .updateBasicProfile(
             name: _nameController.text.trim(),
-            email: isAdminAppUser ? _emailController.text.trim() : null,
             cellPhone: _phoneController.text.trim(),
             information: _infoController.text.trim(),
             cnh: cnhChanged ? cnh : null,

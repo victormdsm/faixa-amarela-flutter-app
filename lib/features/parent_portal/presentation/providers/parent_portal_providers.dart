@@ -2,15 +2,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/models/paginated_result.dart';
 import '../../../../core/network/network_providers.dart';
+import '../../../../data/nestjs_user_repository.dart';
 import '../../../../domain/models/child.dart';
 import '../../../../domain/models/enrollment.dart';
 import '../../../../domain/repositories/children_repository.dart';
 import '../../../../domain/repositories/enrollments_repository.dart';
-import '../../../../domain/repositories/user_repository.dart';
 import '../../data/nestjs_children_repository.dart';
 import '../../data/nestjs_enrollments_repository.dart';
 import '../../data/nestjs_parent_routing_repository.dart';
-import '../../data/nestjs_user_repository.dart';
 import '../state/add_child_controller.dart';
 import '../state/children_controller.dart';
 import '../state/enrollments_controller.dart';
@@ -64,10 +63,6 @@ final enrollmentsControllerProvider =
 
 final addChildControllerProvider =
     AsyncNotifierProvider<AddChildController, void>(AddChildController.new);
-
-final userRepositoryProvider = Provider<UserRepository>(
-  (ref) => NestjsUserRepository(ref.watch(dioProvider)),
-);
 
 final parentUserProfileProvider = FutureProvider.autoDispose((ref) async {
   final repo = ref.watch(userRepositoryProvider);

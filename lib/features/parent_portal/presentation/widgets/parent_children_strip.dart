@@ -4,7 +4,49 @@ import '../../../../app/theme/app_theme.dart';
 import '../../../../domain/models/child.dart';
 
 /// Status simplificado de um dependente na dashboard.
-enum _ChildStatus { boarded, waiting, notBoarded }
+enum ChildBoardingStatus { boarded, waiting, notBoarded }
+
+/// Resolve o status de embarque do filho cruzando com os boardings do dia
+/// (payload de `GET /parent/boardings`).
+///
+/// APP-04: o vínculo filho↔boarding é feito pelo caminho real do payload —
+/// `boarding['client']['child']['id']` (o mesmo usado em
+/// `parent_boardings_page.dart`). Antes o código lia `boarding['childId']`,
+/// chave que não existe no contrato, e o badge nunca casava por id.
+///
+/// APP-08: `absent` (status emitido pelo backend quando o motorista marca
+/// falta) conta como "Não embarcou".
+ChildBoardingStatus resolveChildBoardingStatus({
+  required int childId,
+  required String childName,
+  required List<Map<String, dynamic>> boardings,
+}) {
+  final normalizedName = childName.toLowerCase().trim();
+
+  for (final boarding in boardings) {
+    final client = boarding['client'];
+    final child = client is Map ? client['child'] : null;
+    final bChildId = child is Map ? (child['id'] as num?)?.toInt() : null;
+    final bName = child is Map
+        ? child['name']?.toString().toLowerCase().trim()
+        : null;
+    final matches =
+        (bChildId != null && bChildId > 0 && bChildId == childId) ||
+        (normalizedName.isNotEmpty && bName == normalizedName);
+    if (!matches) continue;
+
+    final status = boarding['status']?.toString().toLowerCase() ?? '';
+    if (status == 'boarded' || status == 'embarcado' || status == 'done') {
+      return ChildBoardingStatus.boarded;
+    }
+    if (status == 'not_boarded' ||
+        status == 'nao_embarcado' ||
+        status == 'absent') {
+      return ChildBoardingStatus.notBoarded;
+    }
+  }
+  return ChildBoardingStatus.waiting;
+}
 
 /// Lista horizontal compacta de dependentes do responsavel.
 class ParentChildrenStrip extends StatelessWidget {
@@ -35,7 +77,11 @@ class ParentChildrenStrip extends StatelessWidget {
         separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.md),
         itemBuilder: (context, index) {
           final child = children[index];
-          final status = _resolveStatus(child);
+          final status = resolveChildBoardingStatus(
+            childId: child.id,
+            childName: child.name,
+            boardings: boardings,
+          );
           return _ChildChip(
             name: child.name,
             status: status,
@@ -45,51 +91,29 @@ class ParentChildrenStrip extends StatelessWidget {
       ),
     );
   }
-
-  _ChildStatus _resolveStatus(Child child) {
-    final childId = child.id;
-    final childName = child.name.toLowerCase().trim();
-
-    for (final boarding in boardings) {
-      final bChildId = boarding['childId'];
-      final bName = boarding['childName']?.toString().toLowerCase().trim();
-      final matches =
-          (bChildId == childId) || (childName.isNotEmpty && bName == childName);
-      if (!matches) continue;
-
-      final status = boarding['status']?.toString().toLowerCase() ?? '';
-      if (status == 'boarded' || status == 'embarcado' || status == 'done') {
-        return _ChildStatus.boarded;
-      }
-      if (status == 'not_boarded' || status == 'nao_embarcado') {
-        return _ChildStatus.notBoarded;
-      }
-    }
-    return _ChildStatus.waiting;
-  }
 }
 
 class _ChildChip extends StatelessWidget {
   const _ChildChip({required this.name, required this.status, this.onTap});
 
   final String name;
-  final _ChildStatus status;
+  final ChildBoardingStatus status;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final (label, color, icon) = switch (status) {
-      _ChildStatus.boarded => (
+      ChildBoardingStatus.boarded => (
         'Embarcou',
         AppColors.success,
         Icons.check_rounded,
       ),
-      _ChildStatus.notBoarded => (
+      ChildBoardingStatus.notBoarded => (
         'Nao embarcou',
         AppColors.danger,
         Icons.close_rounded,
       ),
-      _ChildStatus.waiting => (
+      ChildBoardingStatus.waiting => (
         'Aguardando',
         AppColors.warning,
         Icons.schedule_rounded,

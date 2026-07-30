@@ -75,6 +75,15 @@ class AddChildController extends AsyncNotifier<void> {
         coordChanged(before.longitude, after.longitude);
   }
 
+  /// Detecta se o campo complemento foi editado (APP-01). Só nesse caso a
+  /// chave `reference` vai no payload do update — reenviá-la sem edição
+  /// apagaria o complemento gravado quando o backend não a devolveu no GET
+  /// (campo do form viria vazio e o null seria persistido por cima).
+  static bool complementChanged(ChildAddress? before, ChildAddress after) {
+    String norm(String? s) => (s ?? '').trim();
+    return norm(before?.complement) != norm(after.complement);
+  }
+
   AppFailure _mapError(Object error, String contextMessage) {
     if (error is AppFailure) return error;
     if (error is ApiException) {
@@ -173,6 +182,13 @@ class AddChildController extends AsyncNotifier<void> {
               childId: id,
               addressId: addressId,
               address: formData.address,
+              // APP-01: `reference` só é enviada quando o pai editou o
+              // complemento; caso contrário a chave é omitida e o backend
+              // preserva o valor gravado.
+              includeReference: complementChanged(
+                formData.originalAddress,
+                formData.address,
+              ),
             );
           }
         } else {

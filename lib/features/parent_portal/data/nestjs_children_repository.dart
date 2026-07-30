@@ -182,12 +182,20 @@ class NestjsChildrenRepository implements ChildrenRepository {
 
   /// Campos de endereço enviados no create/update. city/state/neighborhood
   /// são opcionais no DTO do backend e só vão quando preenchidos.
-  Map<String, dynamic> _addressPayload(ChildAddress address, bool isDefault) {
+  ///
+  /// `reference` (complemento) só entra quando [includeReference] é true:
+  /// no update, o backend aplica `reference` sempre que a chave vem — até
+  /// `null` apaga o valor gravado. Omitir a chave preserva o dado (APP-01).
+  Map<String, dynamic> _addressPayload(
+    ChildAddress address,
+    bool isDefault, {
+    required bool includeReference,
+  }) {
     return <String, dynamic>{
       'zipcode': (address.zipCode ?? '').trim(),
       'street': address.street.trim(),
       'number': address.number.trim(),
-      'reference': address.complement?.trim(),
+      if (includeReference) 'reference': address.complement?.trim(),
       'type': 'home',
       'isDefault': isDefault,
       if ((address.district ?? '').trim().isNotEmpty)
@@ -209,7 +217,13 @@ class NestjsChildrenRepository implements ChildrenRepository {
   }) async {
     await _dio.post<Map<String, dynamic>>(
       '/parent/children/$childId/addresses',
-      data: _addressPayload(address, isDefault),
+      // Create: o complemento só vai quando o usuário digitou algo — um
+      // endereço novo sem complemento não precisa da chave (APP-01).
+      data: _addressPayload(
+        address,
+        isDefault,
+        includeReference: (address.complement ?? '').trim().isNotEmpty,
+      ),
     );
   }
 
@@ -311,11 +325,12 @@ class NestjsChildrenRepository implements ChildrenRepository {
     required int childId,
     required int addressId,
     required ChildAddress address,
+    bool includeReference = false,
   }) async {
     try {
       await _dio.put<Map<String, dynamic>>(
         '/parent/children/$childId/addresses/$addressId',
-        data: _addressPayload(address, true),
+        data: _addressPayload(address, true, includeReference: includeReference),
       );
     } catch (e) {
       throw _mapException(e);

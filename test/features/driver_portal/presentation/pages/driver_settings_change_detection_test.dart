@@ -113,4 +113,51 @@ void main() {
       expect(detect(vehicleEdited: true), isTrue);
     });
   });
+
+  group('hasDistrictShiftChanges (APP-02)', () {
+    bool detect({
+      Map<int, Set<int>>? districtShiftMap,
+      Map<int, Set<int>>? originalDistrictShiftMap,
+    }) {
+      return hasDistrictShiftChanges(
+        districtShiftMap: districtShiftMap ?? const {
+          10: {1, 2},
+        },
+        originalDistrictShiftMap: originalDistrictShiftMap ?? const {
+          10: {1, 2},
+        },
+      );
+    }
+
+    test('returns false when the map is untouched (ex.: só trocou a foto)', () {
+      expect(detect(), isFalse);
+    });
+
+    test('returns true when a shift was toggled', () {
+      expect(
+        detect(
+          districtShiftMap: const {
+            10: {1},
+          },
+        ),
+        isTrue,
+      );
+    });
+
+    test('returns true when a district was added', () {
+      expect(
+        detect(
+          districtShiftMap: const {
+            10: {1, 2},
+            20: {1},
+          },
+        ),
+        isTrue,
+      );
+    });
+
+    test('returns true when a district was removed', () {
+      expect(detect(districtShiftMap: const {}), isTrue);
+    });
+  });
 }

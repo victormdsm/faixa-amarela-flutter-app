@@ -94,6 +94,43 @@ class _ScrollableStatus extends StatelessWidget {
   }
 }
 
+/// Visual (rótulo, cores, ícone) de um status de embarque — extraído do
+/// card para ser testável isoladamente.
+///
+/// APP-08: o backend emite `absent` quando o motorista marca falta; antes
+/// caía no fallback e aparecia o texto cru "absent" para o responsável.
+({String label, Color color, Color background, IconData icon})
+boardingStatusVisual(String status) {
+  return switch (status.toLowerCase()) {
+    'boarded' ||
+    'embarcado' => (
+      label: 'Embarcado',
+      color: AppColors.success,
+      background: AppColors.successSurface,
+      icon: Icons.login_rounded,
+    ),
+    'disembarked' ||
+    'desembarcado' => (
+      label: 'Desembarcado',
+      color: AppColors.slate,
+      background: AppColors.surfaceSoft,
+      icon: Icons.logout_rounded,
+    ),
+    'absent' => (
+      label: 'Não embarcou',
+      color: AppColors.danger,
+      background: AppColors.danger.withValues(alpha: 0.08),
+      icon: Icons.cancel_rounded,
+    ),
+    _ => (
+      label: status,
+      color: AppColors.ink,
+      background: AppColors.surfaceSoft,
+      icon: Icons.login_rounded,
+    ),
+  };
+}
+
 class _BoardingCard extends StatelessWidget {
   const _BoardingCard({required this.item});
   final Map<String, dynamic> item;
@@ -112,24 +149,12 @@ class _BoardingCard extends StatelessWidget {
     );
     final theme = Theme.of(context);
 
+    final visual = boardingStatusVisual(status);
+    final (statusColor, statusBg) = (visual.color, visual.background);
     final isDisembarked =
         status.toLowerCase() == 'disembarked' ||
         status.toLowerCase() == 'desembarcado';
-    final isBoarded =
-        status.toLowerCase() == 'boarded' ||
-        status.toLowerCase() == 'embarcado';
-    final (statusColor, statusBg) = switch (status.toLowerCase()) {
-      'boarded' || 'embarcado' => (AppColors.success, AppColors.successSurface),
-      'disembarked' ||
-      'desembarcado' => (AppColors.slate, AppColors.surfaceSoft),
-      _ => (AppColors.ink, AppColors.surfaceSoft),
-    };
-    final statusLabel = isBoarded
-        ? 'Embarcado'
-        : isDisembarked
-        ? 'Desembarcado'
-        : status;
-    final tileIcon = isDisembarked ? Icons.logout_rounded : Icons.login_rounded;
+    final isAbsent = status.toLowerCase() == 'absent';
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
@@ -155,7 +180,7 @@ class _BoardingCard extends StatelessWidget {
               color: statusBg,
               borderRadius: BorderRadius.circular(AppRadius.md),
             ),
-            child: Icon(tileIcon, color: statusColor, size: 22),
+            child: Icon(visual.icon, color: statusColor, size: 22),
           ),
           const SizedBox(width: AppSpacing.md),
           Expanded(
@@ -170,6 +195,8 @@ class _BoardingCard extends StatelessWidget {
                             ? childName
                             : isDisembarked
                             ? 'Desembarque'
+                            : isAbsent
+                            ? 'Não embarcou'
                             : 'Embarque',
                         style: theme.textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.w700,
@@ -190,7 +217,7 @@ class _BoardingCard extends StatelessWidget {
                         ),
                       ),
                       child: Text(
-                        statusLabel,
+                        visual.label,
                         style: theme.textTheme.labelSmall?.copyWith(
                           color: statusColor,
                           fontWeight: FontWeight.w700,

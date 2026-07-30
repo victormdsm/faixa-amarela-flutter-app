@@ -116,6 +116,7 @@ class FakeChildrenRepository implements ChildrenRepository {
     required int childId,
     required int addressId,
     required ChildAddress address,
+    bool includeReference = false,
   }) async {
     final index = _addresses.indexWhere(
       (a) => a['child_id'] == childId && a['id'] == addressId,
@@ -130,6 +131,7 @@ class FakeChildrenRepository implements ChildrenRepository {
       'number': address.number,
       'complement': address.complement,
       'zip_code': address.zipCode,
+      'include_reference': includeReference,
     };
   }
 
