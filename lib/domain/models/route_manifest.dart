@@ -46,7 +46,7 @@ enum StopStatus {
 
 class RouteStop {
   const RouteStop({
-    required this.id,
+    this.id,
     required this.childId,
     required this.childName,
     required this.schoolName,
@@ -60,7 +60,9 @@ class RouteStop {
     this.disembarkedAt,
   });
 
-  final int id;
+  /// APP-24: o backend não emite id de parada no manifesto — opcional,
+  /// default null (antes era required e todo stop chegava com id=0).
+  final int? id;
   final int childId;
   final String childName;
   final String schoolName;
@@ -72,27 +74,6 @@ class RouteStop {
   final double? longitude;
   final DateTime? boardedAt;
   final DateTime? disembarkedAt;
-
-  factory RouteStop.fromJson(Map<String, dynamic> json) {
-    return RouteStop(
-      id: (json['id'] as num?)?.toInt() ?? 0,
-      childId: (json['childId'] as num?)?.toInt() ?? 0,
-      childName: (json['childName'] ?? '').toString(),
-      schoolName: (json['schoolName'] ?? '').toString(),
-      schoolId: (json['schoolId'] as num?)?.toInt(),
-      address: (json['address'] ?? '').toString(),
-      sequence: (json['sequence'] as num?)?.toInt() ?? 0,
-      status: StopStatus.fromJson((json['status'] ?? 'pending').toString()),
-      latitude: (json['latitude'] as num?)?.toDouble(),
-      longitude: (json['longitude'] as num?)?.toDouble(),
-      boardedAt: json['boardedAt'] != null
-          ? DateTime.tryParse(json['boardedAt'].toString())
-          : null,
-      disembarkedAt: json['disembarkedAt'] != null
-          ? DateTime.tryParse(json['disembarkedAt'].toString())
-          : null,
-    );
-  }
 }
 
 class RouteManifest {
@@ -121,52 +102,4 @@ class RouteManifest {
   final DateTime? finishedAt;
   final RouteStatus status;
   final List<RouteStop> stops;
-
-  factory RouteManifest.fromJson(Map<String, dynamic> json) {
-    // O NestJS retorna route.id como int e manifest.id como UUID.
-    // Priorizamos routeId quando disponível.
-    int resolveId() {
-      if (json['routeId'] is num) return (json['routeId'] as num).toInt();
-      if (json['routeId'] is String) return int.tryParse(json['routeId']) ?? 0;
-      if (json['id'] is num) return (json['id'] as num).toInt();
-      return 0;
-    }
-
-    String? resolveManifestId() {
-      if (json['manifestId'] is String) return json['manifestId'] as String;
-      if (json['id'] is String) return json['id'] as String;
-      return null;
-    }
-
-    int? resolveShiftId() {
-      if (json['shiftId'] == null) return null;
-      if (json['shiftId'] is num) return (json['shiftId'] as num).toInt();
-      if (json['shiftId'] is String) {
-        return int.tryParse(json['shiftId'] as String);
-      }
-      return null;
-    }
-
-    return RouteManifest(
-      id: resolveId(),
-      manifestId: resolveManifestId(),
-      driverId: (json['driverId'] as num?)?.toInt() ?? 0,
-      vanId: (json['vanId'] as num?)?.toInt() ?? 0,
-      shiftId: resolveShiftId(),
-      startedAt: json['startedAt'] != null
-          ? DateTime.tryParse(json['startedAt'].toString())
-          : null,
-      finishedAt: json['finishedAt'] != null
-          ? DateTime.tryParse(json['finishedAt'].toString())
-          : null,
-      status: RouteStatus.fromJson((json['status'] ?? 'planning').toString()),
-      stops:
-          (json['stops'] as List<dynamic>?)
-              ?.map(
-                (e) => RouteStop.fromJson(Map<String, dynamic>.from(e as Map)),
-              )
-              .toList() ??
-          const [],
-    );
-  }
 }

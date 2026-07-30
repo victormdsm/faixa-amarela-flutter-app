@@ -24,8 +24,6 @@ class DriverProfileDto {
     this.schools = const [],
     this.districts = const [],
     this.districtShiftMap = const {},
-    this.coverageChangeRequest,
-    this.coverageChangeRequestsRecent = const [],
   });
 
   final int id;
@@ -53,8 +51,6 @@ class DriverProfileDto {
   /// Mapa real bairro→turnos vindo de `coverage.districtShiftMap` (APP-02).
   /// Vazio quando o backend não o envia.
   final Map<int, List<int>> districtShiftMap;
-  final Map<String, dynamic>? coverageChangeRequest;
-  final List<Map<String, dynamic>> coverageChangeRequestsRecent;
 
   factory DriverProfileDto.fromJson(Map<String, dynamic> json) {
     int toInt(dynamic value) {
@@ -143,12 +139,6 @@ class DriverProfileDto {
       schools: schools,
       districts: districts,
       districtShiftMap: districtShiftMap,
-      coverageChangeRequest: json['coverageChangeRequest'] is Map
-          ? Map<String, dynamic>.from(json['coverageChangeRequest'] as Map)
-          : null,
-      coverageChangeRequestsRecent: _listOfMaps(
-        json['coverageChangeRequestsRecent'],
-      ),
     );
   }
 
@@ -177,8 +167,6 @@ class DriverProfileDto {
       'cnhCategory': cnhCategory,
       'schools': schools,
       'districts': districts,
-      'coverageChangeRequest': coverageChangeRequest,
-      'coverageChangeRequestsRecent': coverageChangeRequestsRecent,
     };
   }
 
@@ -205,8 +193,6 @@ class DriverProfileDto {
       avatarUrl: avatarUrl,
       schools: schools,
       districts: districts,
-      coverageChangeRequest: coverageChangeRequest,
-      coverageChangeRequestsRecent: coverageChangeRequestsRecent,
     );
   }
 
@@ -238,8 +224,6 @@ class DriverProfileDto {
           if (((district['id'] as num?)?.toInt() ?? 0) > 0)
             (district['id'] as num).toInt(): toIntList(district['shiftIds']),
       },
-      coverageChangeRequest: profile.coverageChangeRequest,
-      coverageChangeRequestsRecent: profile.coverageChangeRequestsRecent,
     );
   }
 

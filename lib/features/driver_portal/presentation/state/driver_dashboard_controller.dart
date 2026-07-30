@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/network/api_exception.dart';
 import '../../../../domain/models/driver_profile.dart';
 import '../../../../domain/models/route_manifest.dart';
 import '../providers/driver_portal_providers.dart';
@@ -27,12 +28,14 @@ class DriverDashboardController extends AsyncNotifier<DriverDashboardState> {
     final driverRepo = ref.read(driverProfileRepositoryProvider);
     final routesRepo = ref.read(driverRoutesRepositoryProvider);
     final profile = await driverRepo.getDriverProfile();
-    // getActiveRoute é opcional: um motorista sem rota ativa retorna null,
-    // mas um erro de rede/API não deve impedir o carregamento do dashboard.
+    // APP-14: somente 404 significa "sem rota ativa" (null). Qualquer outro
+    // erro (rede, 5xx) propaga e vira estado de erro — nunca "sem rota"
+    // silencioso.
     RouteManifest? activeRoute;
     try {
       activeRoute = await routesRepo.getActiveRoute();
-    } catch (_) {
+    } on ApiException catch (e) {
+      if (e.statusCode != 404) rethrow;
       activeRoute = null;
     }
     return DriverDashboardState(profile: profile, activeRoute: activeRoute);
@@ -47,7 +50,8 @@ class DriverDashboardController extends AsyncNotifier<DriverDashboardState> {
       RouteManifest? activeRoute;
       try {
         activeRoute = await routesRepo.getActiveRoute();
-      } catch (_) {
+      } on ApiException catch (e) {
+        if (e.statusCode != 404) rethrow;
         activeRoute = null;
       }
       return DriverDashboardState(profile: profile, activeRoute: activeRoute);
@@ -63,5 +67,10 @@ class DriverDashboardController extends AsyncNotifier<DriverDashboardState> {
       final profile = await driverRepo.getDriverProfile();
       return DriverDashboardState(profile: profile, activeRoute: activeRoute);
     });
+    // APP-17: rota iniciada — mantém execução e lista de rotas em dia.
+    if (!state.hasError) {
+      ref.invalidate(driverRouteControllerProvider);
+      ref.invalidate(driverRoutesProvider);
+    }
   }
 }

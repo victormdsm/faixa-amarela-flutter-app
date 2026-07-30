@@ -425,6 +425,10 @@ class _SavedRouteCard extends ConsumerWidget {
         await ctrl.stopRouteTracking(silent: true);
       }
       ref.invalidate(driverRoutesProvider);
+      // APP-17/18: dashboard e execução de rota também dependem do estado
+      // da rota ativa — invalidar junto da lista.
+      ref.invalidate(driverRouteControllerProvider);
+      ref.invalidate(driverDashboardControllerProvider);
       if (!context.mounted) return;
       showAppSnackBar(
         context,

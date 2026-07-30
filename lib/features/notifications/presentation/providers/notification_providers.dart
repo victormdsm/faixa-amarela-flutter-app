@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:developer' as developer;
 
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -76,9 +77,20 @@ class PushRegistrationService {
           if (nextToken.isEmpty) return;
           final session = _ref.read(appSessionControllerProvider).session;
           if (session == null) return;
-          _ref
-              .read(notificationRepositoryProvider)
-              .saveDeviceToken(session.authorizationHeader, nextToken);
+          // APP-28: refresh de token em background nunca vira erro não
+          // tratado — falha é apenas logada.
+          unawaited(
+            _ref
+                .read(notificationRepositoryProvider)
+                .saveDeviceToken(session.authorizationHeader, nextToken)
+                .catchError((Object error) {
+                  developer.log(
+                    'Failed to save refreshed FCM token: $error',
+                    name: 'push_registration',
+                    error: error,
+                  );
+                }),
+          );
         });
       }
     } catch (error, stackTrace) {

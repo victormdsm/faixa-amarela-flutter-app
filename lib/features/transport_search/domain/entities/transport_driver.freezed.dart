@@ -22,9 +22,6 @@ mixin _$TransportDriver {
 @pragma('vm:prefer-inline')
 $TransportDriverCopyWith<TransportDriver> get copyWith => _$TransportDriverCopyWithImpl<TransportDriver>(this as TransportDriver, _$identity);
 
-  /// Serializes this TransportDriver to a JSON map.
-  Map<String, dynamic> toJson();
-
 
 @override
 bool operator ==(Object other) {
@@ -220,7 +217,6 @@ return $default(_that.id,_that.driverName,_that.vanName,_that.whatsappNumber,_th
 
 class _TransportDriver implements TransportDriver {
   const _TransportDriver({required this.id, required this.driverName, required this.vanName, required this.whatsappNumber, required final  List<String> schools, required final  List<String> neighborhoods, required final  List<ServicePeriod> periods, required this.availableSeats, required this.rating, this.yearsExperience = 0, this.note}): _schools = schools,_neighborhoods = neighborhoods,_periods = periods;
-  factory _TransportDriver.fromJson(Map<String, dynamic> json) => _$TransportDriverFromJson(json);
 
 @override final  String id;
 @override final  String driverName;
@@ -257,11 +253,6 @@ class _TransportDriver implements TransportDriver {
 @override @JsonKey(includeFromJson: false, includeToJson: false)
 @pragma('vm:prefer-inline')
 _$TransportDriverCopyWith<_TransportDriver> get copyWith => __$TransportDriverCopyWithImpl<_TransportDriver>(this, _$identity);
-
-@override
-Map<String, dynamic> toJson() {
-  return _$TransportDriverToJson(this, );
-}
 
 @override
 bool operator ==(Object other) {

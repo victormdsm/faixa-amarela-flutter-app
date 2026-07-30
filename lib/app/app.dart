@@ -8,6 +8,7 @@ import '../core/error/app_error_reporter.dart';
 import '../core/network/auth_interceptor.dart';
 import '../core/notifications/push_notifications.dart';
 import '../core/permissions/app_permission_service.dart';
+import '../features/ads/presentation/providers/ads_providers.dart';
 import '../features/auth/presentation/state/app_session_controller.dart';
 import '../features/driver_portal/presentation/providers/driver_portal_providers.dart';
 import '../features/notifications/presentation/providers/notification_providers.dart';
@@ -28,6 +29,9 @@ class _FaixaAmarelaAppState extends ConsumerState<FaixaAmarelaApp> {
   void _refreshNotifications() {
     ref.invalidate(unreadNotificationsCountProvider);
     ref.invalidate(notificationsProvider);
+    // APP-29: anúncios também valem por sessão/papel — recarrega no
+    // retorno ao foreground, seguindo o padrão das notificações.
+    ref.invalidate(adsProvider);
   }
 
   void _handleFcmData(Map<String, dynamic> data) {

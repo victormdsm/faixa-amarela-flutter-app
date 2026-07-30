@@ -186,31 +186,4 @@ void main() {
       expect(dto.documentType, ChildDocumentType.cpf);
     });
   });
-
-  group('Child.fromJson document fields', () {
-    test('defaults documentType to cpf when absent', () {
-      final child = Child.fromJson(const <String, dynamic>{
-        'id': 1,
-        'name': 'Ana Silva',
-        'cpf': '12345678901',
-      });
-
-      expect(child.documentType, ChildDocumentType.cpf);
-      expect(child.documentState, isNull);
-    });
-
-    test('parses rg with documentState and `document` key', () {
-      final child = Child.fromJson(const <String, dynamic>{
-        'id': 1,
-        'name': 'Ana Silva',
-        'document': '12.345.678-9',
-        'documentType': 'RG',
-        'documentState': 'pr',
-      });
-
-      expect(child.cpf, '12.345.678-9');
-      expect(child.documentType, ChildDocumentType.rg);
-      expect(child.documentState, 'pr');
-    });
-  });
 }

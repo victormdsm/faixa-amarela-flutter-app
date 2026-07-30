@@ -42,6 +42,10 @@ class ChildrenController extends AsyncNotifier<List<Child>> {
       await repo.deleteChild(id);
       return _load();
     });
+    // APP-15: mantém a listagem canônica do portal em dia após o delete.
+    if (!state.hasError) {
+      ref.invalidate(parentChildrenProvider);
+    }
   }
 
   Future<Enrollment?> findActiveEnrollmentForChild(int childId) async {

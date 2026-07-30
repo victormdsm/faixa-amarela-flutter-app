@@ -294,7 +294,6 @@ class NestjsRoutesRepository implements RoutesRepository {
     if (stop != null) return stop;
 
     return RouteStop(
-      id: 0,
       childId: childId,
       childName: 'Aluno $childId',
       schoolName: '',

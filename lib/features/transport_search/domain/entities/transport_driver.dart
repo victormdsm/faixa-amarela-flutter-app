@@ -20,7 +20,4 @@ abstract class TransportDriver with _$TransportDriver {
     @Default(0) int yearsExperience,
     String? note,
   }) = _TransportDriver;
-
-  factory TransportDriver.fromJson(Map<String, dynamic> json) =>
-      _$TransportDriverFromJson(json);
 }

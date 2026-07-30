@@ -36,8 +36,10 @@ class NestjsDriverRepository implements DriverRepository {
   }) async {
     try {
       // 1. Atualiza dados do motorista (CNH e informacoes).
+      // APP-11: quando o parametro vem nao-nulo, o motorista editou o campo —
+      // envia o valor mesmo vazio (''), pois o backend aceita '' como limpeza.
       final driverPayload = <String, dynamic>{};
-      if (cnh != null && cnh.trim().isNotEmpty) {
+      if (cnh != null) {
         driverPayload['cnh'] = cnh.trim();
       }
       if (information != null) {
@@ -58,10 +60,11 @@ class NestjsDriverRepository implements DriverRepository {
         driverProfileData = driverResponse.data ?? const <String, dynamic>{};
       }
 
-      // 2. Atualiza dados do usuario (nome e telefone).
+      // 2. Atualiza dados do usuario (nome e telefone). Telefone editado para
+      // vazio vai como '' para limpar o dado no servidor (APP-11).
       final userPayload = <String, dynamic>{};
       if (name.trim().isNotEmpty) userPayload['name'] = name.trim();
-      if (cellPhone != null && cellPhone.trim().isNotEmpty) {
+      if (cellPhone != null) {
         userPayload['cellPhone'] = cellPhone.trim();
       }
 
@@ -87,32 +90,6 @@ class NestjsDriverRepository implements DriverRepository {
       }
 
       return DriverProfileDto.fromJson(merged).toDomain();
-    } catch (error) {
-      throw ApiException.fromDio(error);
-    }
-  }
-
-  @override
-  Future<Map<String, dynamic>> updateMyVehicle({
-    required String plate,
-    String? brand,
-    String? color,
-    String? year,
-  }) async {
-    try {
-      // A placa e obrigatoria no backend (UpdateVehicleDto.placa); os demais
-      // campos so sao enviados quando informados (editados pelo motorista),
-      // para nao sobrescrever dados que nao foram tocados.
-      final response = await _dio.put<Map<String, dynamic>>(
-        '/drivers/me/vehicle',
-        data: <String, dynamic>{
-          'placa': plate,
-          'marca': ?brand,
-          'cor': ?color,
-          'ano': ?year,
-        },
-      );
-      return response.data ?? const <String, dynamic>{};
     } catch (error) {
       throw ApiException.fromDio(error);
     }

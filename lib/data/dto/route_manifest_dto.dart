@@ -153,7 +153,7 @@ class RouteManifestDto {
 
 class RouteStopDto {
   const RouteStopDto({
-    required this.id,
+    this.id,
     required this.childId,
     required this.childName,
     required this.schoolName,
@@ -167,7 +167,7 @@ class RouteStopDto {
     this.disembarkedAt,
   });
 
-  final int id;
+  final int? id;
   final int childId;
   final String childName;
   final String schoolName;
@@ -224,7 +224,7 @@ class RouteStopDto {
     }
 
     return RouteStopDto(
-      id: toInt(json['id']),
+      id: json['id'] == null ? null : toInt(json['id']),
       childId: childId,
       childName:
           (json['childName'] ?? childData['name'] ?? '').toString(),
@@ -257,7 +257,7 @@ class RouteStopDto {
 
   Map<String, dynamic> toJson() {
     return {
-      'id': id,
+      if (id != null) 'id': id,
       'childId': childId,
       'childName': childName,
       'schoolName': schoolName,

@@ -50,25 +50,6 @@ class Child {
   final bool isInDebt;
   final DateTime? createdAt;
   final String? photoUrl;
-
-  factory Child.fromJson(Map<String, dynamic> json) {
-    return Child(
-      id: (json['id'] as num?)?.toInt() ?? 0,
-      name: (json['name'] ?? '').toString(),
-      // Contrato novo manda `document`; respostas antigas mandam `cpf`.
-      cpf: (json['document'] ?? json['cpf'] ?? '').toString(),
-      documentType: ChildDocumentType.parse(json['documentType']),
-      documentState: json['documentState']?.toString(),
-      uuid: json['uuid']?.toString(),
-      schoolId: (json['schoolId'] as num?)?.toInt(),
-      shiftId: (json['shiftId'] as num?)?.toInt(),
-      isInDebt: json['isInDebt'] == true || json['isInDebt'] == 1,
-      createdAt: json['createdAt'] != null
-          ? DateTime.tryParse(json['createdAt'].toString())
-          : null,
-      photoUrl: json['photoUrl']?.toString(),
-    );
-  }
 }
 
 class ChildAddress {

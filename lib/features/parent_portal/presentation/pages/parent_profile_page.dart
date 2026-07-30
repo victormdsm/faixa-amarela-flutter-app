@@ -248,7 +248,7 @@ class _ParentProfilePageState extends ConsumerState<ParentProfilePage> {
       (data.cellPhone ?? '').toString(),
     );
     _email = data.email;
-    _avatarUrl = data.avatarUrl?.toString() ?? data.avatar?.toString();
+    _avatarUrl = data.avatarUrl;
     _avatarLocalPath = null;
     if (mounted) setState(() {});
   }
@@ -322,11 +322,9 @@ class _ParentProfilePageState extends ConsumerState<ParentProfilePage> {
     setState(() => _isSaving = true);
     try {
       final repo = ref.read(userRepositoryProvider);
-      String? avatarUrl = _avatarUrl;
 
       if (_avatarLocalPath != null) {
-        final uploaded = await repo.uploadAvatar(_avatarLocalPath!);
-        avatarUrl = uploaded.avatarUrl ?? uploaded.avatar;
+        await repo.uploadAvatar(_avatarLocalPath!);
       }
 
       final updated = await repo.updateMe(
@@ -334,13 +332,11 @@ class _ParentProfilePageState extends ConsumerState<ParentProfilePage> {
         cellPhone: _phoneController.text.replaceAll(RegExp(r'[^0-9]'), ''),
       );
 
+      // APP-21/22: AuthUser não carrega mais telefone/avatar — a sessão
+      // atualiza só o nome; o avatar exibido vem do perfil recém-salvo.
       ref
           .read(appSessionControllerProvider.notifier)
-          .updateCurrentUser(
-            name: updated.name,
-            cellPhone: updated.cellPhone,
-            avatarUrl: avatarUrl ?? updated.avatarUrl ?? updated.avatar,
-          );
+          .updateCurrentUser(name: updated.name);
 
       _applyProfile(updated);
       ref.invalidate(parentUserProfileProvider);

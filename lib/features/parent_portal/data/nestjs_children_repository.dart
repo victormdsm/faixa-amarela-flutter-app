@@ -186,11 +186,17 @@ class NestjsChildrenRepository implements ChildrenRepository {
   /// `reference` (complemento) só entra quando [includeReference] é true:
   /// no update, o backend aplica `reference` sempre que a chave vem — até
   /// `null` apaga o valor gravado. Omitir a chave preserva o dado (APP-01).
+  ///
+  /// APP-27: no update ([explicitNeighborhoodNull]), bairro esvaziado vai
+  /// como `neighborhood: null` explícito — o backend só altera o campo
+  /// quando a chave vem no payload, então omitir preservaria o valor antigo.
   Map<String, dynamic> _addressPayload(
     ChildAddress address,
     bool isDefault, {
     required bool includeReference,
+    bool explicitNeighborhoodNull = false,
   }) {
+    final district = (address.district ?? '').trim();
     return <String, dynamic>{
       'zipcode': (address.zipCode ?? '').trim(),
       'street': address.street.trim(),
@@ -198,8 +204,10 @@ class NestjsChildrenRepository implements ChildrenRepository {
       if (includeReference) 'reference': address.complement?.trim(),
       'type': 'home',
       'isDefault': isDefault,
-      if ((address.district ?? '').trim().isNotEmpty)
-        'neighborhood': address.district!.trim(),
+      if (district.isNotEmpty)
+        'neighborhood': district
+      else if (explicitNeighborhoodNull)
+        'neighborhood': null,
       if ((address.city ?? '').trim().isNotEmpty) 'city': address.city!.trim(),
       if ((address.state ?? '').trim().isNotEmpty)
         'state': address.state!.trim(),
@@ -330,7 +338,13 @@ class NestjsChildrenRepository implements ChildrenRepository {
     try {
       await _dio.put<Map<String, dynamic>>(
         '/parent/children/$childId/addresses/$addressId',
-        data: _addressPayload(address, true, includeReference: includeReference),
+        data: _addressPayload(
+          address,
+          true,
+          includeReference: includeReference,
+          // Update: bairro esvaziado precisa ir como null explícito (APP-27).
+          explicitNeighborhoodNull: true,
+        ),
       );
     } catch (e) {
       throw _mapException(e);

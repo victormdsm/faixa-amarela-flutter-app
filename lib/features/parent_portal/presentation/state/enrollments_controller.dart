@@ -26,6 +26,7 @@ class EnrollmentsController extends AsyncNotifier<List<Enrollment>> {
       await repo.acceptEnrollment(id);
       return _load();
     });
+    _invalidatePortalLists();
   }
 
   Future<void> reject(int id) async {
@@ -35,6 +36,7 @@ class EnrollmentsController extends AsyncNotifier<List<Enrollment>> {
       await repo.rejectEnrollment(id);
       return _load();
     });
+    _invalidatePortalLists();
   }
 
   Future<void> cancel(int id) async {
@@ -44,5 +46,15 @@ class EnrollmentsController extends AsyncNotifier<List<Enrollment>> {
       await repo.cancelEnrollment(id);
       return _load();
     });
+    _invalidatePortalLists();
+  }
+
+  /// APP-16: accept/reject/cancel mudam rotas, embarques e a lista de
+  /// crianças do responsável — invalida as listagens derivadas.
+  void _invalidatePortalLists() {
+    if (state.hasError) return;
+    ref.invalidate(parentRoutesProvider);
+    ref.invalidate(parentBoardingsProvider);
+    ref.invalidate(parentChildrenProvider);
   }
 }

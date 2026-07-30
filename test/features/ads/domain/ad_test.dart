@@ -84,26 +84,37 @@ void main() {
       expect(ad.isClickable, isFalse);
     });
 
-    test('resolvedImageUrl adds cache-bust only when updatedAt is present', () {
-      final withoutUpdatedAt = Ad.fromJson(const <String, dynamic>{
+    test('resolvedImageUrl adds cache-bust only when imageKey is present', () {
+      final withoutImageKey = Ad.fromJson(const <String, dynamic>{
         'id': 1,
         'name': 'x',
         'imageUrl': 'https://cdn.example.com/a.png',
       });
       expect(
-        withoutUpdatedAt.resolvedImageUrl,
+        withoutImageKey.resolvedImageUrl,
         'https://cdn.example.com/a.png',
       );
 
-      final withUpdatedAt = Ad.fromJson(const <String, dynamic>{
+      final withImageKey = Ad.fromJson(const <String, dynamic>{
         'id': 1,
         'name': 'x',
         'imageUrl': 'https://cdn.example.com/a.png',
-        'updatedAt': '2026-01-02T03:04:05.000Z',
+        'imageKey': 'banner-v2',
       });
       expect(
-        withUpdatedAt.resolvedImageUrl,
-        startsWith('https://cdn.example.com/a.png?v='),
+        withImageKey.resolvedImageUrl,
+        'https://cdn.example.com/a.png?k=banner-v2',
+      );
+
+      final withQueryAndImageKey = Ad.fromJson(const <String, dynamic>{
+        'id': 1,
+        'name': 'x',
+        'imageUrl': 'https://cdn.example.com/a.png?w=800',
+        'imageKey': 'banner-v2',
+      });
+      expect(
+        withQueryAndImageKey.resolvedImageUrl,
+        'https://cdn.example.com/a.png?w=800&k=banner-v2',
       );
     });
   });

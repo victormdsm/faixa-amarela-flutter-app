@@ -38,8 +38,8 @@ abstract final class AdPlacements {
 /// Anúncio retornado por `GET /publicities`.
 ///
 /// Contrato do item:
-/// `{ id, name, title?, imageUrl, linkUrl?, format, ctaLabel?, weight,
-///    placements: string[] }`.
+/// `{ id, name, title?, imageUrl, imageKey?, linkUrl?, format, ctaLabel?,
+///    weight, placements: string[] }`.
 class Ad {
   const Ad({
     required this.id,
@@ -51,7 +51,7 @@ class Ad {
     this.ctaLabel,
     this.weight = 0,
     this.placements = const <String>[],
-    this.updatedAt,
+    this.imageKey,
   });
 
   final int id;
@@ -64,9 +64,9 @@ class Ad {
   final int weight;
   final List<String> placements;
 
-  /// Não consta no contrato atual, mas é aceito quando presente para
-  /// cache-bust da imagem (ver [resolvedImageUrl]).
-  final DateTime? updatedAt;
+  /// Chave de versão da imagem enviada pelo backend (`imageKey`): muda
+  /// quando o criativo é substituído — base do cache-bust (APP-13).
+  final String? imageKey;
 
   bool get hasImage => imageUrl != null && imageUrl!.isNotEmpty;
 
@@ -78,15 +78,15 @@ class Ad {
   String get ctaText =>
       ctaLabel != null && ctaLabel!.trim().isNotEmpty ? ctaLabel! : 'Saiba mais';
 
-  /// URL da imagem com cache-bust `?v=<updatedAt>` quando o backend informa
-  /// `updatedAt`; caso contrário retorna a URL crua.
+  /// URL da imagem com cache-bust `?k=<imageKey>` quando o backend informa
+  /// `imageKey` (APP-13); caso contrário retorna a URL crua.
   String? get resolvedImageUrl {
     final raw = imageUrl;
     if (raw == null || raw.isEmpty) return null;
-    final version = updatedAt?.millisecondsSinceEpoch;
-    if (version == null) return raw;
+    final key = imageKey;
+    if (key == null || key.isEmpty) return raw;
     final separator = raw.contains('?') ? '&' : '?';
-    return '$raw${separator}v=$version';
+    return '$raw${separator}k=$key';
   }
 
   factory Ad.fromJson(Map<String, dynamic> json) {
@@ -115,7 +115,7 @@ class Ad {
       placements: rawPlacements is List
           ? rawPlacements.map((e) => e.toString()).toList(growable: false)
           : const <String>[],
-      updatedAt: DateTime.tryParse(json['updatedAt']?.toString() ?? ''),
+      imageKey: json['imageKey']?.toString(),
     );
   }
 }

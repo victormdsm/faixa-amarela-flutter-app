@@ -4,7 +4,6 @@ class UserProfile {
     required this.name,
     required this.email,
     this.cellPhone,
-    this.avatar,
     this.avatarUrl,
   });
 
@@ -12,7 +11,6 @@ class UserProfile {
   final String name;
   final String email;
   final String? cellPhone;
-  final String? avatar;
   final String? avatarUrl;
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
@@ -21,7 +19,6 @@ class UserProfile {
       name: (json['name'] ?? '').toString(),
       email: (json['email'] ?? '').toString(),
       cellPhone: json['cellPhone']?.toString(),
-      avatar: json['avatar']?.toString(),
       avatarUrl: json['avatarUrl']?.toString(),
     );
   }
@@ -32,7 +29,6 @@ class UserProfile {
       'name': name,
       'email': email,
       if (cellPhone != null) 'cellPhone': cellPhone,
-      if (avatar != null) 'avatar': avatar,
       if (avatarUrl != null) 'avatarUrl': avatarUrl,
     };
   }

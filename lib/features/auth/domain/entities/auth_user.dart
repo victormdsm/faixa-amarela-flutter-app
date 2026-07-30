@@ -4,9 +4,6 @@ class AuthUser {
     required this.name,
     required this.email,
     required this.roles,
-    this.cellPhone,
-    this.avatar,
-    this.primaryDriverId,
     this.isActivated = false,
   });
 
@@ -17,9 +14,6 @@ class AuthUser {
   /// Todas as roles retornadas pelo backend. O campo `role` (singular) é
   /// legado e não deve ser usado como fonte de verdade.
   final List<String> roles;
-  final String? cellPhone;
-  final String? avatar;
-  final int? primaryDriverId;
   final bool isActivated;
 
   /// Primeira role não-vazia da lista, usada apenas para mensagens legadas.
@@ -41,9 +35,6 @@ class AuthUser {
     String? name,
     String? email,
     List<String>? roles,
-    String? cellPhone,
-    String? avatar,
-    int? primaryDriverId,
     bool? isActivated,
   }) {
     return AuthUser(
@@ -51,9 +42,6 @@ class AuthUser {
       name: name ?? this.name,
       email: email ?? this.email,
       roles: roles ?? this.roles,
-      cellPhone: cellPhone ?? this.cellPhone,
-      avatar: avatar ?? this.avatar,
-      primaryDriverId: primaryDriverId ?? this.primaryDriverId,
       isActivated: isActivated ?? this.isActivated,
     );
   }
@@ -64,9 +52,6 @@ class AuthUser {
       name: (json['name'] ?? '').toString(),
       email: json['email']?.toString(),
       roles: _extractRoles(json),
-      cellPhone: json['cellPhone']?.toString(),
-      avatar: json['avatar']?.toString(),
-      primaryDriverId: (json['primaryDriverId'] as num?)?.toInt(),
       // Defaults to true when the backend does not send isActive.
       isActivated: _extractIsActivated(json),
     );

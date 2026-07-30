@@ -31,7 +31,7 @@ class DriverCoverageSection extends StatelessWidget {
   final Set<int> selectedSchoolIds;
   final Map<int, Set<int>> districtShiftMap;
   final AsyncValue<List<DriverProfileChangeRequest>> requestsAsync;
-  final Map<String, dynamic>? pendingRequest;
+  final DriverProfileChangeRequest? pendingRequest;
   final bool isSaving;
   final ValueChanged<Set<int>> onSchoolsChanged;
   final ValueChanged<Set<int>> onDistrictsChanged;
@@ -125,7 +125,7 @@ class _CoverageStatusBanner extends StatelessWidget {
     required this.districtsCount,
   });
 
-  final Map<String, dynamic>? pendingRequest;
+  final DriverProfileChangeRequest? pendingRequest;
   final int schoolsCount;
   final int districtsCount;
 
@@ -134,24 +134,15 @@ class _CoverageStatusBanner extends StatelessWidget {
     final theme = Theme.of(context);
 
     if (pendingRequest != null) {
-      final status = (pendingRequest!['status'] ?? '')
-          .toString()
-          .toLowerCase()
-          .trim();
-      final requestedSchoolIds = pendingRequest!['requestedSchoolIds'] as List?;
-      final requestedDistrictShiftMap =
-          pendingRequest!['requestedDistrictShiftMap'] as Map?;
-      final schoolsReq = requestedSchoolIds?.length ?? 0;
-      final districtsReq = requestedDistrictShiftMap?.length ?? 0;
-      final reviewNote = (pendingRequest!['reviewNote'] ?? '')
-          .toString()
-          .trim();
+      final status = pendingRequest!.status.toLowerCase().trim();
+      final schoolsReq = pendingRequest!.requestedSchoolIds?.length ?? 0;
+      final districtsReq =
+          pendingRequest!.requestedDistrictShiftMap?.length ?? 0;
+      final reviewNote = (pendingRequest!.reviewNote ?? '').trim();
       final photoLabels = <String>[
-        if ((pendingRequest!['requestedAvatarPath']?.toString() ?? '')
-            .isNotEmpty)
+        if ((pendingRequest!.requestedAvatarPath ?? '').isNotEmpty)
           'foto do motorista',
-        if ((pendingRequest!['requestedVehicleImagePath']?.toString() ?? '')
-            .isNotEmpty)
+        if ((pendingRequest!.requestedVehicleImagePath ?? '').isNotEmpty)
           'foto do veículo',
       ];
       final coverageLabel = '$schoolsReq escola(s) e $districtsReq bairro(s)';

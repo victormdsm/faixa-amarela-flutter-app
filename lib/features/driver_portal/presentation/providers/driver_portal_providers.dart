@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/models/paginated_result.dart';
@@ -84,9 +85,15 @@ class DriverProfileController extends AsyncNotifier<Map<String, dynamic>> {
       // frescos. Se a rede falhar, cai no cache para não derrubar a tela.
       try {
         return await _fetch(userId);
-      } catch (_) {
+      } catch (e) {
         final cached = _storage.load(userId);
-        if (cached != null) return cached;
+        if (cached != null) {
+          // APP-28: o fallback silencioso escondia falhas de rede — logar.
+          debugPrint(
+            '[DriverProfileController] fetch falhou; usando cache local: $e',
+          );
+          return cached;
+        }
         rethrow;
       }
     }

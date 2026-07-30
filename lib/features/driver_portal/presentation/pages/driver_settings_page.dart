@@ -65,8 +65,6 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
   String? _vehicleImageLocalPath;
   String? _email;
   String? _cpf;
-  Map<String, dynamic>? _coverageChangeRequest;
-  List<DriverProfileChangeRequest> _coverageChangeRequestsRecent = const [];
   final Set<int> _selectedSchoolIds = <int>{};
   final Map<int, Set<int>> _districtShiftMap = <int, Set<int>>{};
   Set<int> _originalSelectedSchoolIds = <int>{};
@@ -124,6 +122,10 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
   @override
   Widget build(BuildContext context) {
     final profileAsync = ref.watch(driverProfileProvider);
+    // APP-10: a seção de solicitações é alimentada pelo provider canônico
+    // (/drivers/me/profile-change-requests) — o /drivers/me não expõe mais
+    // as chaves coverageChangeRequest(sRecent).
+    final changeRequestsAsync = ref.watch(driverProfileChangeRequestsProvider);
     final schoolsAsync = ref.watch(schoolsCatalogProvider);
     final districtsAsync = ref.watch(districtsCatalogProvider);
     final shiftsAsync = ref.watch(shiftsCatalogProvider);
@@ -363,8 +365,10 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                 shiftOptions: effectiveShiftOptions,
                 selectedSchoolIds: _selectedSchoolIds,
                 districtShiftMap: _districtShiftMap,
-                requestsAsync: AsyncValue.data(_coverageChangeRequestsRecent),
-                pendingRequest: _coverageChangeRequest,
+                requestsAsync: changeRequestsAsync,
+                pendingRequest: _latestChangeRequest(
+                  changeRequestsAsync.value,
+                ),
                 isSaving: _isSaving,
                 onSchoolsChanged: (value) => setState(() {
                   _selectedSchoolIds
@@ -439,13 +443,6 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
     _originalCnh = _cnhController.text.trim();
     _avatarImageUrl = data['avatarUrl']?.toString();
     _avatarImageLocalPath = null;
-    _coverageChangeRequest = _map(data['coverageChangeRequest']);
-    if (_coverageChangeRequest != null && _coverageChangeRequest!.isEmpty) {
-      _coverageChangeRequest = null;
-    }
-    _coverageChangeRequestsRecent = _listOfMaps(
-      data['coverageChangeRequestsRecent'],
-    ).map(_toChangeRequest).toList(growable: false);
 
     final van = _map(data['van']);
     // van inexistente é serializada com id 0 (DriverProfile.toJson): coage
@@ -491,9 +488,10 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
   }
 
   /// Sincroniza com dados frescos do servidor sem tocar nos campos de texto
-  /// (o motorista pode estar editando). Atualiza avatar, foto do veículo e o
-  /// status das solicitações — é o que faz a foto aprovada aparecer sozinha
-  /// quando o push `driver_profile_change_reviewed` invalida o provider.
+  /// (o motorista pode estar editando). Atualiza avatar e foto do veículo —
+  /// é o que faz a foto aprovada aparecer sozinha quando o push
+  /// `driver_profile_change_reviewed` invalida o provider. As solicitações
+  /// de alteração vêm do [driverProfileChangeRequestsProvider] (APP-10).
   void _syncRemoteState(Map<String, dynamic> data) {
     if (_avatarImageLocalPath == null) {
       _avatarImageUrl = data['avatarUrl']?.toString();
@@ -505,29 +503,24 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
       _vehicleImageUrl = van['imageUrl']?.toString();
     }
 
-    final pending = _map(data['coverageChangeRequest']);
-    _coverageChangeRequest = pending.isEmpty ? null : pending;
-    _coverageChangeRequestsRecent = _listOfMaps(
-      data['coverageChangeRequestsRecent'],
-    ).map(_toChangeRequest).toList(growable: false);
-
     if (mounted) setState(() {});
   }
 
-  DriverProfileChangeRequest _toChangeRequest(Map<String, dynamic> raw) {
-    return DriverProfileChangeRequest(
-      id: (raw['id'] as num?)?.toInt() ?? 0,
-      driverUserId: (raw['driverUserId'] as num?)?.toInt() ?? 0,
-      requestedByUserId: (raw['requestedByUserId'] as num?)?.toInt() ?? 0,
-      status: (raw['status'] ?? '').toString(),
-      reviewNote: raw['reviewNote']?.toString(),
-      reviewedAt: raw['reviewedAt'] != null
-          ? DateTime.tryParse(raw['reviewedAt'].toString())
-          : null,
-      createdAt: raw['createdAt'] != null
-          ? DateTime.tryParse(raw['createdAt'].toString())
-          : null,
-    );
+  /// Escolhe a solicitação exibida no banner: a pendente mais recente, se
+  /// houver; senão a última do histórico (aprovada/reprovada).
+  DriverProfileChangeRequest? _latestChangeRequest(
+    List<DriverProfileChangeRequest>? items,
+  ) {
+    if (items == null || items.isEmpty) return null;
+    final sorted = items.toList(growable: false)..sort((a, b) {
+      final aDate = a.createdAt ?? DateTime(1970);
+      final bDate = b.createdAt ?? DateTime(1970);
+      return bDate.compareTo(aDate);
+    });
+    for (final item in sorted) {
+      if (item.status.toLowerCase().trim() == 'pending') return item;
+    }
+    return sorted.first;
   }
 
   Future<void> _pickVehicleImage() async {

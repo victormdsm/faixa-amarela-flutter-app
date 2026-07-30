@@ -21,8 +21,6 @@ class DriverProfile {
     this.avatarUrl,
     this.schools = const [],
     this.districts = const [],
-    this.coverageChangeRequest,
-    this.coverageChangeRequestsRecent = const [],
   });
 
   final int id;
@@ -46,8 +44,6 @@ class DriverProfile {
   final String? avatarUrl;
   final List<Map<String, dynamic>> schools;
   final List<Map<String, dynamic>> districts;
-  final Map<String, dynamic>? coverageChangeRequest;
-  final List<Map<String, dynamic>> coverageChangeRequestsRecent;
 
   factory DriverProfile.fromJson(Map<String, dynamic> json) {
     final van = json['van'] is Map
@@ -88,12 +84,6 @@ class DriverProfile {
       avatarUrl: json['avatarUrl']?.toString(),
       schools: _listOfMaps(json['schools']),
       districts: _listOfMaps(json['districts']),
-      coverageChangeRequest: json['coverageChangeRequest'] is Map
-          ? Map<String, dynamic>.from(json['coverageChangeRequest'] as Map)
-          : null,
-      coverageChangeRequestsRecent: _listOfMaps(
-        json['coverageChangeRequestsRecent'],
-      ),
     );
   }
 
@@ -123,8 +113,6 @@ class DriverProfile {
       'cnhCategory': cnhCategory,
       'schools': schools,
       'districts': districts,
-      'coverageChangeRequest': coverageChangeRequest,
-      'coverageChangeRequestsRecent': coverageChangeRequestsRecent,
     };
   }
 

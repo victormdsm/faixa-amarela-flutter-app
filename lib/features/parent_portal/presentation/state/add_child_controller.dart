@@ -130,6 +130,8 @@ class AddChildController extends AsyncNotifier<void> {
         'Erro ao cadastrar dependente',
       );
     }
+    // APP-15: create concluído — invalida a listagem canônica do portal.
+    ref.invalidate(parentChildrenProvider);
     return child!;
   }
 
@@ -212,6 +214,8 @@ class AddChildController extends AsyncNotifier<void> {
         'Erro ao atualizar dependente',
       );
     }
+    // APP-15: update concluído — invalida a listagem canônica do portal.
+    ref.invalidate(parentChildrenProvider);
     return child!;
   }
 }

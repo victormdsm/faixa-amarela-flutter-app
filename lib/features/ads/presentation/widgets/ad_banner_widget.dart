@@ -93,6 +93,7 @@ class _AdBannerWidgetState extends ConsumerState<AdBannerWidget>
           ad.id,
           placement: widget.placement,
           surface: AdFormat.banner.wireValue,
+          role: widget.role,
         );
   }
 
@@ -103,6 +104,7 @@ class _AdBannerWidgetState extends ConsumerState<AdBannerWidget>
           ad.id,
           placement: widget.placement,
           surface: AdFormat.banner.wireValue,
+          role: widget.role,
         );
     await openAdLink(ad.linkUrl!);
   }

@@ -36,16 +36,6 @@ class _FakeDriverRepository implements DriverRepository {
     throw UnimplementedError();
   }
 
-  @override
-  Future<Map<String, dynamic>> updateMyVehicle({
-    required String plate,
-    String? brand,
-    String? color,
-    String? year,
-  }) async {
-    throw UnimplementedError();
-  }
-
   void setProfile(DriverProfile? profile) => _profile = profile;
 }
 

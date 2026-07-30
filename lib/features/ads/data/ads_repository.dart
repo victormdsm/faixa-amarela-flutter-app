@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/network_providers.dart';
@@ -27,6 +28,9 @@ class AdsRepository {
     required String placement,
     required AdRole role,
     String? deviceId,
+    // TODO(APP-12): o app ainda não tem fonte de cidade no perfil/seleção do
+    // usuário — quando existir, propagar até aqui para segmentar os anúncios.
+    String? cityId,
   }) async {
     try {
       final response = await _dio.get<dynamic>(
@@ -35,10 +39,12 @@ class AdsRepository {
           'placement': placement,
           'role': role.wireValue,
           'device_id': deviceId ?? await _deviceIdStorage.getOrCreate(),
+          'cityId': ?cityId,
         },
       );
       return _parseAds(response.data);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[AdsRepository.fetchAds] falhou ($placement): $e');
       return const [];
     }
   }
@@ -48,6 +54,7 @@ class AdsRepository {
     int adId, {
     String? placement,
     String? surface,
+    AdRole? role,
     String? deviceId,
   }) async {
     final key = '${placement ?? ''}:$adId';
@@ -57,6 +64,7 @@ class AdsRepository {
       'impression',
       placement: placement,
       surface: surface,
+      role: role,
       deviceId: deviceId,
     );
   }
@@ -65,6 +73,7 @@ class AdsRepository {
     int adId, {
     String? placement,
     String? surface,
+    AdRole? role,
     String? deviceId,
   }) async {
     await _track(
@@ -72,6 +81,7 @@ class AdsRepository {
       'click',
       placement: placement,
       surface: surface,
+      role: role,
       deviceId: deviceId,
     );
   }
@@ -81,6 +91,7 @@ class AdsRepository {
     String event, {
     String? placement,
     String? surface,
+    AdRole? role,
     String? deviceId,
   }) async {
     try {
@@ -89,11 +100,14 @@ class AdsRepository {
         data: <String, dynamic>{
           'placement': ?placement,
           'surface': ?surface,
+          // APP-25: o backend grava audience_role a partir deste campo.
+          'role': ?role?.wireValue,
           'deviceId': deviceId ?? await _deviceIdStorage.getOrCreate(),
         },
       );
-    } catch (_) {
+    } catch (e) {
       // Endpoint de métrica: não crítico.
+      debugPrint('[AdsRepository._track] $event/$adId falhou: $e');
     }
   }
 

@@ -62,14 +62,12 @@ class AppSessionController extends Notifier<AppSessionState> {
     );
   }
 
-  void updateCurrentUser({String? name, String? cellPhone, String? avatarUrl}) {
+  void updateCurrentUser({String? name}) {
     final current = state.session;
     if (current == null) return;
 
     final updatedUser = current.user.copyWith(
       name: name,
-      cellPhone: cellPhone,
-      avatar: avatarUrl,
     );
     final updated = AuthSession(
       accessToken: current.accessToken,

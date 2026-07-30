@@ -130,6 +130,9 @@ class _DriverRoutesPageState extends ConsumerState<DriverRoutesPage> {
           .read(driverTrackingControllerProvider.notifier)
           .stopRouteTracking(silent: true);
       ref.invalidate(driverRoutesProvider);
+      // APP-18: dashboard e execução também exibem a rota ativa.
+      ref.invalidate(driverRouteControllerProvider);
+      ref.invalidate(driverDashboardControllerProvider);
       if (!mounted) return;
       showAppSnackBar(
         context,
@@ -266,6 +269,9 @@ Future<void> _openAdhocPlanner(BuildContext context, WidgetRef ref) async {
         await startTrackingFromResponse(context, ref, response);
         if (!context.mounted) return;
         ref.invalidate(driverRoutesProvider);
+        // APP-17: rota iniciada — dashboard e execução refletem a nova rota.
+        ref.invalidate(driverRouteControllerProvider);
+        ref.invalidate(driverDashboardControllerProvider);
       },
     ),
   );

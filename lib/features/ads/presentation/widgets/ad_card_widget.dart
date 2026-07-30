@@ -39,6 +39,7 @@ class AdCardWidget extends ConsumerWidget {
             ad.id,
             placement: placement,
             surface: AdFormat.card.wireValue,
+            role: role,
           );
     });
 
@@ -50,6 +51,7 @@ class AdCardWidget extends ConsumerWidget {
             ad.id,
             placement: placement,
             surface: AdFormat.card.wireValue,
+            role: role,
           );
       await openAdLink(ad.linkUrl!);
     }

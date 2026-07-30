@@ -83,7 +83,9 @@ class NotificationRepository {
     }
   }
 
-  Future<void> saveDeviceToken(String authHeader, String? token) async {
+  // APP-20: o backend exige deviceToken não-nulo — o tipo do parâmetro
+  // garante que nenhum caller envie null (todos já blindam antes de chamar).
+  Future<void> saveDeviceToken(String authHeader, String token) async {
     try {
       await _dio.put<Map<String, dynamic>>(
         '/users/me/device-token',

@@ -4,7 +4,7 @@ import 'dart:math' as math;
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart'
-    show defaultTargetPlatform, kIsWeb;
+    show debugPrint, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
@@ -582,8 +582,9 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
         data: <String, dynamic>{
           'lat': position.latitude,
           'lng': position.longitude,
-          'routeId': state.routeId,
-          'routeManifestId': routeManifestId,
+          // Backend passa a honrar radiusMeters/limit e derivou a rota do
+          // token — routeId/routeManifestId saíram do contrato (400 via
+          // whitelist se enviados).
           'radiusMeters': state.geofenceRadiusMeters,
           'limit': 10,
         },
@@ -604,8 +605,10 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
         nearestDistanceMeters: (nearest?['distanceMeters'] as num?)
             ?.toDouble(),
       );
-    } catch (_) {
+    } catch (e) {
       // Geofence é auxiliar; falhas de rede não devem derrubar o tracking.
+      // APP-28: logar em vez de engolir silenciosamente.
+      debugPrint('[DriverTrackingController] geofence check falhou: $e');
     } finally {
       _isGeofenceRequestInFlight = false;
     }

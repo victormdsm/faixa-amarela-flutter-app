@@ -94,6 +94,11 @@ class DriverRouteController extends AsyncNotifier<RouteManifest?> {
       await repo.finishRoute(current.id);
       return null;
     });
+    // APP-18: rota finalizada — dashboard e lista de rotas precisam refletir.
+    if (!state.hasError) {
+      ref.invalidate(driverDashboardControllerProvider);
+      ref.invalidate(driverRoutesProvider);
+    }
   }
 
   RouteManifest _mergeStop(RouteManifest manifest, models.RouteStop updated) {

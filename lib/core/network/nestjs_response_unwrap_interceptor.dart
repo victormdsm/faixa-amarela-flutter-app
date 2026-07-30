@@ -11,13 +11,14 @@ class NestjsResponseUnwrapInterceptor extends Interceptor {
   void onResponse(Response response, ResponseInterceptorHandler handler) {
     final data = response.data;
     // O backend envolve respostas genéricas em `{ data: <payload> }`.
-    // Alguns endpoints (paginação, busca pública) já retornam seu próprio
-    // contrato `{ data: [...], meta: {...} }`. Quando `meta` está presente,
-    // preservamos o envelope original para que o repository possa acessar
-    // tanto a lista quanto os metadados de paginação.
+    // APP-19: só desembrulha quando `data` é a ÚNICA chave do objeto —
+    // payloads legítimos que contêm um campo `data` próprio (ex.: a entidade
+    // notification retornada por PUT /notifications/:id/read) não podem ser
+    // confundidos com o envelope. Envelopes paginados `{ data, meta }` também
+    // são preservados (length > 1) para o repository acessar os metadados.
     if (data is Map<String, dynamic> &&
-        data.containsKey('data') &&
-        !data.containsKey('meta')) {
+        data.length == 1 &&
+        data.containsKey('data')) {
       response.data = data['data'];
     }
     handler.next(response);
