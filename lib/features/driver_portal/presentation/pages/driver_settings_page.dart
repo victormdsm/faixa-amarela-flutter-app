@@ -68,9 +68,12 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
   String? _email;
   String? _cpf;
   final Set<int> _selectedSchoolIds = <int>{};
-  final Map<int, Set<int>> _districtShiftMap = <int, Set<int>>{};
+  final Set<int> _selectedDistrictIds = <int>{};
   Set<int> _originalSelectedSchoolIds = <int>{};
-  Map<int, Set<int>> _originalDistrictShiftMap = <int, Set<int>>{};
+  Set<int> _originalSelectedDistrictIds = <int>{};
+  /// Turnos por escola herdados do servidor (schools_has_shifts): apenas
+  /// exibição — o motorista não escolhe mais turno por bairro.
+  final Map<int, Set<int>> _schoolShiftMap = <int, Set<int>>{};
   late final ProviderSubscription<AsyncValue<Map<String, dynamic>>>
   _profileSubscription;
   // Valores carregados do servidor: base para detectar edições do motorista
@@ -403,7 +406,8 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                 districtsAsync: districtsAsync,
                 shiftOptions: effectiveShiftOptions,
                 selectedSchoolIds: _selectedSchoolIds,
-                districtShiftMap: _districtShiftMap,
+                schoolShiftMap: _schoolShiftMap,
+                selectedDistrictIds: _selectedDistrictIds,
                 requestsAsync: changeRequestsAsync,
                 pendingRequest: _latestChangeRequest(
                   changeRequestsAsync.value,
@@ -415,25 +419,10 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                     ..addAll(value);
                 }),
                 onDistrictsChanged: (value) => setState(() {
-                  final keep = value.toSet();
-                  _districtShiftMap.removeWhere(
-                    (key, _) => !keep.contains(key),
-                  );
-                  for (final id in keep) {
-                    _districtShiftMap.putIfAbsent(id, () => <int>{});
-                  }
+                  _selectedDistrictIds
+                    ..clear()
+                    ..addAll(value);
                 }),
-                onToggleShift: (districtId, shiftId) {
-                  setState(() {
-                    final set = _districtShiftMap.putIfAbsent(
-                      districtId,
-                      () => <int>{},
-                    );
-                    if (!set.add(shiftId)) {
-                      set.remove(shiftId);
-                    }
-                  });
-                },
               ),
               const SizedBox(height: AppSpacing.lg),
               FaixaSectionCard(
@@ -507,22 +496,28 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
         ).map((e) => (e['id'] as num?)?.toInt() ?? 0).where((id) => id > 0),
       );
 
-    _districtShiftMap.clear();
-    for (final district in _listOfMaps(data['districts'])) {
-      final districtId = (district['id'] as num?)?.toInt() ?? 0;
-      if (districtId <= 0) continue;
-      final shifts = ((district['shiftIds'] as List?) ?? const [])
+    // Turnos por escola (herdados, informativos): o DTO embute os shiftIds
+    // de coverage.schoolShiftMap em cada escola.
+    _schoolShiftMap.clear();
+    for (final school in _listOfMaps(data['schools'])) {
+      final schoolId = (school['id'] as num?)?.toInt() ?? 0;
+      if (schoolId <= 0) continue;
+      _schoolShiftMap[schoolId] = ((school['shiftIds'] as List?) ?? const [])
           .map((e) => (e as num?)?.toInt() ?? 0)
           .where((id) => id > 0)
           .toSet();
-      _districtShiftMap[districtId] = shifts;
     }
 
+    _selectedDistrictIds
+      ..clear()
+      ..addAll(
+        _listOfMaps(
+          data['districts'],
+        ).map((e) => (e['id'] as num?)?.toInt() ?? 0).where((id) => id > 0),
+      );
+
     _originalSelectedSchoolIds = Set<int>.from(_selectedSchoolIds);
-    _originalDistrictShiftMap = <int, Set<int>>{
-      for (final entry in _districtShiftMap.entries)
-        entry.key: Set<int>.from(entry.value),
-    };
+    _originalSelectedDistrictIds = Set<int>.from(_selectedDistrictIds);
 
     if (mounted) setState(() {});
   }
@@ -769,8 +764,8 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
     return hasCoverageChanges(
       selectedSchoolIds: _selectedSchoolIds,
       originalSelectedSchoolIds: _originalSelectedSchoolIds,
-      districtShiftMap: _districtShiftMap,
-      originalDistrictShiftMap: _originalDistrictShiftMap,
+      selectedDistrictIds: _selectedDistrictIds,
+      originalSelectedDistrictIds: _originalSelectedDistrictIds,
       hasNewAvatarImage: _avatarImageLocalPath != null,
       hasNewVehicleImage: _vehicleImageLocalPath != null,
       hasVehicleDataChanges: _hasVehicleDataChanges(),
@@ -812,12 +807,17 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
     final cnhChanged = cnh != _originalCnh;
 
     final hasCoverageChanges = _hasCoverageChanges();
-    // APP-02: o mapa bairro→turnos só é enviado quando o motorista editou
-    // de fato — antes, uma troca de foto/avatar reenviava o mapa inteiro.
-    final districtShiftEdited = hasDistrictShiftChanges(
-      districtShiftMap: _districtShiftMap,
-      originalDistrictShiftMap: _originalDistrictShiftMap,
-    );
+    // Cobertura (escolas/bairros) só é enviada quando o motorista editou
+    // de fato — antes, uma troca de foto/avatar reenviava tudo.
+    final coverageEdited =
+        hasSchoolChanges(
+          selectedSchoolIds: _selectedSchoolIds,
+          originalSelectedSchoolIds: _originalSelectedSchoolIds,
+        ) ||
+        hasDistrictChanges(
+          selectedDistrictIds: _selectedDistrictIds,
+          originalSelectedDistrictIds: _originalSelectedDistrictIds,
+        );
 
     setState(() => _isSaving = true);
     DriverProfile? updatedProfile;
@@ -842,10 +842,19 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
         }
         await repo.submitRequest(
           schoolIds: _selectedSchoolIds.toList()..sort(),
-          districtShiftMap: districtShiftEdited
+          districtIds: coverageEdited
+              ? (_selectedDistrictIds.toList()..sort())
+              : null,
+          // Turnos são herdados das escolas (read-only no app): o mapa
+          // escola→turnos acompanha a seleção de escolas quando a cobertura
+          // foi editada; ausente = backend não toca na cobertura.
+          schoolShiftMap: coverageEdited
               ? {
-                  for (final entry in _districtShiftMap.entries)
-                    entry.key: (entry.value.toList()..sort()),
+                  for (final schoolId in _selectedSchoolIds)
+                    schoolId:
+                        ((_schoolShiftMap[schoolId] ?? const <int>{})
+                            .toList()
+                          ..sort()),
                 }
               : null,
           avatarImagePath: avatarUrl,

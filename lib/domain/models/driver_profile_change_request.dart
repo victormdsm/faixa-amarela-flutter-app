@@ -5,8 +5,12 @@ class DriverProfileChangeRequest {
     required this.requestedByUserId,
     required this.status,
     this.requestedSchoolIds,
-    this.requestedDistrictShiftMap,
+    this.requestedDistrictIds,
+    this.requestedSchoolShiftMap,
     this.currentSchoolIds,
+    this.currentDistrictIds,
+    this.currentSchoolShiftMap,
+    this.requestedDistrictShiftMap,
     this.currentDistrictShiftMap,
     this.requestedAvatarPath,
     this.currentAvatarPath,
@@ -25,8 +29,17 @@ class DriverProfileChangeRequest {
   final int requestedByUserId;
   final String status;
   final List<int>? requestedSchoolIds;
-  final Map<String, List<int>>? requestedDistrictShiftMap;
+  final List<int>? requestedDistrictIds;
+
+  /// Mapa escola→turnos desejado (contrato novo — turnos herdados das
+  /// escolas). Substitui [requestedDistrictShiftMap].
+  final Map<String, List<int>>? requestedSchoolShiftMap;
   final List<int>? currentSchoolIds;
+  final List<int>? currentDistrictIds;
+  final Map<String, List<int>>? currentSchoolShiftMap;
+
+  /// Legado (solicitações antigas): mapa bairro→turnos.
+  final Map<String, List<int>>? requestedDistrictShiftMap;
   final Map<String, List<int>>? currentDistrictShiftMap;
   final String? requestedAvatarPath;
   final String? currentAvatarPath;
@@ -48,7 +61,7 @@ class DriverProfileChangeRequest {
           .toList(growable: false);
     }
 
-    Map<String, List<int>>? toDistrictShiftMap(dynamic raw) {
+    Map<String, List<int>>? toShiftMap(dynamic raw) {
       if (raw is! Map) return null;
       final result = <String, List<int>>{};
       for (final entry in raw.entries) {
@@ -67,9 +80,13 @@ class DriverProfileChangeRequest {
       requestedByUserId: (json['requestedByUserId'] as num?)?.toInt() ?? 0,
       status: (json['status'] ?? '').toString(),
       requestedSchoolIds: toIntList(json['requestedSchoolIds']),
-      requestedDistrictShiftMap: toDistrictShiftMap(json['requestedDistrictShiftMap']),
+      requestedDistrictIds: toIntList(json['requestedDistrictIds']),
+      requestedSchoolShiftMap: toShiftMap(json['requestedSchoolShiftMap']),
       currentSchoolIds: toIntList(json['currentSchoolIds']),
-      currentDistrictShiftMap: toDistrictShiftMap(json['currentDistrictShiftMap']),
+      currentDistrictIds: toIntList(json['currentDistrictIds']),
+      currentSchoolShiftMap: toShiftMap(json['currentSchoolShiftMap']),
+      requestedDistrictShiftMap: toShiftMap(json['requestedDistrictShiftMap']),
+      currentDistrictShiftMap: toShiftMap(json['currentDistrictShiftMap']),
       requestedAvatarPath: json['requestedAvatarPath']?.toString(),
       currentAvatarPath: json['currentAvatarPath']?.toString(),
       requestedVehicleImagePath: json['requestedVehicleImagePath']?.toString(),

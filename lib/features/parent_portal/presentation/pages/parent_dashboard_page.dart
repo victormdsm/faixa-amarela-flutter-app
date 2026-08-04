@@ -14,6 +14,7 @@ import '../../../../core/presentation/widgets/dashboard/dashboard_models.dart';
 import '../../../../core/presentation/widgets/dashboard/dashboard_section_title.dart';
 import '../../../../core/presentation/widgets/e2e_keys.dart';
 import '../../../../core/presentation/widgets/faixa_app_bar.dart';
+import '../../../../core/presentation/widgets/find_transport_button.dart';
 import '../../../auth/presentation/state/app_session_controller.dart';
 import '../../../ads/domain/ad.dart';
 import '../../../ads/presentation/providers/ads_providers.dart';
@@ -130,6 +131,12 @@ class ParentDashboardPage extends ConsumerWidget {
                   ? () => context.push(AppRoutes.parentRoutes)
                   : null,
             ),
+            const SizedBox(height: AppSpacing.lg),
+            // CTA principal da home: a busca de transporte estava escondida
+            // no painel "Mais ações" — agora é um botão primário em destaque.
+            FindTransportButton(
+              onPressed: () => context.push(AppRoutes.searchTransport),
+            ),
             const SizedBox(height: AppSpacing.xl),
             const DashboardSectionTitle('Meus dependentes'),
             const SizedBox(height: AppSpacing.md),
@@ -190,7 +197,6 @@ class ParentDashboardPage extends ConsumerWidget {
             ),
             const SizedBox(height: AppSpacing.lg),
             _MoreActionsPanel(
-              onSearchTransport: () => context.push(AppRoutes.searchTransport),
               onEnrollments: () => context.push(AppRoutes.parentEnrollments),
               onProfile: () => context.push(AppRoutes.parentProfile),
             ),
@@ -235,12 +241,10 @@ class ParentDashboardPage extends ConsumerWidget {
 
 class _MoreActionsPanel extends StatefulWidget {
   const _MoreActionsPanel({
-    required this.onSearchTransport,
     required this.onEnrollments,
     required this.onProfile,
   });
 
-  final VoidCallback onSearchTransport;
   final VoidCallback onEnrollments;
   final VoidCallback onProfile;
 
@@ -295,13 +299,8 @@ class _MoreActionsPanelState extends State<_MoreActionsPanel> {
         if (_expanded) ...[
           const SizedBox(height: AppSpacing.md),
           DashboardActionGrid(
-            crossAxisCount: 3,
+            crossAxisCount: 2,
             actions: [
-              PortalHomeAction(
-                label: 'Buscar van',
-                icon: Icons.search_rounded,
-                onTap: widget.onSearchTransport,
-              ),
               PortalHomeAction(
                 label: 'Matrículas',
                 icon: Icons.how_to_reg_rounded,

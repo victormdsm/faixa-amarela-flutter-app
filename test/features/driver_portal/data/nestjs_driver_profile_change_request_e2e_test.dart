@@ -64,13 +64,15 @@ void main() {
       // Submit a request with current valid schools (so approval won't fail)
       final result = await repo.submitRequest(
         schoolIds: const [253, 250, 121, 124, 136, 272, 275],
-        districtShiftMap: const {
-          59: [1, 2, 3, 4],
-          139: [1, 2, 3, 4],
-          178: [1, 2, 3, 4],
-          201: [1, 2, 3, 4],
-          204: [1, 2, 3, 4],
-          300: [1, 2, 3, 4],
+        districtIds: const [59, 139, 178, 201, 204, 300],
+        schoolShiftMap: const {
+          253: [1, 2, 3, 4],
+          250: [1, 2, 3, 4],
+          121: [1, 2, 3, 4],
+          124: [1, 2, 3, 4],
+          136: [1, 2, 3, 4],
+          272: [1, 2, 3, 4],
+          275: [1, 2, 3, 4],
         },
         requestNote: 'E2E test request',
       );

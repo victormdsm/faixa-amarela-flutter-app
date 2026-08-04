@@ -98,6 +98,19 @@ final filteredTransportDriversProvider = Provider<List<PublicTransportDriver>>((
   return ref.watch(transportDriversProvider).value ?? const [];
 });
 
+/// Detalhe do motorista para o bottom sheet: resolve pelo id na lista já
+/// carregada pela busca pública (não há endpoint de detalhe no contrato).
+/// `null` = o motorista não consta mais no resultado atual.
+final transportDriverDetailProvider =
+    Provider.family<AsyncValue<PublicTransportDriver?>, int>((ref, driverId) {
+      return ref.watch(transportDriversProvider).whenData((drivers) {
+        for (final driver in drivers) {
+          if (driver.id == driverId) return driver;
+        }
+        return null;
+      });
+    });
+
 String _periodKey(ServicePeriod period) {
   return switch (period) {
     ServicePeriod.morning => 'manha',

@@ -243,8 +243,42 @@ class _RequestCard extends StatelessWidget {
       lines.add('Escolas: ${names.join(', ')}');
     }
 
+    // Contrato novo: bairros em lista simples + mapa escola→turnos.
+    final districtIds = request.requestedDistrictIds;
+    if (districtIds != null && districtIds.isNotEmpty) {
+      final names = districtIds
+          .map((id) => districtById[id]?.name ?? 'Bairro #$id')
+          .toList(growable: false);
+      lines.add('Bairros: ${names.join(', ')}');
+    }
+
+    final schoolShiftMap = request.requestedSchoolShiftMap;
+    if (schoolShiftMap != null && schoolShiftMap.isNotEmpty) {
+      final entries = schoolShiftMap.entries.toList(growable: false)
+        ..sort((a, b) {
+          final aName = schoolById[int.tryParse(a.key)]?.name ?? a.key;
+          final bName = schoolById[int.tryParse(b.key)]?.name ?? b.key;
+          return aName.compareTo(bName);
+        });
+
+      for (final entry in entries) {
+        final schoolId = int.tryParse(entry.key);
+        final schoolName =
+            schoolById[schoolId]?.name ?? 'Escola #${entry.key}';
+        final shiftNames = entry.value
+            .map((id) => shiftById[id]?.name ?? 'Turno #$id')
+            .toList(growable: false);
+        if (shiftNames.isNotEmpty) {
+          lines.add('Escola $schoolName: ${shiftNames.join(', ')}');
+        }
+      }
+    }
+
+    // Legado: solicitações antigas com mapa bairro→turnos.
     final districtShiftMap = request.requestedDistrictShiftMap;
-    if (districtShiftMap != null && districtShiftMap.isNotEmpty) {
+    if (districtIds == null &&
+        districtShiftMap != null &&
+        districtShiftMap.isNotEmpty) {
       final entries = districtShiftMap.entries.toList(growable: false)
         ..sort((a, b) {
           final aName = districtById[int.tryParse(a.key)]?.name ?? a.key;

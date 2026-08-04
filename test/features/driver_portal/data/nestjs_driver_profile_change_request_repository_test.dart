@@ -53,8 +53,9 @@ void main() {
     test('includes the 4 vehicle fields when provided', () async {
       await repository.submitRequest(
         schoolIds: const [1, 2],
-        districtShiftMap: const {
-          10: [1, 2],
+        districtIds: const [10],
+        schoolShiftMap: const {
+          1: [1, 2],
         },
         vehicleId: 7,
         requestedVehiclePlaca: 'ABC1D23',
@@ -71,11 +72,12 @@ void main() {
       // Campos já existentes continuam intactos.
       expect(payload['vehicleId'], 7);
       expect(jsonDecode(payload['requestedSchoolIds'] as String), [1, 2]);
+      expect(jsonDecode(payload['requestedDistrictIds'] as String), [10]);
       expect(
-        jsonDecode(payload['requestedDistrictShiftMap'] as String),
+        jsonDecode(payload['requestedSchoolShiftMap'] as String),
         [
           {
-            'districtId': 10,
+            'schoolId': 1,
             'shiftIds': [1, 2],
           },
         ],
@@ -85,8 +87,9 @@ void main() {
     test('omits the vehicle fields when not provided', () async {
       await repository.submitRequest(
         schoolIds: const [1],
-        districtShiftMap: const {
-          10: [1],
+        districtIds: const [10],
+        schoolShiftMap: const {
+          1: [1],
         },
       );
 
@@ -100,8 +103,9 @@ void main() {
     test('omits only the vehicle fields left null', () async {
       await repository.submitRequest(
         schoolIds: const [1],
-        districtShiftMap: const {
-          10: [1],
+        districtIds: const [10],
+        schoolShiftMap: const {
+          1: [1],
         },
         requestedVehiclePlaca: 'ABC1234',
         requestedVehicleAno: '2021',
@@ -115,42 +119,60 @@ void main() {
     });
   });
 
-  group('submitRequest districtShiftMap (APP-02)', () {
-    test('omits requestedDistrictShiftMap when the driver did not edit districts/shifts', () async {
-      await repository.submitRequest(
-        schoolIds: const [1, 2],
-        districtShiftMap: null,
-        avatarImagePath: 'https://cdn.example.com/avatar.jpg',
-      );
+  group('submitRequest cobertura (schoolShiftMap)', () {
+    test(
+      'omits requestedDistrictIds/requestedSchoolShiftMap when the driver did not edit coverage',
+      () async {
+        await repository.submitRequest(
+          schoolIds: const [1, 2],
+          districtIds: null,
+          schoolShiftMap: null,
+          avatarImagePath: 'https://cdn.example.com/avatar.jpg',
+        );
 
-      final payload = capturePayload();
-      expect(payload.containsKey('requestedDistrictShiftMap'), isFalse);
-      // Escolas e foto seguem no payload normalmente.
-      expect(jsonDecode(payload['requestedSchoolIds'] as String), [1, 2]);
-      expect(
-        payload['requestedAvatarPath'],
-        'https://cdn.example.com/avatar.jpg',
-      );
-    });
+        final payload = capturePayload();
+        expect(payload.containsKey('requestedDistrictIds'), isFalse);
+        expect(payload.containsKey('requestedSchoolShiftMap'), isFalse);
+        // Escolas e foto seguem no payload normalmente.
+        expect(jsonDecode(payload['requestedSchoolIds'] as String), [1, 2]);
+        expect(
+          payload['requestedAvatarPath'],
+          'https://cdn.example.com/avatar.jpg',
+        );
+      },
+    );
 
-    test('sends requestedDistrictShiftMap when the driver edited districts/shifts', () async {
-      await repository.submitRequest(
-        schoolIds: const [1],
-        districtShiftMap: const {
-          10: [1, 3],
-        },
-      );
-
-      final payload = capturePayload();
-      expect(
-        jsonDecode(payload['requestedDistrictShiftMap'] as String),
-        [
-          {
-            'districtId': 10,
-            'shiftIds': [1, 3],
+    test(
+      'sends requestedDistrictIds and requestedSchoolShiftMap when the driver edited coverage',
+      () async {
+        await repository.submitRequest(
+          schoolIds: const [1, 3],
+          districtIds: const [10, 20],
+          schoolShiftMap: const {
+            1: [1, 3],
+            3: [2],
           },
-        ],
-      );
-    });
+        );
+
+        final payload = capturePayload();
+        expect(jsonDecode(payload['requestedSchoolIds'] as String), [1, 3]);
+        expect(jsonDecode(payload['requestedDistrictIds'] as String), [10, 20]);
+        expect(
+          jsonDecode(payload['requestedSchoolShiftMap'] as String),
+          [
+            {
+              'schoolId': 1,
+              'shiftIds': [1, 3],
+            },
+            {
+              'schoolId': 3,
+              'shiftIds': [2],
+            },
+          ],
+        );
+        // A chave legada bairro→turnos não é mais enviada.
+        expect(payload.containsKey('requestedDistrictShiftMap'), isFalse);
+      },
+    );
   });
 }

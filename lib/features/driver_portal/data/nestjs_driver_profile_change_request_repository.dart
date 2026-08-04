@@ -34,10 +34,15 @@ class NestjsDriverProfileChangeRequestRepository {
 
   Future<Map<String, dynamic>> submitRequest({
     required List<int> schoolIds,
-    /// Mapa bairro→turnos desejado. Null = motorista não editou bairros/
-    /// turnos — a chave `requestedDistrictShiftMap` é omitida e o backend
-    /// não toca na cobertura atual (APP-02).
-    required Map<int, List<int>>? districtShiftMap,
+    /// Bairros desejados (lista simples — a seleção de turnos por bairro
+    /// morreu; turnos agora são herdados das escolas). Null = motorista não
+    /// editou bairros — a chave `requestedDistrictIds` é omitida e o
+    /// backend não toca na cobertura atual.
+    required List<int>? districtIds,
+    /// Mapa escola→turnos desejado (turnos definidos pelas escolas, apenas
+    /// herdados/informativos para o motorista). Null = motorista não editou
+    /// escolas — a chave `requestedSchoolShiftMap` é omitida.
+    required Map<int, List<int>>? schoolShiftMap,
     String? avatarImagePath,
     String? vehicleImagePath,
     int? vehicleId,
@@ -48,18 +53,22 @@ class NestjsDriverProfileChangeRequestRepository {
     String? requestedVehicleAno,
   }) async {
     try {
-      final districtShiftMapJson = districtShiftMap == null
+      final districtIdsJson = districtIds == null
+          ? null
+          : jsonEncode(districtIds);
+      final schoolShiftMapJson = schoolShiftMap == null
           ? null
           : jsonEncode(
-              districtShiftMap.entries
-                  .map((e) => {'districtId': e.key, 'shiftIds': e.value})
+              schoolShiftMap.entries
+                  .map((e) => {'schoolId': e.key, 'shiftIds': e.value})
                   .toList(growable: false),
             );
       final response = await _dio.post<Map<String, dynamic>>(
         '/driver/profile-change-requests',
         data: {
           'requestedSchoolIds': jsonEncode(schoolIds),
-          'requestedDistrictShiftMap': ?districtShiftMapJson,
+          'requestedDistrictIds': ?districtIdsJson,
+          'requestedSchoolShiftMap': ?schoolShiftMapJson,
           'requestedAvatarPath': avatarImagePath,
           'requestedVehicleImagePath': vehicleImagePath,
           'vehicleId': vehicleId,

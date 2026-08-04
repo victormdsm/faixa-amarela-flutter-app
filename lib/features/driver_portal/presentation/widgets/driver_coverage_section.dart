@@ -9,6 +9,10 @@ import '../../../../domain/models/driver_profile_change_request.dart';
 import 'driver_change_requests_card.dart';
 
 /// Seção de cobertura (escolas, bairros e turnos) nas configurações do motorista.
+///
+/// O motorista escolhe escolas e bairros. Turnos NÃO são mais escolhidos
+/// por bairro: cada escola define os próprios turnos (schools_has_shifts),
+/// exibidos aqui apenas de forma informativa (read-only).
 class DriverCoverageSection extends StatelessWidget {
   const DriverCoverageSection({
     super.key,
@@ -16,26 +20,28 @@ class DriverCoverageSection extends StatelessWidget {
     required this.districtsAsync,
     required this.shiftOptions,
     required this.selectedSchoolIds,
-    required this.districtShiftMap,
+    required this.schoolShiftMap,
+    required this.selectedDistrictIds,
     required this.requestsAsync,
     this.pendingRequest,
     required this.isSaving,
     required this.onSchoolsChanged,
     required this.onDistrictsChanged,
-    required this.onToggleShift,
   });
 
   final AsyncValue<List<CatalogOption>> schoolsAsync;
   final AsyncValue<List<CatalogOption>> districtsAsync;
   final List<CatalogOption> shiftOptions;
   final Set<int> selectedSchoolIds;
-  final Map<int, Set<int>> districtShiftMap;
+
+  /// Turnos por escola herdados do servidor (read-only).
+  final Map<int, Set<int>> schoolShiftMap;
+  final Set<int> selectedDistrictIds;
   final AsyncValue<List<DriverProfileChangeRequest>> requestsAsync;
   final DriverProfileChangeRequest? pendingRequest;
   final bool isSaving;
   final ValueChanged<Set<int>> onSchoolsChanged;
   final ValueChanged<Set<int>> onDistrictsChanged;
-  final void Function(int districtId, int shiftId) onToggleShift;
 
   @override
   Widget build(BuildContext context) {
@@ -49,7 +55,7 @@ class DriverCoverageSection extends StatelessWidget {
           _CoverageStatusBanner(
             pendingRequest: pendingRequest,
             schoolsCount: selectedSchoolIds.length,
-            districtsCount: districtShiftMap.length,
+            districtsCount: selectedDistrictIds.length,
           ),
           const SizedBox(height: AppSpacing.sm + 2),
           requestsAsync.when(
@@ -84,14 +90,23 @@ class DriverCoverageSection extends StatelessWidget {
               options: schoolsAsync.value!,
               selectedIds: selectedSchoolIds,
             ),
+            const SizedBox(height: 12),
+            // Turnos vêm das escolas (schools_has_shifts): exibição
+            // read-only — o motorista não escolhe mais turno por bairro.
+            _SchoolShiftSummary(
+              schoolOptions: schoolsAsync.value!,
+              shiftOptions: shiftOptions,
+              selectedSchoolIds: selectedSchoolIds,
+              schoolShiftMap: schoolShiftMap,
+            ),
           ],
           const SizedBox(height: 12),
           FaixaSearchableSelect<CatalogOption>(
             label: 'Bairros atendidos',
-            count: districtShiftMap.length,
+            count: selectedDistrictIds.length,
             icon: Icons.location_city_rounded,
             items: districtsAsync.value ?? const [],
-            selectedIds: districtShiftMap.keys.toSet(),
+            selectedIds: selectedDistrictIds,
             itemToId: (item) => item.id,
             itemToName: (item) => item.name,
             title: 'Bairros atendidos',
@@ -102,14 +117,11 @@ class DriverCoverageSection extends StatelessWidget {
               onDistrictsChanged(keep);
             },
           ),
-          if (districtsAsync.hasValue && districtShiftMap.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            _DistrictShiftEditor(
-              districtOptions: districtsAsync.value!,
-              shiftOptions: shiftOptions,
-              districtShiftMap: districtShiftMap,
-              enabled: !isSaving,
-              onToggleShift: onToggleShift,
+          if (districtsAsync.hasValue && selectedDistrictIds.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.sm + 2),
+            _CoverageChips(
+              options: districtsAsync.value!,
+              selectedIds: selectedDistrictIds,
             ),
           ],
         ],
@@ -136,8 +148,11 @@ class _CoverageStatusBanner extends StatelessWidget {
     if (pendingRequest != null) {
       final status = pendingRequest!.status.toLowerCase().trim();
       final schoolsReq = pendingRequest!.requestedSchoolIds?.length ?? 0;
-      final districtsReq =
-          pendingRequest!.requestedDistrictShiftMap?.length ?? 0;
+      // Contrato novo: requestedDistrictIds (lista). Solicitações antigas
+      // carregam os bairros como chaves do requestedDistrictShiftMap.
+      final districtsReq = pendingRequest!.requestedDistrictIds?.length ??
+          pendingRequest!.requestedDistrictShiftMap?.length ??
+          0;
       final reviewNote = (pendingRequest!.reviewNote ?? '').trim();
       final photoLabels = <String>[
         if ((pendingRequest!.requestedAvatarPath ?? '').isNotEmpty)
@@ -382,60 +397,81 @@ class _CoverageChips extends StatelessWidget {
   }
 }
 
-class _DistrictShiftEditor extends StatelessWidget {
-  const _DistrictShiftEditor({
-    required this.districtOptions,
+
+/// Resumo read-only dos turnos por escola: cada escola define os próprios
+/// turnos (schools_has_shifts) e o motorista apenas herda — a seleção de
+/// turno por bairro não existe mais.
+class _SchoolShiftSummary extends StatelessWidget {
+  const _SchoolShiftSummary({
+    required this.schoolOptions,
     required this.shiftOptions,
-    required this.districtShiftMap,
-    required this.enabled,
-    required this.onToggleShift,
+    required this.selectedSchoolIds,
+    required this.schoolShiftMap,
   });
 
-  final List<CatalogOption> districtOptions;
+  final List<CatalogOption> schoolOptions;
   final List<CatalogOption> shiftOptions;
-  final Map<int, Set<int>> districtShiftMap;
-  final bool enabled;
-  final void Function(int districtId, int shiftId) onToggleShift;
+  final Set<int> selectedSchoolIds;
+  final Map<int, Set<int>> schoolShiftMap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    if (districtShiftMap.isEmpty) return const SizedBox.shrink();
+    if (selectedSchoolIds.isEmpty) return const SizedBox.shrink();
 
-    final districtById = {for (final d in districtOptions) d.id: d};
-    final sortedEntries = districtShiftMap.entries.toList()
+    final schoolById = {for (final s in schoolOptions) s.id: s};
+    final shiftById = {for (final s in shiftOptions) s.id: s};
+    final sortedIds = selectedSchoolIds.toList(growable: false)
       ..sort((a, b) {
-        final aName = districtById[a.key]?.name ?? a.key.toString();
-        final bName = districtById[b.key]?.name ?? b.key.toString();
+        final aName = schoolById[a]?.name ?? a.toString();
+        final bName = schoolById[b]?.name ?? b.toString();
         return aName.compareTo(bName);
       });
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Períodos por bairro',
-          style: theme.textTheme.labelMedium?.copyWith(
-            fontWeight: FontWeight.w800,
-            color: AppColors.slate,
-            letterSpacing: 0.4,
-          ),
+        Row(
+          children: [
+            const Icon(
+              Icons.schedule_rounded,
+              size: 15,
+              color: AppColors.muted,
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            Expanded(
+              child: Text(
+                'Turnos por escola (definidos pela escola)',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.slate,
+                  letterSpacing: 0.4,
+                ),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 8),
-        ...sortedEntries.map((entry) {
-          final district = districtById[entry.key];
-          final selectedShiftIds = entry.value;
-          final allSelected =
-              shiftOptions.isNotEmpty &&
-              shiftOptions.every((s) => selectedShiftIds.contains(s.id));
+        ...sortedIds.map((schoolId) {
+          final school = schoolById[schoolId];
+          final shiftIds = schoolShiftMap[schoolId] ?? const <int>{};
+          final shiftNames = shiftIds
+              .map((id) => shiftById[id]?.name ?? 'Turno #$id')
+              .toList(growable: false);
 
           return Container(
             margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.sm,
+              AppSpacing.md,
+              AppSpacing.md,
+            ),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(AppRadius.lg),
               border: Border.all(
-                color: selectedShiftIds.isNotEmpty
+                color: shiftIds.isNotEmpty
                     ? AppColors.success.withValues(alpha: 0.3)
                     : AppColors.border,
               ),
@@ -444,138 +480,76 @@ class _DistrictShiftEditor extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.md,
-                    AppSpacing.sm,
-                    AppSpacing.md,
-                    AppSpacing.xs,
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 28,
-                        height: 28,
-                        decoration: BoxDecoration(
-                          color: selectedShiftIds.isNotEmpty
-                              ? AppColors.success.withValues(alpha: 0.12)
-                              : AppColors.surfaceSoft,
-                          borderRadius: BorderRadius.circular(AppRadius.sm),
-                        ),
-                        child: Icon(
-                          Icons.location_on_rounded,
-                          size: 15,
-                          color: selectedShiftIds.isNotEmpty
-                              ? AppColors.success
-                              : AppColors.muted,
+                Row(
+                  children: [
+                    Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: shiftIds.isNotEmpty
+                            ? AppColors.success.withValues(alpha: 0.12)
+                            : AppColors.surfaceSoft,
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                      ),
+                      child: Icon(
+                        Icons.school_rounded,
+                        size: 15,
+                        color: shiftIds.isNotEmpty
+                            ? AppColors.success
+                            : AppColors.muted,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Text(
+                        school?.name ?? 'Escola #$schoolId',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
-                      const SizedBox(width: AppSpacing.sm),
-                      Expanded(
-                        child: Text(
-                          district?.name ?? 'Bairro #${entry.key}',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                      if (selectedShiftIds.isNotEmpty)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.sm - 1,
-                            vertical: AppSpacing.xs - 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: allSelected
-                                ? AppColors.success.withValues(alpha: 0.12)
-                                : AppColors.yellowLight,
-                            borderRadius: BorderRadius.circular(AppRadius.full),
-                          ),
-                          child: Text(
-                            allSelected
-                                ? 'Todos os turnos'
-                                : '${selectedShiftIds.length}/${shiftOptions.length} turnos',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: allSelected
-                                  ? AppColors.success
-                                  : AppColors.yellowDark,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-                const Divider(height: 1),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.md,
-                    AppSpacing.sm,
-                    AppSpacing.md,
-                    AppSpacing.md,
-                  ),
-                  child: Wrap(
+                const SizedBox(height: AppSpacing.sm),
+                if (shiftNames.isEmpty)
+                  Text(
+                    'Nenhum turno definido pela escola.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppColors.muted,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  )
+                else
+                  Wrap(
                     spacing: AppSpacing.sm,
                     runSpacing: AppSpacing.sm,
-                    children: shiftOptions
-                        .map((shift) {
-                          final isSelected = selectedShiftIds.contains(
-                            shift.id,
-                          );
-                          return GestureDetector(
-                            onTap: enabled
-                                ? () => onToggleShift(entry.key, shift.id)
-                                : null,
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 160),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: AppSpacing.md,
-                                vertical: AppSpacing.sm - 1,
+                    children: shiftNames
+                        .map(
+                          (name) => Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.md,
+                              vertical: AppSpacing.sm - 1,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.yellow.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(
+                                AppRadius.full,
                               ),
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? AppColors.yellow
-                                    : AppColors.surfaceSoft,
-                                borderRadius: BorderRadius.circular(
-                                  AppRadius.full,
-                                ),
-                                border: Border.all(
-                                  color: isSelected
-                                      ? AppColors.yellowDark
-                                      : AppColors.border,
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (isSelected) ...[
-                                    const Icon(
-                                      Icons.check_rounded,
-                                      size: 13,
-                                      color: AppColors.ink,
-                                    ),
-                                    const SizedBox(width: AppSpacing.xs),
-                                  ],
-                                  Text(
-                                    shift.name,
-                                    style: theme.textTheme.labelMedium
-                                        ?.copyWith(
-                                          color: isSelected
-                                              ? AppColors.ink
-                                              : AppColors.slate,
-                                          fontWeight: isSelected
-                                              ? FontWeight.w800
-                                              : FontWeight.w600,
-                                        ),
-                                  ),
-                                ],
+                              border: Border.all(
+                                color: AppColors.yellow.withValues(alpha: 0.5),
                               ),
                             ),
-                          );
-                        })
+                            child: Text(
+                              name,
+                              style: theme.textTheme.labelMedium?.copyWith(
+                                color: AppColors.ink,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        )
                         .toList(growable: false),
                   ),
-                ),
               ],
             ),
           );

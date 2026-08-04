@@ -5,8 +5,12 @@ import '../../../../core/presentation/widgets/app_feedback.dart';
 import '../../../../core/presentation/widgets/app_shared_widgets.dart';
 import '../../../../core/utils/whatsapp_launcher.dart';
 import '../../domain/entities/public_transport_driver.dart';
+import 'public_transport_driver_detail_sheet.dart';
 
 /// Card de um motorista de transporte escolar publico encontrado na busca.
+/// Toque no card abre o bottom sheet de detalhe (CNH, descrição, van,
+/// cobertura e contato público); o botão "Solicitar" segue direto no
+/// WhatsApp (contato público — o backend nunca expõe o celular pessoal).
 class PublicTransportDriverCard extends StatelessWidget {
   const PublicTransportDriverCard({super.key, required this.driver});
 
@@ -17,7 +21,10 @@ class PublicTransportDriverCard extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Card(
-      child: Padding(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => showPublicTransportDriverDetail(context, driver: driver),
+        child: Padding(
         padding: const EdgeInsets.all(AppSpacing.lg),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
@@ -161,6 +168,7 @@ class PublicTransportDriverCard extends StatelessWidget {
               ],
             ),
           ],
+        ),
         ),
       ),
     );

@@ -18,10 +18,10 @@ void main() {
     await tester.pumpAndSettle();
 
     // A nova tela de login (Stitch design) exibe o titulo do shell auth,
-    // o botao de entrar e a acao anonima de busca de transporte.
+    // o botao de entrar e o CTA primario de busca de transporte.
     expect(find.text('Entrar no Faixa Amarela'), findsOneWidget);
     expect(find.text('Escolha seu perfil para continuar.'), findsOneWidget);
     expect(find.text('Entrar'), findsOneWidget);
-    expect(find.text('Buscar transporte na minha região'), findsOneWidget);
+    expect(find.text('Encontrar transporte escolar'), findsOneWidget);
   });
 }

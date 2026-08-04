@@ -46,8 +46,8 @@ void main() {
     bool detect({
       Set<int>? selectedSchoolIds,
       Set<int>? originalSelectedSchoolIds,
-      Map<int, Set<int>>? districtShiftMap,
-      Map<int, Set<int>>? originalDistrictShiftMap,
+      Set<int>? selectedDistrictIds,
+      Set<int>? originalSelectedDistrictIds,
       bool hasNewAvatarImage = false,
       bool hasNewVehicleImage = false,
       bool vehicleEdited = false,
@@ -55,12 +55,8 @@ void main() {
       return hasCoverageChanges(
         selectedSchoolIds: selectedSchoolIds ?? const {1, 2},
         originalSelectedSchoolIds: originalSelectedSchoolIds ?? const {1, 2},
-        districtShiftMap: districtShiftMap ?? const {
-          10: {1, 2},
-        },
-        originalDistrictShiftMap: originalDistrictShiftMap ?? const {
-          10: {1, 2},
-        },
+        selectedDistrictIds: selectedDistrictIds ?? const {10},
+        originalSelectedDistrictIds: originalSelectedDistrictIds ?? const {10},
         hasNewAvatarImage: hasNewAvatarImage,
         hasNewVehicleImage: hasNewVehicleImage,
         hasVehicleDataChanges: vehicleEdited,
@@ -75,27 +71,12 @@ void main() {
       expect(detect(selectedSchoolIds: const {1, 3}), isTrue);
     });
 
-    test('returns true when district shifts changed', () {
-      expect(
-        detect(
-          districtShiftMap: const {
-            10: {1},
-          },
-        ),
-        isTrue,
-      );
+    test('returns true when a district was added', () {
+      expect(detect(selectedDistrictIds: const {10, 20}), isTrue);
     });
 
-    test('returns true when a district was added', () {
-      expect(
-        detect(
-          districtShiftMap: const {
-            10: {1, 2},
-            20: {1},
-          },
-        ),
-        isTrue,
-      );
+    test('returns true when a district was removed', () {
+      expect(detect(selectedDistrictIds: const {}), isTrue);
     });
 
     test('returns true for new avatar image', () {
@@ -114,50 +95,28 @@ void main() {
     });
   });
 
-  group('hasDistrictShiftChanges (APP-02)', () {
+  group('hasDistrictChanges', () {
     bool detect({
-      Map<int, Set<int>>? districtShiftMap,
-      Map<int, Set<int>>? originalDistrictShiftMap,
+      Set<int>? selectedDistrictIds,
+      Set<int>? originalSelectedDistrictIds,
     }) {
-      return hasDistrictShiftChanges(
-        districtShiftMap: districtShiftMap ?? const {
-          10: {1, 2},
-        },
-        originalDistrictShiftMap: originalDistrictShiftMap ?? const {
-          10: {1, 2},
-        },
+      return hasDistrictChanges(
+        selectedDistrictIds: selectedDistrictIds ?? const {10, 20},
+        originalSelectedDistrictIds: originalSelectedDistrictIds ??
+            const {10, 20},
       );
     }
 
-    test('returns false when the map is untouched (ex.: só trocou a foto)', () {
+    test('returns false when the list is untouched (ex.: só trocou a foto)', () {
       expect(detect(), isFalse);
     });
 
-    test('returns true when a shift was toggled', () {
-      expect(
-        detect(
-          districtShiftMap: const {
-            10: {1},
-          },
-        ),
-        isTrue,
-      );
-    });
-
     test('returns true when a district was added', () {
-      expect(
-        detect(
-          districtShiftMap: const {
-            10: {1, 2},
-            20: {1},
-          },
-        ),
-        isTrue,
-      );
+      expect(detect(selectedDistrictIds: const {10, 20, 30}), isTrue);
     });
 
     test('returns true when a district was removed', () {
-      expect(detect(districtShiftMap: const {}), isTrue);
+      expect(detect(selectedDistrictIds: const {10}), isTrue);
     });
   });
 }
