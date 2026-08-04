@@ -167,20 +167,29 @@ class _RoutePassengerTileState extends State<RoutePassengerTile> {
                     runSpacing: AppSpacing.sm,
                     children: [
                       FilledButton.tonal(
-                        onPressed: widget.submitting || !widget.routeActive
+                        // onBoard nulo = ação indisponível p/ o status atual —
+                        // o botão fica visivelmente desabilitado em vez de
+                        // parecer ativo e não fazer nada ao toque.
+                        onPressed:
+                            widget.submitting ||
+                                !widget.routeActive ||
+                                widget.onBoard == null
                             ? null
                             : () {
                                 HapticFeedback.lightImpact();
-                                widget.onBoard?.call();
+                                widget.onBoard!.call();
                               },
                         child: const Text('Embarcou'),
                       ),
                       OutlinedButton(
-                        onPressed: widget.submitting || !widget.routeActive
+                        onPressed:
+                            widget.submitting ||
+                                !widget.routeActive ||
+                                widget.onDisembark == null
                             ? null
                             : () {
                                 HapticFeedback.lightImpact();
-                                widget.onDisembark?.call();
+                                widget.onDisembark!.call();
                               },
                         child: const Text('Desembarcou'),
                       ),

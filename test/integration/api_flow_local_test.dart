@@ -430,10 +430,9 @@ void main() {
               data: {
                 'lat': -25.5163,
                 'lng': -54.5854,
-                'routeId': routeId,
-                'routeManifestId': 'route.$routeId',
-                'radiusMeters': 50,
-                'limit': 10,
+                // Contrato novo: o backend decide o raio por regra (casa 500m
+                // / escola 50m) e deriva a rota do token — radiusMeters,
+                // limit, routeId e routeManifestId saíram do payload.
               },
             );
           } on DioException catch (e) {

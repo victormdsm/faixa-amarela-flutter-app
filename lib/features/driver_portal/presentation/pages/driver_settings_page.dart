@@ -52,6 +52,8 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
   final _vehicleColorController = TextEditingController();
   final _vehicleYearController = TextEditingController();
   final _vehiclePlateController = TextEditingController();
+  final _publicContactNameController = TextEditingController();
+  final _publicContactPhoneController = TextEditingController();
   final _picker = ImagePicker();
 
   bool _hydrated = false;
@@ -78,6 +80,8 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
   String _originalVehicleColor = '';
   String _originalVehicleYear = '';
   String _originalVehiclePlate = '';
+  String _originalPublicContactName = '';
+  String _originalPublicContactPhone = '';
 
   @override
   void initState() {
@@ -116,6 +120,8 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
     _vehicleColorController.dispose();
     _vehicleYearController.dispose();
     _vehiclePlateController.dispose();
+    _publicContactNameController.dispose();
+    _publicContactPhoneController.dispose();
     super.dispose();
   }
 
@@ -323,20 +329,53 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                 icon: Icons.directions_bus_filled_rounded,
                 title: 'Veículo',
                 subtitle: 'Foto, modelo, cor, ano e placa usados no app.',
-                child: DriverVehicleSection(
-                  brandController: _vehicleBrandController,
-                  colorController: _vehicleColorController,
-                  yearController: _vehicleYearController,
-                  plateController: _vehiclePlateController,
-                  isSaving: _isSaving,
-                  editMode: _vehicleEditMode,
-                  imageUrl: _vehicleImageUrl,
-                  localPath: _vehicleImageLocalPath,
-                  onPickImage: _pickVehicleImage,
-                  onToggleEdit: () =>
-                      setState(() => _vehicleEditMode = !_vehicleEditMode),
-                  onUndoImage: () =>
-                      setState(() => _vehicleImageLocalPath = null),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    DriverVehicleSection(
+                      brandController: _vehicleBrandController,
+                      colorController: _vehicleColorController,
+                      yearController: _vehicleYearController,
+                      plateController: _vehiclePlateController,
+                      isSaving: _isSaving,
+                      editMode: _vehicleEditMode,
+                      imageUrl: _vehicleImageUrl,
+                      localPath: _vehicleImageLocalPath,
+                      onPickImage: _pickVehicleImage,
+                      onToggleEdit: () =>
+                          setState(() => _vehicleEditMode = !_vehicleEditMode),
+                      onUndoImage: () =>
+                          setState(() => _vehicleImageLocalPath = null),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    const Divider(height: 1),
+                    const SizedBox(height: AppSpacing.md),
+                    // Contato público: não exige aprovação do admin (vai
+                    // direto no PUT /drivers/me/vehicle), então fica fora do
+                    // "modo de edição" dos dados estruturais da van.
+                    TextFormField(
+                      controller: _publicContactNameController,
+                      enabled: !_isSaving,
+                      decoration: const InputDecoration(
+                        labelText: 'Nome de contato público (opcional)',
+                        prefixIcon: Icon(Icons.badge_outlined),
+                        helperText:
+                            'Exibido para os pais no lugar do seu nome pessoal.',
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    TextFormField(
+                      controller: _publicContactPhoneController,
+                      enabled: !_isSaving,
+                      keyboardType: TextInputType.phone,
+                      decoration: const InputDecoration(
+                        labelText: 'Telefone público (opcional)',
+                        prefixIcon: Icon(Icons.phone_in_talk_outlined),
+                        helperText:
+                            'Exibido para os pais no lugar do seu telefone pessoal.',
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: AppSpacing.lg),
@@ -454,6 +493,7 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
     _vehiclePlateController.text = (van['plate'] ?? '').toString();
     _vehicleImageUrl = van['imageUrl']?.toString();
     _vehicleImageLocalPath = null;
+    _hydratePublicContact(van);
     _originalVehicleBrand = _vehicleBrandController.text.trim();
     _originalVehicleColor = _vehicleColorController.text.trim();
     _originalVehicleYear = _vehicleYearController.text.trim();
@@ -696,6 +736,35 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
     );
   }
 
+  /// Contato público da van (contrato novo do backend). Só hidrata quando a
+  /// chave veio no payload — o DriverProfileDto local ainda não serializa
+  /// esses campos; sem esse cuidado, o re-hydrate pós-save apagaria da tela
+  /// os valores recém-salvos.
+  void _hydratePublicContact(Map<String, dynamic> van) {
+    if (van.containsKey('publicContactName') ||
+        van.containsKey('public_contact_name')) {
+      _publicContactNameController.text =
+          (van['publicContactName'] ?? van['public_contact_name'] ?? '')
+              .toString();
+      _originalPublicContactName = _publicContactNameController.text.trim();
+    }
+    if (van.containsKey('publicContactPhone') ||
+        van.containsKey('public_contact_phone')) {
+      _publicContactPhoneController.text =
+          (van['publicContactPhone'] ?? van['public_contact_phone'] ?? '')
+              .toString();
+      _originalPublicContactPhone = _publicContactPhoneController.text.trim();
+    }
+  }
+
+  /// Edição no contato público da van comparada aos valores do servidor.
+  bool _hasPublicContactChanges() {
+    return _publicContactNameController.text.trim() !=
+            _originalPublicContactName ||
+        _publicContactPhoneController.text.trim() !=
+            _originalPublicContactPhone;
+  }
+
   bool _hasCoverageChanges() {
     return hasCoverageChanges(
       selectedSchoolIds: _selectedSchoolIds,
@@ -801,6 +870,20 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
             information: _infoController.text.trim(),
             cnh: cnhChanged ? cnh : null,
           );
+
+      // Contato público da van: PUT /drivers/me/vehicle direto (sem fluxo de
+      // aprovação), apenas quando o motorista editou algum dos dois campos.
+      if (_hasPublicContactChanges()) {
+        await ref
+            .read(driverProfileRepositoryProvider)
+            .updateVehiclePublicContact(
+              publicContactName: _publicContactNameController.text.trim(),
+              publicContactPhone: _publicContactPhoneController.text.trim(),
+            );
+        _originalPublicContactName = _publicContactNameController.text.trim();
+        _originalPublicContactPhone = _publicContactPhoneController.text
+            .trim();
+      }
 
       _applyProfile(updatedProfile.toJson());
       try {

@@ -14,6 +14,7 @@ class LiveTrackingOverlay extends StatelessWidget {
     required this.dependents,
     this.driverPos,
     this.lastPositionAt,
+    this.isLive = true,
   });
 
   final List<Child> dependents;
@@ -22,9 +23,14 @@ class LiveTrackingOverlay extends StatelessWidget {
   /// Timestamp da última posição recebida, quando o modelo o expõe.
   final DateTime? lastPositionAt;
 
+  /// Socket conectado ("AO VIVO") ou não ("RECONECTANDO" — momento em que o
+  /// polling HTTP de fallback assume a atualização do marcador).
+  final bool isLive;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final badgeColor = isLive ? AppColors.success : AppColors.warning;
     return Container(
       margin: const EdgeInsets.fromLTRB(
         AppSpacing.md,
@@ -56,22 +62,22 @@ class LiveTrackingOverlay extends StatelessWidget {
                   vertical: AppSpacing.xs,
                 ),
                 decoration: BoxDecoration(
-                  color: AppColors.success.withValues(alpha: 0.1),
+                  color: badgeColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(AppRadius.full),
                   border: Border.all(
-                    color: AppColors.success.withValues(alpha: 0.3),
+                    color: badgeColor.withValues(alpha: 0.3),
                   ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const AppPulsingDot(color: AppColors.success),
+                    AppPulsingDot(color: badgeColor),
                     const SizedBox(width: AppSpacing.sm - 2),
                     Text(
-                      'AO VIVO',
+                      isLive ? 'AO VIVO' : 'RECONECTANDO',
                       style: theme.textTheme.labelSmall?.copyWith(
                         fontWeight: FontWeight.w800,
-                        color: AppColors.success,
+                        color: isLive ? AppColors.success : AppColors.warningInk,
                         letterSpacing: 0.8,
                       ),
                     ),

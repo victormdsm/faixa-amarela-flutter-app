@@ -391,6 +391,22 @@ class _AdhocPlannerContentState extends State<AdhocPlannerContent> {
                   onSelected: _busy
                       ? null
                       : (selected) => _selectPeriod(selected ? value : null),
+                  // Contraste DS: ink sobre amarelo no selecionado (7.9:1) e
+                  // ink sobre surface nos demais — o chipTheme global não
+                  // define cor de label e o texto ficava claro/ilegível.
+                  labelStyle: Theme.of(context).textTheme.labelMedium
+                      ?.copyWith(
+                        color: AppColors.ink,
+                        fontWeight: _period == value
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                      ),
+                  selectedColor: AppColors.yellow,
+                  backgroundColor: AppColors.surface,
+                  checkmarkColor: AppColors.ink,
+                  side: BorderSide(
+                    color: _period == value ? AppColors.ink : AppColors.border,
+                  ),
                 ),
             ],
           ),
@@ -516,97 +532,101 @@ class _AdhocPlannerContentState extends State<AdhocPlannerContent> {
 
   Widget _buildChildItem(PlanningChild child, bool selected) {
     final shiftName = child.shiftName;
-    return Opacity(
-      opacity: selected ? 1 : 0.55,
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
-          boxShadow: const [
-            BoxShadow(
-              color: AppColors.shadowSubtle,
-              blurRadius: 8,
-              offset: Offset(0, 2),
-            ),
-          ],
+    // Seleção indicada por borda ink — antes o card não selecionado ficava
+    // com Opacity 0.55 e os textos (ink/slate) viravam cinza claro ilegível.
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(
+          color: selected
+              ? AppColors.ink
+              : AppColors.border.withValues(alpha: 0.5),
+          width: selected ? 2 : 1,
         ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(AppRadius.lg),
-            onTap: _busy ? null : () => _toggleChild(child, !selected),
-            child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 18,
-                        backgroundColor: AppColors.yellowLight,
-                        child: Text(
-                          child.name.trim().isNotEmpty
-                              ? child.name.trim().characters.first.toUpperCase()
-                              : '?',
-                          style: Theme.of(context).textTheme.labelSmall
-                              ?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.ink,
-                              ),
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.md),
-                      Expanded(
-                        child: Text(
-                          child.name,
-                          style: Theme.of(context).textTheme.titleSmall
-                              ?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.ink,
-                              ),
-                        ),
-                      ),
-                      Checkbox(
-                        value: selected,
-                        onChanged: _busy
-                            ? null
-                            : (value) => _toggleChild(child, value ?? false),
-                      ),
-                    ],
-                  ),
-                  if (child.address.isNotEmpty ||
-                      (shiftName != null && shiftName.isNotEmpty)) ...[
-                    const SizedBox(height: AppSpacing.md),
-                    Container(
-                      padding: const EdgeInsets.all(AppSpacing.md),
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceSoft,
-                        borderRadius: BorderRadius.circular(AppRadius.md),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (shiftName != null && shiftName.isNotEmpty)
-                            AppIconTextRow(
-                              icon: Icons.access_time_rounded,
-                              text: 'Turno: $shiftName',
+        boxShadow: const [
+          BoxShadow(
+            color: AppColors.shadowSubtle,
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          onTap: _busy ? null : () => _toggleChild(child, !selected),
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 18,
+                      backgroundColor: AppColors.yellowLight,
+                      child: Text(
+                        child.name.trim().isNotEmpty
+                            ? child.name.trim().characters.first.toUpperCase()
+                            : '?',
+                        style: Theme.of(context).textTheme.labelSmall
+                            ?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.ink,
                             ),
-                          if (child.address.isNotEmpty) ...[
-                            if (shiftName != null && shiftName.isNotEmpty)
-                              const SizedBox(height: AppSpacing.xs),
-                            AppIconTextRow(
-                              icon: Icons.location_on_rounded,
-                              text: 'Endereço: ${child.address}',
-                            ),
-                          ],
-                        ],
                       ),
                     ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: Text(
+                        child.name,
+                        style: Theme.of(context).textTheme.titleSmall
+                            ?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.ink,
+                            ),
+                      ),
+                    ),
+                    Checkbox(
+                      value: selected,
+                      onChanged: _busy
+                          ? null
+                          : (value) => _toggleChild(child, value ?? false),
+                    ),
                   ],
+                ),
+                if (child.address.isNotEmpty ||
+                    (shiftName != null && shiftName.isNotEmpty)) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  Container(
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceSoft,
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (shiftName != null && shiftName.isNotEmpty)
+                          AppIconTextRow(
+                            icon: Icons.access_time_rounded,
+                            text: 'Turno: $shiftName',
+                          ),
+                        if (child.address.isNotEmpty) ...[
+                          if (shiftName != null && shiftName.isNotEmpty)
+                            const SizedBox(height: AppSpacing.xs),
+                          AppIconTextRow(
+                            icon: Icons.location_on_rounded,
+                            text: 'Endereço: ${child.address}',
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
                 ],
-              ),
+              ],
             ),
           ),
         ),

@@ -9,6 +9,7 @@ import '../../../../core/error/app_error_reporter.dart';
 import '../../../../core/presentation/widgets/app_shared_widgets.dart';
 import '../../../../core/presentation/widgets/faixa_app_bar.dart';
 import '../../../../domain/models/child.dart';
+import '../../../auth/presentation/state/app_session_controller.dart';
 import '../providers/parent_portal_providers.dart';
 import '../widgets/driver_location_map.dart';
 import '../widgets/live_tracking_overlay.dart';
@@ -55,6 +56,10 @@ class _ParentRoutesPageState extends ConsumerState<ParentRoutesPage>
     _refreshTimer = Timer.periodic(const Duration(seconds: 15), (_) {
       if (mounted &&
           WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+        // Com o socket ao vivo o marcador já atualiza em tempo real — o
+        // polling HTTP vira apenas fallback para quando a conexão cai.
+        final realtime = ref.read(parentRealtimeControllerProvider);
+        if (realtime.isLive) return;
         ref.invalidate(parentRoutesProvider);
         ref.invalidate(parentChildrenProvider);
       }
@@ -70,6 +75,9 @@ class _ParentRoutesPageState extends ConsumerState<ParentRoutesPage>
   Widget build(BuildContext context) {
     final routesAsync = ref.watch(parentRoutesProvider);
     final childrenAsync = ref.watch(parentChildrenProvider);
+    // Sempre observado enquanto a tela está aberta: ao sair daqui o provider
+    // (autoDispose) encerra o socket sozinho.
+    final realtime = ref.watch(parentRealtimeControllerProvider);
 
     return Scaffold(
       backgroundColor: AppColors.surfaceSoft,
@@ -109,6 +117,13 @@ class _ParentRoutesPageState extends ConsumerState<ParentRoutesPage>
           }).toList();
 
           if (activeRoutes.isEmpty) {
+            // Rota finalizada: encerra a assinatura do socket, se houver.
+            if (realtime.routeId != null) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted) return;
+                ref.read(parentRealtimeControllerProvider.notifier).unwatch();
+              });
+            }
             return NoActiveRoutesState(hasChildren: children.isNotEmpty);
           }
 
@@ -117,6 +132,22 @@ class _ParentRoutesPageState extends ConsumerState<ParentRoutesPage>
           }
 
           final route = activeRoutes[_selectedRouteIndex];
+          final routeId = (route['id'] as num?)?.toInt();
+          // Assina a rota selecionada no socket (uma vez por troca de rota).
+          if (routeId != null && routeId > 0 && routeId != realtime.routeId) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) return;
+              final token = ref
+                  .read(appSessionControllerProvider)
+                  .session
+                  ?.accessToken;
+              if (token == null || token.isEmpty) return;
+              ref
+                  .read(parentRealtimeControllerProvider.notifier)
+                  .watchRoute(routeId: routeId, token: token);
+            });
+          }
+
           final manifest = route['activeManifest'] as Map<String, dynamic>?;
           final manifestChildIds = _extractChildIdsFromManifest(manifest);
 
@@ -128,13 +159,17 @@ class _ParentRoutesPageState extends ConsumerState<ParentRoutesPage>
               route['latestLocation'] as Map<String, dynamic>?;
           final driverLat = (latestLocation?['latitude'] as num?)?.toDouble();
           final driverLng = (latestLocation?['longitude'] as num?)?.toDouble();
-          final driverPos = (driverLat != null && driverLng != null)
+          final httpDriverPos = (driverLat != null && driverLng != null)
               ? LatLng(driverLat, driverLng)
               : null;
           final latestLocationAtRaw = route['latestLocationAt'];
-          final lastPositionAt = latestLocationAtRaw == null
+          final httpLastPositionAt = latestLocationAtRaw == null
               ? null
               : DateTime.tryParse(latestLocationAtRaw.toString());
+
+          // Socket tem prioridade; posição/timestamp do HTTP são o fallback.
+          final driverPos = realtime.position ?? httpDriverPos;
+          final lastPositionAt = realtime.updatedAt ?? httpLastPositionAt;
 
           return Stack(
             children: [
@@ -172,6 +207,7 @@ class _ParentRoutesPageState extends ConsumerState<ParentRoutesPage>
                     dependents: myDependents,
                     driverPos: driverPos,
                     lastPositionAt: lastPositionAt,
+                    isLive: realtime.isLive,
                   ),
                 ),
               ),

@@ -36,6 +36,14 @@ class _FakeDriverRepository implements DriverRepository {
     throw UnimplementedError();
   }
 
+  @override
+  Future<void> updateVehiclePublicContact({
+    String? publicContactName,
+    String? publicContactPhone,
+  }) async {
+    throw UnimplementedError();
+  }
+
   void setProfile(DriverProfile? profile) => _profile = profile;
 }
 

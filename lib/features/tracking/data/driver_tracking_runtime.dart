@@ -30,13 +30,18 @@ class TrackingLocationSettingsFactory {
   static LocationSettings background() =>
       _settings(allowBackgroundLocationUpdates: true);
 
+  // Alta frequência de amostragem (distanceFilter 2m / interval 1s) para o
+  // acompanhamento do pai ficar quase em tempo real. Impacto de bateria:
+  // GPS contínuo em accuracy best consome mais — mitigado pelo fato de o
+  // stream só rodar durante a rota ativa; monitorar dreno em campo e, se
+  // necessário, voltar distanceFilter para 5-10m no modo background.
   static LocationSettings _settings({
     required bool allowBackgroundLocationUpdates,
   }) {
     if (kIsWeb) {
       return const LocationSettings(
         accuracy: LocationAccuracy.best,
-        distanceFilter: 10,
+        distanceFilter: 2,
       );
     }
 
@@ -44,14 +49,14 @@ class TrackingLocationSettingsFactory {
       case TargetPlatform.android:
         return AndroidSettings(
           accuracy: LocationAccuracy.best,
-          distanceFilter: 10,
-          intervalDuration: const Duration(seconds: 3),
+          distanceFilter: 2,
+          intervalDuration: const Duration(seconds: 1),
         );
       case TargetPlatform.iOS:
       case TargetPlatform.macOS:
         return AppleSettings(
           accuracy: LocationAccuracy.best,
-          distanceFilter: 10,
+          distanceFilter: 2,
           allowBackgroundLocationUpdates: allowBackgroundLocationUpdates,
           showBackgroundLocationIndicator: allowBackgroundLocationUpdates,
           activityType: ActivityType.automotiveNavigation,
@@ -59,7 +64,7 @@ class TrackingLocationSettingsFactory {
       default:
         return const LocationSettings(
           accuracy: LocationAccuracy.best,
-          distanceFilter: 10,
+          distanceFilter: 2,
         );
     }
   }
@@ -96,7 +101,11 @@ class _BackgroundTrackingRuntime {
   static String? _apiBaseUrl;
   static String? _routeManifestId;
   static int? _vanId;
-  static int _flushIntervalSeconds = 15;
+  // Flush 2s: pontos chegam ao backend (e ao socket do pai) quase em tempo
+  // real. Bateria/rede: mais POSTs por rota, porém payloads pequenos (GPS a
+  // 1s gera no máx. ~2 pontos por lote); aceito conforme requisito do pai
+  // ao vivo. Se o dreno/rede pesar, subir para 5s via flush_interval_seconds.
+  static int _flushIntervalSeconds = 2;
   static int _pointKeySequence = 0;
   static bool _commandHandlersRegistered = false;
   static bool _isFlushing = false;
@@ -135,8 +144,8 @@ class _BackgroundTrackingRuntime {
       _routeManifestId = args['route_manifest_id']?.toString();
       _vanId = (args['van_id'] as num?)?.toInt();
       _flushIntervalSeconds =
-          ((args['flush_interval_seconds'] as num?)?.toInt() ?? 15).clamp(
-            5,
+          ((args['flush_interval_seconds'] as num?)?.toInt() ?? 2).clamp(
+            2,
             120,
           );
       await _ensureTelemetryHttpClient();

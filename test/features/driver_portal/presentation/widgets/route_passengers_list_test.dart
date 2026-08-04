@@ -85,6 +85,59 @@ void main() {
       expect(cards, hasLength(1));
       expect(cards.first.childId, 10);
     });
+
+    test('recognizes backend boarded/disembarked statuses', () {
+      final tracking = DriverTrackingState(
+        routeActive: true,
+        routePlannedStops: [
+          _stop(childId: 10, type: 'pickup', status: 'boarded', name: 'Ana Silva', sequence: 1),
+          _stop(childId: 11, type: 'pickup', status: 'disembarked', name: 'Bruno Souza', sequence: 2),
+          _stop(childId: 12, type: 'pickup', status: 'pending', name: 'Carla Lima', sequence: 3),
+        ],
+        routeRemainingStops: const [],
+      );
+
+      final cards = buildStudentRouteCards(tracking);
+
+      expect(cards, hasLength(3));
+      expect(cards[0].status, StopStatus.boarded);
+      expect(cards[1].status, StopStatus.droppedOff);
+      expect(cards[2].status, StopStatus.pending);
+    });
+
+    test('absent/removed complete the card (no pending dead actions)', () {
+      final tracking = DriverTrackingState(
+        routeActive: true,
+        routePlannedStops: [
+          _stop(childId: 10, type: 'pickup', status: 'absent', name: 'Ana Silva', sequence: 1),
+          _stop(childId: 11, type: 'pickup', status: 'removed', name: 'Bruno Souza', sequence: 2),
+        ],
+        routeRemainingStops: const [],
+      );
+
+      final cards = buildStudentRouteCards(tracking);
+
+      expect(cards[0].status, StopStatus.droppedOff);
+      expect(cards[1].status, StopStatus.droppedOff);
+    });
+
+    test('all delivered (backend vocab) enables auto-finish condition', () {
+      final tracking = DriverTrackingState(
+        routeActive: true,
+        routePlannedStops: [
+          _stop(childId: 10, type: 'pickup', status: 'disembarked', name: 'Ana Silva', sequence: 1),
+          _stop(childId: 11, type: 'pickup', status: 'delivered', name: 'Bruno Souza', sequence: 2),
+        ],
+        routeRemainingStops: const [],
+      );
+
+      final cards = buildStudentRouteCards(tracking);
+
+      expect(
+        cards.isNotEmpty && cards.every((s) => s.status == StopStatus.droppedOff),
+        isTrue,
+      );
+    });
   });
 
   group('RoutePassengerTile', () {

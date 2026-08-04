@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../domain/models/route_manifest.dart';
 import '../../../../domain/models/route_manifest.dart' as models;
+import '../../../../domain/repositories/routes_repository.dart';
 import '../providers/driver_portal_providers.dart';
 
 class DriverRouteController extends AsyncNotifier<RouteManifest?> {
@@ -18,40 +19,48 @@ class DriverRouteController extends AsyncNotifier<RouteManifest?> {
     state = await AsyncValue.guard(_load);
   }
 
-  Future<void> markBoarded(int childId) async {
+  Future<void> markBoarded(int childId) => _runStopAction(
+    childId,
+    optimisticStatus: StopStatus.boarded,
+    call: (repo, routeId) => repo.markBoarding(routeId, childId),
+  );
+
+  Future<void> markDisembarked(int childId) => _runStopAction(
+    childId,
+    optimisticStatus: StopStatus.disembarked,
+    call: (repo, routeId) => repo.markDisembarking(routeId, childId),
+  );
+
+  Future<void> markAbsent(int childId) => _runStopAction(
+    childId,
+    optimisticStatus: StopStatus.absent,
+    call: (repo, routeId) => repo.markAbsent(routeId, childId),
+  );
+
+  /// Atualização otimista: aplica o status na hora, chama a API e, em caso
+  /// de erro, restaura o manifesto anterior (rollback) e relança a exceção
+  /// para a UI exibir o motivo. Antes o estado ia para AsyncLoading e a
+  /// tela inteira virava spinner a cada toque.
+  Future<void> _runStopAction(
+    int childId, {
+    required StopStatus optimisticStatus,
+    required Future<models.RouteStop> Function(RoutesRepository, int) call,
+  }) async {
     final current = state.asData?.value;
     if (current == null) return;
 
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(() async {
+    state = AsyncData(_applyStopStatusLocal(current, childId, optimisticStatus));
+    try {
       final repo = ref.read(driverRoutesRepositoryProvider);
-      final updatedStop = await repo.markBoarding(current.id, childId);
-      return _mergeStop(current, updatedStop);
-    });
-  }
-
-  Future<void> markDisembarked(int childId) async {
-    final current = state.asData?.value;
-    if (current == null) return;
-
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(() async {
-      final repo = ref.read(driverRoutesRepositoryProvider);
-      final updatedStop = await repo.markDisembarking(current.id, childId);
-      return _mergeStop(current, updatedStop);
-    });
-  }
-
-  Future<void> markAbsent(int childId) async {
-    final current = state.asData?.value;
-    if (current == null) return;
-
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(() async {
-      final repo = ref.read(driverRoutesRepositoryProvider);
-      final updatedStop = await repo.markAbsent(current.id, childId);
-      return _mergeStop(current, updatedStop);
-    });
+      final updatedStop = await call(repo, current.id);
+      final latest = state.asData?.value;
+      if (latest != null) {
+        state = AsyncData(_mergeStop(latest, updatedStop));
+      }
+    } catch (_) {
+      state = AsyncData(current);
+      rethrow;
+    }
   }
 
   Future<void> removeStudent(int childId) async {
@@ -99,6 +108,41 @@ class DriverRouteController extends AsyncNotifier<RouteManifest?> {
       ref.invalidate(driverDashboardControllerProvider);
       ref.invalidate(driverRoutesProvider);
     }
+  }
+
+  RouteManifest _applyStopStatusLocal(
+    RouteManifest manifest,
+    int childId,
+    StopStatus status,
+  ) {
+    return RouteManifest(
+      id: manifest.id,
+      driverId: manifest.driverId,
+      vanId: manifest.vanId,
+      startedAt: manifest.startedAt,
+      finishedAt: manifest.finishedAt,
+      status: manifest.status,
+      stops: manifest.stops
+          .map(
+            (s) => s.childId == childId
+                ? models.RouteStop(
+                    id: s.id,
+                    childId: s.childId,
+                    childName: s.childName,
+                    schoolName: s.schoolName,
+                    schoolId: s.schoolId,
+                    address: s.address,
+                    sequence: s.sequence,
+                    status: status,
+                    latitude: s.latitude,
+                    longitude: s.longitude,
+                    boardedAt: s.boardedAt,
+                    disembarkedAt: s.disembarkedAt,
+                  )
+                : s,
+          )
+          .toList(),
+    );
   }
 
   RouteManifest _mergeStop(RouteManifest manifest, models.RouteStop updated) {

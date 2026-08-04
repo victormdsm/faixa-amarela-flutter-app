@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/theme/app_theme.dart';
+import '../../../../core/network/api_exception.dart';
+import '../../../../core/presentation/widgets/app_feedback.dart';
 import '../../../../domain/models/route_manifest.dart';
 import '../providers/driver_portal_providers.dart';
 import 'route_execution_action_button.dart';
@@ -148,6 +150,10 @@ class _RouteExecutionStopCardState
     setState(() => _isProcessing = true);
     try {
       await action();
+    } on ApiException catch (e) {
+      // O controller já fez rollback do estado otimista; aqui só avisamos.
+      if (!mounted) return;
+      showAppSnackBar(context, message: e.message, type: AppFeedbackType.error);
     } finally {
       if (mounted) setState(() => _isProcessing = false);
     }

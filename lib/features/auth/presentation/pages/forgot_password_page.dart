@@ -57,11 +57,11 @@ class ForgotPasswordPage extends ConsumerWidget {
                 : () async => _submit(context, ref),
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.yellow,
-              foregroundColor: Colors.white,
+              foregroundColor: AppColors.ink,
               disabledBackgroundColor: AppColors.yellow.withValues(
                 alpha: 0.4,
               ),
-              disabledForegroundColor: Colors.white.withValues(alpha: 0.7),
+              disabledForegroundColor: AppColors.ink.withValues(alpha: 0.5),
               minimumSize: const Size.fromHeight(48),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(AppRadius.md),
@@ -73,7 +73,7 @@ class ForgotPasswordPage extends ConsumerWidget {
                     height: 18,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: Colors.white,
+                      color: AppColors.ink,
                     ),
                   )
                 : const Text('Enviar recuperação'),

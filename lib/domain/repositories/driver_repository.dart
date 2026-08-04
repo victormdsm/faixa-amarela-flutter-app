@@ -12,4 +12,13 @@ abstract interface class DriverRepository {
     String? information,
     String? cnh,
   });
+
+  /// Atualiza o contato público da van (`PUT /drivers/me/vehicle`) — exibido
+  /// aos pais no lugar do telefone pessoal do motorista. Diferente dos dados
+  /// estruturais da van (placa/modelo/cor/ano), não exige aprovação do admin.
+  /// Valores vazios ('') limpam o campo no servidor (convenção APP-11).
+  Future<void> updateVehiclePublicContact({
+    String? publicContactName,
+    String? publicContactPhone,
+  });
 }

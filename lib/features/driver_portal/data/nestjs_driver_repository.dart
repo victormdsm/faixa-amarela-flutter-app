@@ -94,4 +94,28 @@ class NestjsDriverRepository implements DriverRepository {
       throw ApiException.fromDio(error);
     }
   }
+
+  @override
+  Future<void> updateVehiclePublicContact({
+    String? publicContactName,
+    String? publicContactPhone,
+  }) async {
+    try {
+      final payload = <String, dynamic>{};
+      if (publicContactName != null) {
+        payload['publicContactName'] = publicContactName.trim();
+      }
+      if (publicContactPhone != null) {
+        payload['publicContactPhone'] = publicContactPhone.trim();
+      }
+      if (payload.isEmpty) return;
+
+      await _dio.put<Map<String, dynamic>>(
+        '/drivers/me/vehicle',
+        data: payload,
+      );
+    } catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
 }

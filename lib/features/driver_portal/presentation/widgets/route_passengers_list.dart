@@ -100,6 +100,7 @@ class _RoutePassengersListState extends ConsumerState<RoutePassengersList> {
       childId: childId,
       apiCall: (repo, routeId) => repo.markBoarding(routeId, childId),
       onLocal: (ctrl) => ctrl.markClientBoardedLocal(childId),
+      onRollback: (ctrl) => ctrl.updateClientStopStatusLocal(childId, 'pending'),
       msg: 'Aluno embarcou.',
     );
   }
@@ -109,6 +110,8 @@ class _RoutePassengersListState extends ConsumerState<RoutePassengersList> {
       childId: childId,
       apiCall: (repo, routeId) => repo.markDisembarking(routeId, childId),
       onLocal: (ctrl) => ctrl.markClientDisembarkedLocal(childId),
+      onRollback: (ctrl) =>
+          ctrl.updateClientStopStatusLocal(childId, 'picked_up'),
       msg: 'Aluno desembarcou.',
     );
 
@@ -190,23 +193,26 @@ class _RoutePassengersListState extends ConsumerState<RoutePassengersList> {
     required int childId,
     required Future<void> Function(RoutesRepository, int) apiCall,
     required void Function(DriverTrackingController) onLocal,
+    void Function(DriverTrackingController)? onRollback,
     required String msg,
   }) async {
     if (_submitting) return;
     final routeId = widget.tracking.routeId;
     if (routeId == null || routeId <= 0) return;
 
+    final ctrl = ref.read(driverTrackingControllerProvider.notifier);
     setState(() => _submitting = true);
+    // Atualização otimista: o card muda na hora; em caso de erro na API,
+    // desfaz (rollback) e avisa.
+    onLocal(ctrl);
     try {
       await apiCall(ref.read(driverRoutesRepositoryProvider), routeId);
-      onLocal(ref.read(driverTrackingControllerProvider.notifier));
-      await ref
-          .read(driverTrackingControllerProvider.notifier)
-          .refreshRoutePreviewNow();
+      await ctrl.refreshRoutePreviewNow();
       ref.invalidate(driverRoutesProvider);
       if (!mounted) return;
       showAppSnackBar(context, message: msg, type: AppFeedbackType.success);
     } on ApiException catch (e) {
+      onRollback?.call(ctrl);
       if (!mounted) return;
       showAppSnackBar(context, message: e.message, type: AppFeedbackType.error);
     } finally {
@@ -265,10 +271,8 @@ List<StudentRouteCard> buildStudentRouteCards(DriverTrackingState tracking) {
         .where((s) => _isDropoffType(s.type))
         .cast<DriverTrackingStopPoint?>()
         .firstWhere((_) => true, orElse: () => null);
-    final anyDelivered = stops.any(
-      (s) => s.status.toLowerCase() == 'delivered',
-    );
-    final anyPicked = stops.any((s) => s.status.toLowerCase() == 'picked_up');
+    final anyDelivered = stops.any((s) => _isCompletedCardStatus(s.status));
+    final anyPicked = stops.any((s) => _isBoardedCardStatus(s.status));
     final status = anyDelivered
         ? StopStatus.droppedOff
         : anyPicked
@@ -299,6 +303,23 @@ String _keyOf(DriverTrackingStopPoint s) {
   if ((s.childId ?? 0) > 0) return 'ch:${s.childId}';
   if ((s.clientId ?? 0) > 0) return 'c:${s.clientId}';
   return 's:${s.id ?? s.name ?? s.sequence ?? ''}';
+}
+
+bool _isBoardedCardStatus(String status) {
+  final s = status.toLowerCase();
+  // Cobre o vocabulário legado da UI (picked_up) e o do backend (boarded).
+  return s == 'picked_up' || s == 'boarded';
+}
+
+bool _isCompletedCardStatus(String status) {
+  final s = status.toLowerCase();
+  // Cobre delivered (UI) e disembarked/absent/removed (backend) — ausente ou
+  // removido não pode ficar preso como "pendente" com botões mortos.
+  return s == 'delivered' ||
+      s == 'disembarked' ||
+      s == 'done' ||
+      s == 'absent' ||
+      s == 'removed';
 }
 
 bool _isPickupType(String? type) {

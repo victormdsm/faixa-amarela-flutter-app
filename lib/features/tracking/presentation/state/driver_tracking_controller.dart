@@ -168,7 +168,7 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
             'route_id': routeId,
             'route_manifest_id': routeManifestId,
             'van_id': vanId,
-            'flush_interval_seconds': 15,
+            'flush_interval_seconds': 2,
           });
         } catch (_) {}
       } catch (e) {
@@ -258,7 +258,8 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
   void markClientBoardedLocal(int childId) {
     _applyClientStopStatusLocal(
       childId: childId,
-      targetTypes: _pickupTypes,
+      matches: (stop) =>
+          _isPickupType(stop.type) && !_isCompletedStopStatus(stop.status),
       nextStatus: 'picked_up',
     );
   }
@@ -266,8 +267,28 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
   void markClientDisembarkedLocal(int childId) {
     _applyClientStopStatusLocal(
       childId: childId,
-      targetTypes: _dropoffTypes,
+      matches: (stop) {
+        // O backend emite um stop por criança (type 'pickup') que
+        // transiciona pending → boarded → disembarked. O desembarque precisa
+        // mirar o stop embarcado — antes mirava só tipos dropoff, que não
+        // existem no contrato, e o toque em "Desembarcou" morria aqui.
+        if (_isBoardedStopStatus(stop.status)) return true;
+        return _isDropoffType(stop.type) &&
+            !_isCompletedStopStatus(stop.status);
+      },
       nextStatus: 'delivered',
+    );
+  }
+
+  /// Define um status arbitrário para o stop da criança — usado no rollback
+  /// otimista da UI (ex.: desfaz 'picked_up' de volta para 'pending' quando
+  /// a chamada de embarque falha).
+  void updateClientStopStatusLocal(int childId, String status) {
+    _applyClientStopStatusLocal(
+      childId: childId,
+      matches: (stop) => stop.status.toLowerCase() != status.toLowerCase(),
+      nextStatus: status,
+      allowFromCompleted: true,
     );
   }
 
@@ -278,12 +299,7 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
         .toList(growable: false);
 
     final remaining = planned
-        .where((s) {
-          final status = s.status.toLowerCase();
-          return status != 'picked_up' &&
-              status != 'delivered' &&
-              status != 'done';
-        })
+        .where((s) => _isRemainingStopStatus(s.status))
         .toList(growable: false);
 
     state = state.copyWith(
@@ -582,11 +598,11 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
         data: <String, dynamic>{
           'lat': position.latitude,
           'lng': position.longitude,
-          // Backend passa a honrar radiusMeters/limit e derivou a rota do
-          // token — routeId/routeManifestId saíram do contrato (400 via
-          // whitelist se enviados).
-          'radiusMeters': state.geofenceRadiusMeters,
-          'limit': 10,
+          // O raio NÃO é mais enviado: o backend decide por regra (casa 500m /
+          // escola 50m). Enviar radiusMeters:50 sobrescrevia o threshold da
+          // regra e matava o alerta de casa; limit também saiu do payload.
+          // routeId/routeManifestId seguem fora do contrato (a rota deriva do
+          // token — 400 via whitelist se enviados).
         },
         options: Options(
           headers: <String, dynamic>{'Authorization': _authHeader},
@@ -1082,7 +1098,9 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
             clientId: (map['clientId'] as num?)?.toInt(),
             childId: (map['childId'] as num?)?.toInt(),
             type: map['type']?.toString(),
-            status: (map['status'] ?? 'pending').toString(),
+            status: _normalizeBackendStopStatus(
+              (map['status'] ?? 'pending').toString(),
+            ),
             sequence:
                 (map['sequence'] as num?)?.toInt() ??
                 (map['order'] as num?)?.toInt(),
@@ -1148,17 +1166,19 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
 
   void _applyClientStopStatusLocal({
     required int childId,
-    required Set<String> targetTypes,
+    required bool Function(DriverTrackingStopPoint stop) matches,
     required String nextStatus,
+    bool allowFromCompleted = false,
   }) {
     final planned = [...state.routePlannedStops];
     var changed = false;
     for (var i = 0; i < planned.length; i++) {
       final stop = planned[i];
       if ((stop.childId ?? 0) != childId) continue;
-      if (!targetTypes.contains(_normalizedStopType(stop.type))) continue;
-      final current = stop.status.toLowerCase();
-      if (current == 'delivered' || current == 'done') continue;
+      if (!matches(stop)) continue;
+      if (!allowFromCompleted && _isCompletedStopStatus(stop.status)) {
+        continue;
+      }
       planned[i] = (
         id: stop.id,
         clientId: stop.clientId,
@@ -1176,12 +1196,7 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
     if (!changed) return;
 
     final remaining = planned
-        .where((s) {
-          final status = s.status.toLowerCase();
-          return status != 'picked_up' &&
-              status != 'delivered' &&
-              status != 'done';
-        })
+        .where((s) => _isRemainingStopStatus(s.status))
         .toList(growable: false);
 
     state = state.copyWith(
@@ -1189,6 +1204,28 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
       routeRemainingStops: remaining,
       routeNextStopName: remaining.isNotEmpty ? remaining.first.name : null,
     );
+  }
+
+  /// Status terminal: o stop não aceita mais transições otimistas e não
+  /// conta como restante. Cobre o vocabulário do backend (disembarked,
+  /// absent, removed) e o legado da UI (delivered, done).
+  static bool _isCompletedStopStatus(String status) {
+    final s = status.toLowerCase();
+    return s == 'delivered' ||
+        s == 'disembarked' ||
+        s == 'done' ||
+        s == 'absent' ||
+        s == 'removed';
+  }
+
+  static bool _isBoardedStopStatus(String status) {
+    final s = status.toLowerCase();
+    return s == 'picked_up' || s == 'boarded';
+  }
+
+  static bool _isRemainingStopStatus(String status) {
+    final s = status.toLowerCase();
+    return !_isCompletedStopStatus(s) && !_isBoardedStopStatus(s);
   }
 
   static final _pickupTypes = <String>{
@@ -1211,6 +1248,25 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
 
   static String _normalizedStopType(String? type) =>
       (type ?? '').toLowerCase().trim();
+
+  /// O backend usa boarded/disembarked/absent/removed nos stops; a UI de
+  /// tracking trabalha com picked_up/delivered. Normaliza na entrada
+  /// (recalculate/preview) para o merge local e os cards falarem a mesma
+  /// língua — sem isso, após o refresh o embarque "voltava" para pendente
+  /// e o botão Desembarcou ficava morto.
+  static String _normalizeBackendStopStatus(String raw) {
+    final s = raw.toLowerCase().trim();
+    switch (s) {
+      case 'boarded':
+        return 'picked_up';
+      case 'disembarked':
+        return 'delivered';
+      case '':
+        return 'pending';
+      default:
+        return s;
+    }
+  }
 
   static String _resolveCompletedStatus(String? type) {
     if (_isPickupType(type)) return 'picked_up';
