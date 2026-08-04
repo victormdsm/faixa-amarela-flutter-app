@@ -13,6 +13,8 @@ class DriverProfileDto {
     required this.vanYear,
     required this.vanColor,
     required this.vanImageUrl,
+    this.publicContactName,
+    this.publicContactPhone,
     required this.coverageArea,
     this.isActive = true,
     this.status,
@@ -38,6 +40,8 @@ class DriverProfileDto {
   final String? vanColor;
   final String vanYear;
   final String? vanImageUrl;
+  final String? publicContactName;
+  final String? publicContactPhone;
   final String coverageArea;
   final bool isActive;
   final String? status;
@@ -147,6 +151,8 @@ class DriverProfileDto {
       vanColor: effectiveVanColor,
       vanYear: effectiveVanYear,
       vanImageUrl: effectiveVanImageUrl,
+      publicContactName: (van['publicContactName'] ?? van['public_contact_name'])?.toString(),
+      publicContactPhone: (van['publicContactPhone'] ?? van['public_contact_phone'])?.toString(),
       coverageArea: (json['coverageArea'] ?? '').toString(),
       isActive: json['isActive'] == true || json['isActive'] == 1,
       status: json['status']?.toString(),
@@ -180,6 +186,8 @@ class DriverProfileDto {
         'color': vanColor,
         'year': vanYear,
         'imageUrl': vanImageUrl,
+        'publicContactName': publicContactName,
+        'publicContactPhone': publicContactPhone,
       },
       'coverageArea': coverageArea,
       'isActive': isActive,
@@ -203,6 +211,8 @@ class DriverProfileDto {
       vanColor: vanColor,
       vanYear: vanYear,
       vanImageUrl: vanImageUrl,
+      publicContactName: publicContactName,
+      publicContactPhone: publicContactPhone,
       coverageArea: coverageArea,
       isActive: isActive,
       status: status,
@@ -229,6 +239,8 @@ class DriverProfileDto {
       vanColor: profile.vanColor,
       vanYear: profile.vanYear,
       vanImageUrl: profile.vanImageUrl,
+      publicContactName: profile.publicContactName,
+      publicContactPhone: profile.publicContactPhone,
       coverageArea: profile.coverageArea,
       isActive: profile.isActive,
       status: profile.status,

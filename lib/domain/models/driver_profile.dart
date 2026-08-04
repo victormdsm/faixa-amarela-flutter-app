@@ -11,6 +11,8 @@ class DriverProfile {
     this.vanColor,
     required this.vanYear,
     this.vanImageUrl,
+    this.publicContactName,
+    this.publicContactPhone,
     required this.coverageArea,
     this.isActive = true,
     this.status,
@@ -35,6 +37,8 @@ class DriverProfile {
   final String? vanColor;
   final String vanYear;
   final String? vanImageUrl;
+  final String? publicContactName;
+  final String? publicContactPhone;
   final String coverageArea;
   final bool isActive;
   final String? status;
@@ -76,6 +80,12 @@ class DriverProfile {
       vanImageUrl: van.isNotEmpty
           ? van['imageUrl']?.toString()
           : json['vanImageUrl']?.toString(),
+      publicContactName: van.isNotEmpty
+          ? (van['publicContactName'] ?? van['public_contact_name'])?.toString()
+          : null,
+      publicContactPhone: van.isNotEmpty
+          ? (van['publicContactPhone'] ?? van['public_contact_phone'])?.toString()
+          : null,
       coverageArea: (json['coverageArea'] ?? '').toString(),
       isActive: json['isActive'] == true || json['isActive'] == 1,
       status: json['status']?.toString(),
@@ -110,6 +120,8 @@ class DriverProfile {
         'color': vanColor,
         'year': vanYear,
         'imageUrl': vanImageUrl,
+        'publicContactName': publicContactName,
+        'publicContactPhone': publicContactPhone,
       },
       'coverageArea': coverageArea,
       'isActive': isActive,

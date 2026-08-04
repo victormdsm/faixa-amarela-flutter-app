@@ -307,41 +307,7 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                         prefixIcon: Icon(Icons.phone_rounded),
                       ),
                     ),
-                    const SizedBox(height: AppSpacing.md),
-                    TextFormField(
-                      controller: _cnhController,
-                      enabled: !_isSaving,
-                      decoration: const InputDecoration(
-                        labelText: 'CNH',
-                        prefixIcon: Icon(Icons.credit_card_rounded),
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    TextFormField(
-                      controller: _infoController,
-                      enabled: !_isSaving,
-                      maxLines: 3,
-                      decoration: const InputDecoration(
-                        labelText: 'Sobre / Informações',
-                        alignLabelWithHint: true,
-                        prefixIcon: Icon(Icons.info_outline_rounded),
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    // Descrição pública do motorista (drivers.description):
-                    // passa pela aprovação do admin junto da van. Limite do
-                    // contrato: 255 caracteres.
-                    TextFormField(
-                      controller: _descriptionController,
-                      enabled: !_isSaving,
-                      maxLines: 3,
-                      maxLength: 255,
-                      decoration: const InputDecoration(
-                        labelText: 'Sobre você (opcional, até 255 caracteres)',
-                        alignLabelWithHint: true,
-                        prefixIcon: Icon(Icons.record_voice_over_outlined),
-                      ),
-                    ),
+
                   ],
                 ),
               ),
@@ -367,6 +333,28 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                           setState(() => _vehicleEditMode = !_vehicleEditMode),
                       onUndoImage: () =>
                           setState(() => _vehicleImageLocalPath = null),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    const Divider(height: 1),
+                    const SizedBox(height: AppSpacing.md),
+                    TextFormField(
+                      controller: _cnhController,
+                      enabled: !_isSaving,
+                      decoration: const InputDecoration(
+                        labelText: 'CNH',
+                        prefixIcon: Icon(Icons.credit_card_rounded),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    TextFormField(
+                      controller: _infoController,
+                      enabled: !_isSaving,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        labelText: 'Sobre / Informações adicionais',
+                        alignLabelWithHint: true,
+                        prefixIcon: Icon(Icons.info_outline_rounded),
+                      ),
                     ),
                     const SizedBox(height: AppSpacing.md),
                     const Divider(height: 1),
@@ -437,6 +425,21 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                   _selectedSchoolIds
                     ..clear()
                     ..addAll(value);
+                  // Turnos de escolas novas: completa o mapa local a
+                  // partir do catálogo (que já embute shifts por escola).
+                  final catalog = schoolsAsync.value ?? const <CatalogOption>[];
+                  for (final schoolId in value) {
+                    if (!_schoolShiftMap.containsKey(schoolId)) {
+                      final school = catalog.cast<CatalogOption?>().firstWhere(
+                            (s) => s?.id == schoolId,
+                            orElse: () => null,
+                          );
+                      if (school != null && school.shifts.isNotEmpty) {
+                        _schoolShiftMap[schoolId] =
+                            school.shifts.map((s) => s.id).toSet();
+                      }
+                    }
+                  }
                 }),
                 onDistrictsChanged: (value) => setState(() {
                   _selectedDistrictIds
