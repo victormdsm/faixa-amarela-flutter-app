@@ -1,18 +1,26 @@
 import 'package:app_faixa_amarela/features/parent_portal/data/parent_realtime_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../helpers/fake_parent_realtime_socket.dart';
+
+late List<FakeParentRealtimeSocket> sockets;
+late ParentRealtimeService service;
+
+/// Último socket criado pela factory (reconnect cria um novo).
+FakeParentRealtimeSocket get socket => sockets.last;
+
 void main() {
   group('ParentRealtimeService', () {
-    late _FakeParentRealtimeSocket socket;
-    late ParentRealtimeService service;
-
     setUp(() {
+      sockets = [];
       service = ParentRealtimeService(
         baseUrl: 'http://localhost:3000',
         socketFactory: ({required baseUrl, required token}) {
           expect(baseUrl, 'http://localhost:3000');
           expect(token, 'token-abc');
-          return socket = _FakeParentRealtimeSocket();
+          final created = FakeParentRealtimeSocket();
+          sockets.add(created);
+          return created;
         },
       );
     });
@@ -117,6 +125,31 @@ void main() {
       expect(socket.ackEmissions.last.$2, {'routeId': 7});
     });
 
+    test('reconnect descarta o socket travado e reabre mantendo a rota', () {
+      service.watchRoute(routeId: 7, token: 'token-abc');
+      socket.simulateConnect();
+      final first = socket;
+
+      service.reconnect();
+
+      expect(first.disposed, isTrue);
+      expect(service.status, ParentRealtimeStatus.connecting);
+      expect(sockets, hasLength(2));
+
+      final next = sockets.last;
+      next.simulateConnect();
+      expect(service.status, ParentRealtimeStatus.connected);
+      // Assinatura refeita no novo socket (a room é por conexão).
+      expect(next.ackEmissions.single.$1, 'subscribe.route');
+      expect(next.ackEmissions.single.$2, {'routeId': 7});
+    });
+
+    test('reconnect sem rota assinada não faz nada', () {
+      service.reconnect();
+      expect(sockets, isEmpty);
+      expect(service.status, ParentRealtimeStatus.disconnected);
+    });
+
     test('unwatch sai da room, encerra o socket e desconecta', () async {
       service.watchRoute(routeId: 7, token: 'token-abc');
       socket.simulateConnect();
@@ -140,78 +173,4 @@ void main() {
       expect(service.watchedRouteId, isNull);
     });
   });
-}
-
-/// Socket fake: disparo manual de connect/disconnect/eventos, sem rede.
-class _FakeParentRealtimeSocket implements ParentRealtimeSocket {
-  final handlers = <String, List<void Function(dynamic)>>{};
-  final emissions = <(String, Map<String, dynamic>)>[];
-  final ackEmissions =
-      <(String, Map<String, dynamic>, void Function(dynamic)?)>[];
-  void Function(dynamic)? connectHandler;
-  void Function(dynamic)? disconnectHandler;
-  void Function(dynamic)? connectErrorHandler;
-  bool disposed = false;
-  bool _connected = false;
-
-  @override
-  bool get connected => _connected;
-
-  @override
-  void connect() {}
-
-  @override
-  void onConnect(void Function(dynamic data) handler) =>
-      connectHandler = handler;
-
-  @override
-  void onDisconnect(void Function(dynamic data) handler) =>
-      disconnectHandler = handler;
-
-  @override
-  void onConnectError(void Function(dynamic data) handler) =>
-      connectErrorHandler = handler;
-
-  @override
-  void on(String event, void Function(dynamic data) handler) =>
-      handlers.putIfAbsent(event, () => []).add(handler);
-
-  @override
-  void off(String event) => handlers.remove(event);
-
-  @override
-  void emit(String event, Map<String, dynamic> data) =>
-      emissions.add((event, data));
-
-  @override
-  void emitWithAck(
-    String event,
-    Map<String, dynamic> data, {
-    void Function(dynamic response)? ack,
-  }) =>
-      ackEmissions.add((event, data, ack));
-
-  @override
-  void dispose() {
-    disposed = true;
-    _connected = false;
-  }
-
-  void simulateConnect() {
-    _connected = true;
-    connectHandler?.call(null);
-  }
-
-  void simulateDisconnect() {
-    _connected = false;
-    disconnectHandler?.call(null);
-  }
-
-  void simulateLocation(Map<String, dynamic> payload) {
-    for (final handler
-        in handlers[ParentRealtimeService.eventLocationUpdated] ??
-            const <void Function(dynamic)>[]) {
-      handler(payload);
-    }
-  }
 }

@@ -52,8 +52,38 @@ bool hasDistrictChanges({
   );
 }
 
+/// Detecta edição no contato público da van e na descrição do motorista —
+/// os três campos passam a fluir pela solicitação de aprovação do admin
+/// (antes o contato ia direto no PUT /drivers/me/vehicle, sem revisão).
+bool hasPublicContactChanges({
+  required String name,
+  required String phone,
+  required String originalName,
+  required String originalPhone,
+}) {
+  return name != originalName || phone != originalPhone;
+}
+
+bool hasDescriptionChanges({
+  required String description,
+  required String originalDescription,
+}) {
+  return description != originalDescription;
+}
+
+/// Validador do contato público obrigatório: nome e telefone precisam estar
+/// preenchidos para salvar o perfil/van (mensagem única, amigável).
+const String publicContactRequiredMessage =
+    'Preencha o nome e telefone de contato público.';
+
+String? validatePublicContactField(String? value) {
+  if ((value ?? '').trim().isEmpty) return publicContactRequiredMessage;
+  return null;
+}
+
 /// Detecta alterações que exigem solicitação de aprovação do admin:
-/// escolas, bairros, fotos (perfil/veículo) e dados da van.
+/// escolas, bairros, fotos (perfil/veículo), dados da van, contato público
+/// e descrição.
 bool hasCoverageChanges({
   required Set<int> selectedSchoolIds,
   required Set<int> originalSelectedSchoolIds,
@@ -62,6 +92,8 @@ bool hasCoverageChanges({
   required bool hasNewAvatarImage,
   required bool hasNewVehicleImage,
   required bool hasVehicleDataChanges,
+  required bool hasPublicContactChanges,
+  required bool hasDescriptionChanges,
 }) {
   if (hasSchoolChanges(
     selectedSchoolIds: selectedSchoolIds,
@@ -80,5 +112,8 @@ bool hasCoverageChanges({
   // Edição dos dados da van também passa pela solicitação de aprovação —
   // sem isso o _save nem entraria no fluxo de request para a van.
   if (hasVehicleDataChanges) return true;
+  // Contato público e descrição seguem o mesmo fluxo de aprovação.
+  if (hasPublicContactChanges) return true;
+  if (hasDescriptionChanges) return true;
   return false;
 }

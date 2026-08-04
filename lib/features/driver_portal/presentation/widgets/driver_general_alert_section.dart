@@ -22,6 +22,18 @@ class _DriverGeneralAlertSectionState
     extends ConsumerState<DriverGeneralAlertSection> {
   bool _sending = false;
 
+  /// Mensagem padrão enviada como body da notificação de cada tipo de alerta.
+  /// O backend exige `message` (vira o texto exibido ao responsável).
+  static const _defaultMessages = <String, String>{
+    'breakdown':
+        'A van quebrou. Já estamos resolvendo e avisamos qualquer novidade.',
+    'flat_tire':
+        'O pneu da van furou. Vamos parar para o reparo, pode haver atraso.',
+    'accident':
+        'Houve um acidente no trajeto. Todos estão bem, avisaremos em breve.',
+    'general': 'A rota de hoje está com atraso geral.',
+  };
+
   static const _alertTypes = <(String, String, IconData, Color)>[
     ('breakdown', 'Van quebrou', Icons.car_crash_rounded, AppColors.dangerInk),
     (
@@ -92,12 +104,13 @@ class _DriverGeneralAlertSectionState
   }
 
   Future<void> _sendAlert(String type, String label) async {
+    final message = _defaultMessages[type] ?? label;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Enviar alerta geral?'),
+        title: Text('Enviar alerta: $label?'),
         content: Text(
-          'Todos os responsáveis dos alunos na rota serão notificados: "$label".',
+          'Todos os responsáveis dos alunos na rota receberão:\n\n"$message"',
         ),
         actions: [
           TextButton(
@@ -122,7 +135,11 @@ class _DriverGeneralAlertSectionState
 
     setState(() => _sending = true);
     try {
-      await ref.read(driverRoutesRepositoryProvider).alertAll(routeId, type);
+      await ref.read(driverRoutesRepositoryProvider).alertAll(
+            routeId,
+            type,
+            message: message,
+          );
       if (!mounted) return;
       showAppSnackBar(
         context,

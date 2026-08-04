@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:app_faixa_amarela/app/theme/app_theme.dart';
 import 'package:app_faixa_amarela/core/models/paginated_result.dart';
 import 'package:app_faixa_amarela/features/auth/domain/entities/auth_session.dart';
@@ -175,4 +177,66 @@ void main() {
     expect(find.text('Sistema'), findsOneWidget);
     verifyNever(() => repository.markAsRead(any(), any()));
   });
+
+  testWidgets(
+    'alerta do motorista com texto só em data (legado): tile e sheet exibem a mensagem completa',
+    (tester) async {
+      // Registro legado do Laravel: colunas title/body vazias e o texto real
+      // do motorista dentro do JSON de `data` (custom_message).
+      final legacyDriverAlert = AppNotification.fromJson({
+        'id': '9',
+        'type': 'driver_alert',
+        'title': '',
+        'body': '',
+        'data': jsonEncode({
+          'title': 'Alerta do motorista',
+          'custom_message': 'Pneu furou! Vou trocar e volto em 20 minutos.',
+          'driver_name': 'Seu Zé',
+        }),
+        'createdAt': '2026-07-08T09:15:00.000Z',
+        'readAt': null,
+      });
+
+      when(
+        () => repository.notifications(
+          any(),
+          page: any(named: 'page'),
+          perPage: any(named: 'perPage'),
+        ),
+      ).thenAnswer(
+        (_) async => PaginatedResult<AppNotification>(
+          items: [legacyDriverAlert],
+          currentPage: 1,
+          lastPage: 1,
+          total: 1,
+        ),
+      );
+
+      await pumpPage(tester);
+
+      // Tile da lista: texto real do motorista, sem JSON cru.
+      expect(find.text('Alerta do motorista'), findsOneWidget);
+      expect(
+        find.text('Pneu furou! Vou trocar e volto em 20 minutos.'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('{'), findsNothing);
+
+      await tester.tap(find.text('Alerta do motorista'));
+      await tester.pumpAndSettle();
+
+      // Sheet de detalhe: mesmo texto completo, selecionável.
+      expect(find.byType(NotificationDetailSheet), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(NotificationDetailSheet),
+          matching: find.text(
+            'Pneu furou! Vou trocar e volto em 20 minutos.',
+            findRichText: true,
+          ),
+        ),
+        findsOneWidget,
+      );
+    },
+  );
 }

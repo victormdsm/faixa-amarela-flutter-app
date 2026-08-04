@@ -107,9 +107,9 @@ typedef ParentRealtimeSocketFactory =
 ///
 /// O socket_io_client faz reconexão automática; a cada `connect` (primeira
 /// ou reconexão) a assinatura da rota é refeita. A UI trata
-/// [ParentRealtimeStatus.connected] como "ao vivo" e qualquer outro estado
-/// como "reconectando" (momento em que o polling HTTP volta a ser o
-/// fallback).
+/// [ParentRealtimeStatus.connected] como "ao vivo"; nos demais estados o
+/// polling HTTP de 15s assume como fallback silencioso (sem mensagem de erro
+/// para o usuário — ver `ParentRealtimeController` e `LiveTrackingOverlay`).
 class ParentRealtimeService {
   ParentRealtimeService({
     required String baseUrl,
@@ -178,6 +178,22 @@ class ParentRealtimeService {
     _teardownSocket();
     _token = null;
     _setStatus(ParentRealtimeStatus.disconnected);
+  }
+
+  /// Força uma nova conexão mantendo a rota assinada — ação "tentar de novo"
+  /// da UI quando a reconexão automática não vingou. O socket antigo é
+  /// descartado e um novo é aberto com o mesmo token; a assinatura da rota é
+  /// refeita no `connect` (handler em [_bindSocket]).
+  void reconnect() {
+    final token = _token;
+    if (token == null || token.isEmpty || _routeId == null) return;
+    _teardownSocket();
+    _setStatus(ParentRealtimeStatus.connecting);
+    final socket = _socketFactory(baseUrl: _baseUrl, token: token);
+    _socket = socket;
+    _bindSocket(socket);
+    socket.connect();
+    _subscribeWatchedRoute();
   }
 
   void dispose() {

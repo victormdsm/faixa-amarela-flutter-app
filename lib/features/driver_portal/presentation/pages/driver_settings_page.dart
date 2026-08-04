@@ -47,6 +47,7 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _infoController = TextEditingController();
+  final _descriptionController = TextEditingController();
   final _cnhController = TextEditingController();
   final _vehicleBrandController = TextEditingController();
   final _vehicleColorController = TextEditingController();
@@ -85,6 +86,7 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
   String _originalVehiclePlate = '';
   String _originalPublicContactName = '';
   String _originalPublicContactPhone = '';
+  String _originalDescription = '';
 
   @override
   void initState() {
@@ -118,6 +120,7 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
     _emailController.dispose();
     _phoneController.dispose();
     _infoController.dispose();
+    _descriptionController.dispose();
     _cnhController.dispose();
     _vehicleBrandController.dispose();
     _vehicleColorController.dispose();
@@ -324,6 +327,21 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                         prefixIcon: Icon(Icons.info_outline_rounded),
                       ),
                     ),
+                    const SizedBox(height: AppSpacing.md),
+                    // Descrição pública do motorista (drivers.description):
+                    // passa pela aprovação do admin junto da van. Limite do
+                    // contrato: 255 caracteres.
+                    TextFormField(
+                      controller: _descriptionController,
+                      enabled: !_isSaving,
+                      maxLines: 3,
+                      maxLength: 255,
+                      decoration: const InputDecoration(
+                        labelText: 'Sobre você (opcional, até 255 caracteres)',
+                        alignLabelWithHint: true,
+                        prefixIcon: Icon(Icons.record_voice_over_outlined),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -353,18 +371,19 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                     const SizedBox(height: AppSpacing.md),
                     const Divider(height: 1),
                     const SizedBox(height: AppSpacing.md),
-                    // Contato público: não exige aprovação do admin (vai
-                    // direto no PUT /drivers/me/vehicle), então fica fora do
-                    // "modo de edição" dos dados estruturais da van.
+                    // Contato público: OBRIGATÓRIO e agora passa pela
+                    // aprovação do admin junto dos dados da van (não vai
+                    // mais direto no PUT /drivers/me/vehicle).
                     TextFormField(
                       controller: _publicContactNameController,
                       enabled: !_isSaving,
                       decoration: const InputDecoration(
-                        labelText: 'Nome de contato público (opcional)',
+                        labelText: 'Nome de contato público (obrigatório)',
                         prefixIcon: Icon(Icons.badge_outlined),
                         helperText:
                             'Exibido para os pais no lugar do seu nome pessoal.',
                       ),
+                      validator: validatePublicContactField,
                     ),
                     const SizedBox(height: AppSpacing.md),
                     TextFormField(
@@ -372,11 +391,12 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                       enabled: !_isSaving,
                       keyboardType: TextInputType.phone,
                       decoration: const InputDecoration(
-                        labelText: 'Telefone público (opcional)',
+                        labelText: 'Telefone público (obrigatório)',
                         prefixIcon: Icon(Icons.phone_in_talk_outlined),
                         helperText:
                             'Exibido para os pais no lugar do seu telefone pessoal.',
                       ),
+                      validator: validatePublicContactField,
                     ),
                   ],
                 ),
@@ -467,6 +487,8 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
     _emailController.text = (_email ?? '');
     _phoneController.text = (data['cellPhone'] ?? '').toString();
     _infoController.text = (data['information'] ?? '').toString();
+    _descriptionController.text = (data['description'] ?? '').toString();
+    _originalDescription = _descriptionController.text.trim();
     _cnhController.text = (data['cnh'] ?? '').toString();
     _originalCnh = _cnhController.text.trim();
     _avatarImageUrl = data['avatarUrl']?.toString();
@@ -754,10 +776,20 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
 
   /// Edição no contato público da van comparada aos valores do servidor.
   bool _hasPublicContactChanges() {
-    return _publicContactNameController.text.trim() !=
-            _originalPublicContactName ||
-        _publicContactPhoneController.text.trim() !=
-            _originalPublicContactPhone;
+    return hasPublicContactChanges(
+      name: _publicContactNameController.text.trim(),
+      phone: _publicContactPhoneController.text.trim(),
+      originalName: _originalPublicContactName,
+      originalPhone: _originalPublicContactPhone,
+    );
+  }
+
+  /// Edição na descrição pública do motorista (drivers.description).
+  bool _hasDescriptionChanges() {
+    return hasDescriptionChanges(
+      description: _descriptionController.text.trim(),
+      originalDescription: _originalDescription,
+    );
   }
 
   bool _hasCoverageChanges() {
@@ -769,6 +801,8 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
       hasNewAvatarImage: _avatarImageLocalPath != null,
       hasNewVehicleImage: _vehicleImageLocalPath != null,
       hasVehicleDataChanges: _hasVehicleDataChanges(),
+      hasPublicContactChanges: _hasPublicContactChanges(),
+      hasDescriptionChanges: _hasDescriptionChanges(),
     );
   }
 
@@ -807,6 +841,10 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
     final cnhChanged = cnh != _originalCnh;
 
     final hasCoverageChanges = _hasCoverageChanges();
+    // Contato público e descrição só entram no submit quando editados (mesma
+    // regra dos dados da van) — a edição deles já aciona hasCoverageChanges.
+    final publicContactEdited = _hasPublicContactChanges();
+    final descriptionEdited = _hasDescriptionChanges();
     // Cobertura (escolas/bairros) só é enviada quando o motorista editou
     // de fato — antes, uma troca de foto/avatar reenviava tudo.
     final coverageEdited =
@@ -867,6 +905,17 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
           requestedVehicleMarca: hasVehicleChanges ? vehicleBrand : null,
           requestedVehicleCor: hasVehicleChanges ? vehicleColor : null,
           requestedVehicleAno: hasVehicleChanges ? vehicleYear : null,
+          // Contato público e descrição seguem o mesmo fluxo de aprovação
+          // (aplicados em vehicles.public_contact_* e drivers.description).
+          requestedPublicContactName: publicContactEdited
+              ? _publicContactNameController.text.trim()
+              : null,
+          requestedPublicContactPhone: publicContactEdited
+              ? _publicContactPhoneController.text.trim()
+              : null,
+          requestedDescription: descriptionEdited
+              ? _descriptionController.text.trim()
+              : null,
         );
         coverageRequestSubmitted = true;
       }
@@ -879,20 +928,6 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
             information: _infoController.text.trim(),
             cnh: cnhChanged ? cnh : null,
           );
-
-      // Contato público da van: PUT /drivers/me/vehicle direto (sem fluxo de
-      // aprovação), apenas quando o motorista editou algum dos dois campos.
-      if (_hasPublicContactChanges()) {
-        await ref
-            .read(driverProfileRepositoryProvider)
-            .updateVehiclePublicContact(
-              publicContactName: _publicContactNameController.text.trim(),
-              publicContactPhone: _publicContactPhoneController.text.trim(),
-            );
-        _originalPublicContactName = _publicContactNameController.text.trim();
-        _originalPublicContactPhone = _publicContactPhoneController.text
-            .trim();
-      }
 
       _applyProfile(updatedProfile.toJson());
       try {

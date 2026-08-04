@@ -51,6 +51,13 @@ class NestjsDriverProfileChangeRequestRepository {
     String? requestedVehicleMarca,
     String? requestedVehicleCor,
     String? requestedVehicleAno,
+    /// Contato público da van e descrição do motorista: seguem o mesmo fluxo
+    /// de aprovação dos dados da van (aplicados em vehicles.public_contact_*
+    /// e drivers.description na aprovação). Nulos = sem alteração — a chave é
+    /// omitida do payload e o backend não toca no valor atual.
+    String? requestedPublicContactName,
+    String? requestedPublicContactPhone,
+    String? requestedDescription,
   }) async {
     try {
       final districtIdsJson = districtIds == null
@@ -80,6 +87,9 @@ class NestjsDriverProfileChangeRequestRepository {
           'requestedVehicleMarca': ?requestedVehicleMarca,
           'requestedVehicleCor': ?requestedVehicleCor,
           'requestedVehicleAno': ?requestedVehicleAno,
+          'requestedPublicContactName': ?requestedPublicContactName,
+          'requestedPublicContactPhone': ?requestedPublicContactPhone,
+          'requestedDescription': ?requestedDescription,
         },
       );
       return response.data ?? const <String, dynamic>{};

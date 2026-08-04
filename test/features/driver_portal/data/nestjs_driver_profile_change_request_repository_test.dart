@@ -119,6 +119,41 @@ void main() {
     });
   });
 
+  group('submitRequest contato público + descrição (aprovação)', () {
+    test('includes the 3 fields when provided', () async {
+      await repository.submitRequest(
+        schoolIds: const [1],
+        districtIds: const [10],
+        schoolShiftMap: const {
+          1: [1],
+        },
+        requestedPublicContactName: 'Van Escolar do Carlos',
+        requestedPublicContactPhone: '45988887777',
+        requestedDescription: 'Motorista há 10 anos em Foz.',
+      );
+
+      final payload = capturePayload();
+      expect(payload['requestedPublicContactName'], 'Van Escolar do Carlos');
+      expect(payload['requestedPublicContactPhone'], '45988887777');
+      expect(payload['requestedDescription'], 'Motorista há 10 anos em Foz.');
+    });
+
+    test('omits the 3 fields when not provided', () async {
+      await repository.submitRequest(
+        schoolIds: const [1],
+        districtIds: const [10],
+        schoolShiftMap: const {
+          1: [1],
+        },
+      );
+
+      final payload = capturePayload();
+      expect(payload.containsKey('requestedPublicContactName'), isFalse);
+      expect(payload.containsKey('requestedPublicContactPhone'), isFalse);
+      expect(payload.containsKey('requestedDescription'), isFalse);
+    });
+  });
+
   group('submitRequest cobertura (schoolShiftMap)', () {
     test(
       'omits requestedDistrictIds/requestedSchoolShiftMap when the driver did not edit coverage',

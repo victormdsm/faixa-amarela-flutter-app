@@ -14,6 +14,7 @@ class ParentRealtimeState {
     this.latitude,
     this.longitude,
     this.updatedAt,
+    this.connectionIssue = false,
   });
 
   final ParentRealtimeStatus status;
@@ -23,6 +24,11 @@ class ParentRealtimeState {
 
   /// Momento da última posição recebida via socket.
   final DateTime? updatedAt;
+
+  /// Sem conexão em tempo real de forma persistente (ver
+  /// [ParentRealtimeController.outageGracePeriod]). Antes disso a queda é
+  /// tratada como transitória — o polling HTTP de 15s cobre sem alarme.
+  final bool connectionIssue;
 
   /// Socket conectado e assinado na rota: marcador atualiza em tempo real e
   /// o polling HTTP fica em standby (fallback).
@@ -41,6 +47,7 @@ class ParentRealtimeState {
     double? latitude,
     double? longitude,
     DateTime? updatedAt,
+    bool? connectionIssue,
     bool clearPosition = false,
   }) {
     return ParentRealtimeState(
@@ -49,6 +56,7 @@ class ParentRealtimeState {
       latitude: clearPosition ? null : (latitude ?? this.latitude),
       longitude: clearPosition ? null : (longitude ?? this.longitude),
       updatedAt: clearPosition ? null : (updatedAt ?? this.updatedAt),
+      connectionIssue: connectionIssue ?? this.connectionIssue,
     );
   }
 }
@@ -56,10 +64,20 @@ class ParentRealtimeState {
 /// Controla o ciclo de vida do socket do pai: assina a rota ativa, reflete
 /// as posições recebidas no estado e encerra tudo quando a tela sai (o
 /// provider é autoDispose).
+///
+/// Quedas de conexão são normais em rede móvel e o socket se reconecta
+/// sozinho — por isso o estado só vira "problema" (`connectionIssue`)
+/// depois de [outageGracePeriod] sem conectar. Até lá a UI mostra um
+/// estado neutro de atualização e o polling HTTP cobre.
 class ParentRealtimeController extends Notifier<ParentRealtimeState> {
+  /// Tempo sem conexão em tempo real a partir do qual a UI passa a exibir o
+  /// estado de problema persistente (com ação de tentar de novo).
+  static const outageGracePeriod = Duration(seconds: 30);
+
   late final ParentRealtimeService _service;
   StreamSubscription<ParentVanLocation>? _locationSub;
   StreamSubscription<ParentRealtimeStatus>? _statusSub;
+  Timer? _outageTimer;
 
   @override
   ParentRealtimeState build() {
@@ -67,6 +85,7 @@ class ParentRealtimeController extends Notifier<ParentRealtimeState> {
     _locationSub = _service.locations.listen(_onLocation);
     _statusSub = _service.statusChanges.listen(_onStatus);
     ref.onDispose(() {
+      _outageTimer?.cancel();
       _locationSub?.cancel();
       _statusSub?.cancel();
       _service.unwatch();
@@ -85,13 +104,30 @@ class ParentRealtimeController extends Notifier<ParentRealtimeState> {
     // Troca de rota: posição anterior não vale mais.
     state = ParentRealtimeState(status: _service.status, routeId: routeId);
     _service.watchRoute(routeId: routeId, token: token);
+    _syncOutageTimer();
   }
 
   /// Encerra a assinatura (rota finalizada/sem rota ativa).
   void unwatch() {
+    _outageTimer?.cancel();
+    _outageTimer = null;
     _service.unwatch();
     if (!ref.mounted) return;
     state = const ParentRealtimeState();
+  }
+
+  /// Ação "tentar de novo" do estado de falha persistente: descarta o socket
+  /// travado e abre uma conexão nova (a reconexão automática continua valendo
+  /// para quedas futuras).
+  void retry() {
+    if (state.routeId == null) return;
+    _service.reconnect();
+    if (!ref.mounted) return;
+    state = state.copyWith(
+      status: _service.status,
+      connectionIssue: false,
+    );
+    _syncOutageTimer();
   }
 
   void _onLocation(ParentVanLocation location) {
@@ -112,5 +148,28 @@ class ParentRealtimeController extends Notifier<ParentRealtimeState> {
   void _onStatus(ParentRealtimeStatus status) {
     if (!ref.mounted) return;
     state = state.copyWith(status: status);
+    _syncOutageTimer();
+  }
+
+  /// Liga o timer de falha persistente enquanto há rota assinada sem
+  /// conexão; cancela (e limpa a flag) assim que o socket volta.
+  void _syncOutageTimer() {
+    final waitingConnection = state.routeId != null && !state.isLive;
+    if (waitingConnection) {
+      _outageTimer ??= Timer(outageGracePeriod, _onOutageGracePeriodEnded);
+    } else {
+      _outageTimer?.cancel();
+      _outageTimer = null;
+      if (state.connectionIssue) {
+        state = state.copyWith(connectionIssue: false);
+      }
+    }
+  }
+
+  void _onOutageGracePeriodEnded() {
+    _outageTimer = null;
+    if (!ref.mounted) return;
+    if (state.routeId == null || state.isLive) return;
+    state = state.copyWith(connectionIssue: true);
   }
 }

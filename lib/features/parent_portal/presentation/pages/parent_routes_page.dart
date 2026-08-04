@@ -213,6 +213,10 @@ class _ParentRoutesPageState extends ConsumerState<ParentRoutesPage>
                     driverPos: driverPos,
                     lastPositionAt: lastPositionAt,
                     isLive: realtime.isLive,
+                    connectionIssue: realtime.connectionIssue,
+                    onRetry: () => ref
+                        .read(parentRealtimeControllerProvider.notifier)
+                        .retry(),
                   ),
                 ),
               ),

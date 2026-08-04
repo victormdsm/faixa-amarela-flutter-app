@@ -51,6 +51,8 @@ void main() {
       bool hasNewAvatarImage = false,
       bool hasNewVehicleImage = false,
       bool vehicleEdited = false,
+      bool publicContactEdited = false,
+      bool descriptionEdited = false,
     }) {
       return hasCoverageChanges(
         selectedSchoolIds: selectedSchoolIds ?? const {1, 2},
@@ -60,6 +62,8 @@ void main() {
         hasNewAvatarImage: hasNewAvatarImage,
         hasNewVehicleImage: hasNewVehicleImage,
         hasVehicleDataChanges: vehicleEdited,
+        hasPublicContactChanges: publicContactEdited,
+        hasDescriptionChanges: descriptionEdited,
       );
     }
 
@@ -92,6 +96,80 @@ void main() {
       // Garante que editar só os dados da van entra no fluxo de solicitação
       // de aprovação (senão o _save nem chamaria o submitRequest).
       expect(detect(vehicleEdited: true), isTrue);
+    });
+
+    test('returns true for public contact edit (vai para aprovação)', () {
+      expect(detect(publicContactEdited: true), isTrue);
+    });
+
+    test('returns true for description edit (vai para aprovação)', () {
+      expect(detect(descriptionEdited: true), isTrue);
+    });
+  });
+
+  group('hasPublicContactChanges / hasDescriptionChanges', () {
+    test('contato: false quando nada mudou, true quando nome ou fone mudou', () {
+      expect(
+        hasPublicContactChanges(
+          name: 'Van do Carlos',
+          phone: '45999990000',
+          originalName: 'Van do Carlos',
+          originalPhone: '45999990000',
+        ),
+        isFalse,
+      );
+      expect(
+        hasPublicContactChanges(
+          name: 'Van Escolar',
+          phone: '45999990000',
+          originalName: 'Van do Carlos',
+          originalPhone: '45999990000',
+        ),
+        isTrue,
+      );
+      expect(
+        hasPublicContactChanges(
+          name: 'Van do Carlos',
+          phone: '45988887777',
+          originalName: 'Van do Carlos',
+          originalPhone: '45999990000',
+        ),
+        isTrue,
+      );
+    });
+
+    test('descrição: false quando igual, true quando editada', () {
+      expect(
+        hasDescriptionChanges(
+          description: 'Bio',
+          originalDescription: 'Bio',
+        ),
+        isFalse,
+      );
+      expect(
+        hasDescriptionChanges(
+          description: 'Bio nova',
+          originalDescription: 'Bio',
+        ),
+        isTrue,
+      );
+    });
+  });
+
+  group('validatePublicContactField (obrigatório)', () {
+    test('vazio/null/espaços → mensagem amigável', () {
+      expect(validatePublicContactField(null), publicContactRequiredMessage);
+      expect(validatePublicContactField(''), publicContactRequiredMessage);
+      expect(validatePublicContactField('   '), publicContactRequiredMessage);
+      expect(
+        publicContactRequiredMessage,
+        'Preencha o nome e telefone de contato público.',
+      );
+    });
+
+    test('preenchido → sem erro', () {
+      expect(validatePublicContactField('Van do Carlos'), isNull);
+      expect(validatePublicContactField('45999990000'), isNull);
     });
   });
 

@@ -55,5 +55,34 @@ void main() {
 
       expect(tapped, isTrue);
     });
+
+    testWidgets('exibe título e texto completo do alerta do motorista', (
+      tester,
+    ) async {
+      // Alerta customizado do motorista (ex.: pneu furou) — o tile mostra o
+      // texto real, não um placeholder genérico.
+      final notification = AppNotification.fromJson({
+        'id': '3',
+        'type': 'flat_tire',
+        'title': 'Alerta: pneu furou',
+        'body': 'Pneu furou! Vou trocar e volto em 20 minutos.',
+        'data': <String, dynamic>{},
+        'createdAt': '2026-07-08T09:15:00.000Z',
+      });
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: FaixaNotificationTile(notification: notification),
+          ),
+        ),
+      );
+
+      expect(find.text('Alerta: pneu furou'), findsOneWidget);
+      expect(
+        find.text('Pneu furou! Vou trocar e volto em 20 minutos.'),
+        findsOneWidget,
+      );
+    });
   });
 }
