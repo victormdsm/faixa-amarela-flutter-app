@@ -10,7 +10,6 @@ class PublicTransportDriver {
     required this.districts,
     required this.shiftIds,
     this.cnh,
-    this.description,
     this.publicContactName,
     this.publicContactPhone,
     this.vehicleDescription,
@@ -34,10 +33,6 @@ class PublicTransportDriver {
   /// CNH do motorista (contrato novo da busca pública).
   final String? cnh;
 
-  /// Descrição pública do motorista (campo novo do driver). Quando ausente,
-  /// a UI cai no campo legado [information].
-  final String? description;
-
   /// Nome/telefone de contato público da van (exibidos no detalhe).
   final String? publicContactName;
   final String? publicContactPhone;
@@ -58,11 +53,8 @@ class PublicTransportDriver {
     return cellPhone;
   }
 
-  /// Descrição pública preferencial: campo novo `description`, caindo no
-  /// legado `information` quando o backend ainda não o envia.
+  /// Descrição pública do motorista (sobre) — campo `information`.
   String? get about {
-    final desc = (description ?? '').trim();
-    if (desc.isNotEmpty) return description;
     final info = (information ?? '').trim();
     if (info.isNotEmpty) return information;
     return null;
@@ -103,7 +95,6 @@ class PublicTransportDriver {
       districts: names(json['districts']),
       shiftIds: ids(json['shiftIds']),
       cnh: json['cnh']?.toString(),
-      description: json['description']?.toString(),
       publicContactName: json['publicContactName']?.toString(),
       publicContactPhone: json['publicContactPhone']?.toString(),
       vehicleDescription: json['vehicleDescription']?.toString(),

@@ -19,7 +19,6 @@ class DriverProfile {
     this.cnhCategory,
     this.cellPhone,
     this.information,
-    this.description,
     this.email,
     this.avatarUrl,
     this.schools = const [],
@@ -45,7 +44,6 @@ class DriverProfile {
   final String? cnhCategory;
   final String? cellPhone;
   final String? information;
-  final String? description;
   final String? email;
   final String? avatarUrl;
   final List<Map<String, dynamic>> schools;
@@ -81,10 +79,10 @@ class DriverProfile {
           ? van['imageUrl']?.toString()
           : json['vanImageUrl']?.toString(),
       publicContactName: van.isNotEmpty
-          ? (van['publicContactName'] ?? van['public_contact_name'])?.toString()
+          ? van['publicContactName']?.toString()
           : null,
       publicContactPhone: van.isNotEmpty
-          ? (van['publicContactPhone'] ?? van['public_contact_phone'])?.toString()
+          ? van['publicContactPhone']?.toString()
           : null,
       coverageArea: (json['coverageArea'] ?? '').toString(),
       isActive: json['isActive'] == true || json['isActive'] == 1,
@@ -92,7 +90,6 @@ class DriverProfile {
       cnhCategory: json['cnhCategory']?.toString(),
       cellPhone: json['cellPhone']?.toString(),
       information: json['information']?.toString(),
-      description: json['description']?.toString(),
       email: json['email']?.toString(),
       avatarUrl: json['avatarUrl']?.toString(),
       schools: _listOfMaps(json['schools']),
@@ -110,7 +107,6 @@ class DriverProfile {
       'cnh': licenseNumber,
       'cellPhone': cellPhone,
       'information': information,
-      'description': description,
       'email': email,
       'avatarUrl': avatarUrl,
       'van': <String, dynamic>{

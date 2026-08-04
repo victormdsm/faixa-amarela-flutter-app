@@ -160,7 +160,7 @@ class DriverProfileController extends AsyncNotifier<Map<String, dynamic>> {
 // New NestJS repository providers
 // ---------------------------------------------------------------------------
 
-final driverEnrollmentsRepositoryProvider = Provider<EnrollmentsRepository>(
+final driverEnrollmentsRepositoryProvider = Provider<DriverEnrollmentsRepository>(
   (ref) => NestjsDriverEnrollmentsRepository(ref.watch(dioProvider)),
 );
 

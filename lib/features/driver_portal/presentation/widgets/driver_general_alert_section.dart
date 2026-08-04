@@ -23,7 +23,9 @@ class _DriverGeneralAlertSectionState
   bool _sending = false;
 
   /// Mensagem padrão enviada como body da notificação de cada tipo de alerta.
-  /// O backend exige `message` (vira o texto exibido ao responsável).
+  /// O backend exige `message` (vira o texto exibido ao responsável). O campo
+  /// `type` não é mais enviado no contrato — usamos apenas o label local como
+  /// title opcional.
   static const _defaultMessages = <String, String>{
     'breakdown':
         'A van quebrou. Já estamos resolvendo e avisamos qualquer novidade.',
@@ -105,6 +107,7 @@ class _DriverGeneralAlertSectionState
 
   Future<void> _sendAlert(String type, String label) async {
     final message = _defaultMessages[type] ?? label;
+    final title = label;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -137,8 +140,8 @@ class _DriverGeneralAlertSectionState
     try {
       await ref.read(driverRoutesRepositoryProvider).alertAll(
             routeId,
-            type,
             message: message,
+            title: title,
           );
       if (!mounted) return;
       showAppSnackBar(

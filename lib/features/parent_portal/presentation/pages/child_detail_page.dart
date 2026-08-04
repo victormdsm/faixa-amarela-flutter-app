@@ -121,11 +121,7 @@ class ChildDetailPage extends ConsumerWidget {
             const SizedBox(height: AppSpacing.lg),
             _AddressSection(childId: child.id, addressesAsync: addressesAsync),
             const SizedBox(height: AppSpacing.lg),
-            _EnrollmentSection(
-              enrollmentAsync: enrollmentAsync,
-              onCancelEnrollment: (enrollment) =>
-                  _confirmCancelEnrollment(context, ref, enrollment),
-            ),
+            _EnrollmentSection(enrollmentAsync: enrollmentAsync),
             const SizedBox(height: AppSpacing.xxl),
           ],
         ),
@@ -135,65 +131,6 @@ class ChildDetailPage extends ConsumerWidget {
 
   void _editChild(BuildContext context) {
     context.push(AppRoutes.parentChildrenAdd, extra: child);
-  }
-
-  Future<void> _confirmCancelEnrollment(
-    BuildContext context,
-    WidgetRef ref,
-    Enrollment enrollment,
-  ) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        surfaceTintColor: AppColors.surface,
-        title: const Text('Cancelar matrícula'),
-        content: Text(
-          'Deseja cancelar a matrícula de ${child.name} com o motorista '
-          '${enrollment.driverName}? O vínculo de transporte será encerrado.',
-          style: Theme.of(context).textTheme.bodyMedium,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Voltar'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.danger,
-              foregroundColor: AppColors.surface,
-            ),
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Cancelar matrícula'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true || !context.mounted) return;
-
-    try {
-      await ref
-          .read(enrollmentsControllerProvider.notifier)
-          .cancel(enrollment.id);
-      ref.invalidate(_childDetailEnrollmentProvider(child.id));
-
-      if (context.mounted) {
-        showAppSnackBar(
-          context,
-          message: 'Matrícula cancelada.',
-          type: AppFeedbackType.warning,
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        showAppSnackBar(
-          context,
-          message: AppErrorReporter.messageFor(e),
-          type: AppFeedbackType.error,
-        );
-      }
-    }
   }
 }
 
@@ -369,7 +306,7 @@ class _AddressSection extends ConsumerWidget {
   final AsyncValue<List<Map<String, dynamic>>> addressesAsync;
 
   static bool _isDefault(Map<String, dynamic> addr) {
-    final raw = addr['isDefault'] ?? addr['is_default'];
+    final raw = addr['isDefault'];
     return raw == true || raw == 1;
   }
 
@@ -1006,13 +943,9 @@ class _AddressFormSheetState extends ConsumerState<_AddressFormSheet> {
 }
 
 class _EnrollmentSection extends StatelessWidget {
-  const _EnrollmentSection({
-    required this.enrollmentAsync,
-    this.onCancelEnrollment,
-  });
+  const _EnrollmentSection({required this.enrollmentAsync});
 
   final AsyncValue<Enrollment?> enrollmentAsync;
-  final ValueChanged<Enrollment>? onCancelEnrollment;
 
   @override
   Widget build(BuildContext context) {
@@ -1073,19 +1006,6 @@ class _EnrollmentSection extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.md),
               StatusPill.fromStatus(enrollment.status),
-              if (enrollment.status == EnrollmentStatus.active &&
-                  onCancelEnrollment != null) ...[
-                const SizedBox(height: AppSpacing.md),
-                OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.danger,
-                    side: const BorderSide(color: AppColors.danger),
-                  ),
-                  onPressed: () => onCancelEnrollment!(enrollment),
-                  icon: const Icon(Icons.cancel_rounded),
-                  label: const Text('Cancelar matrícula'),
-                ),
-              ],
             ],
           );
         },

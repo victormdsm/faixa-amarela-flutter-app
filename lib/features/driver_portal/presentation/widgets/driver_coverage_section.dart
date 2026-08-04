@@ -10,9 +10,8 @@ import 'driver_change_requests_card.dart';
 
 /// Seção de cobertura (escolas, bairros e turnos) nas configurações do motorista.
 ///
-/// O motorista escolhe escolas e bairros. Turnos NÃO são mais escolhidos
-/// por bairro: cada escola define os próprios turnos (schools_has_shifts),
-/// exibidos aqui apenas de forma informativa (read-only).
+/// O motorista escolhe escolas e bairros. Para cada escola selecionada,
+/// escolhe também quais turnos atende (schools_has_shifts).
 class DriverCoverageSection extends StatelessWidget {
   const DriverCoverageSection({
     super.key,
@@ -27,6 +26,7 @@ class DriverCoverageSection extends StatelessWidget {
     required this.isSaving,
     required this.onSchoolsChanged,
     required this.onDistrictsChanged,
+    required this.onSchoolShiftMapChanged,
   });
 
   final AsyncValue<List<CatalogOption>> schoolsAsync;
@@ -34,7 +34,7 @@ class DriverCoverageSection extends StatelessWidget {
   final List<CatalogOption> shiftOptions;
   final Set<int> selectedSchoolIds;
 
-  /// Turnos por escola herdados do servidor (read-only).
+  /// Turnos por escola selecionados pelo motorista.
   final Map<int, Set<int>> schoolShiftMap;
   final Set<int> selectedDistrictIds;
   final AsyncValue<List<DriverProfileChangeRequest>> requestsAsync;
@@ -42,13 +42,14 @@ class DriverCoverageSection extends StatelessWidget {
   final bool isSaving;
   final ValueChanged<Set<int>> onSchoolsChanged;
   final ValueChanged<Set<int>> onDistrictsChanged;
+  final ValueChanged<Map<int, Set<int>>> onSchoolShiftMapChanged;
 
   @override
   Widget build(BuildContext context) {
     return FaixaSectionCard(
       icon: Icons.map_rounded,
       title: 'Cobertura',
-      subtitle: 'Escolas, bairros e períodos atendidos.',
+      subtitle: 'Escolas, bairros e turnos atendidos por escola.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -91,13 +92,12 @@ class DriverCoverageSection extends StatelessWidget {
               selectedIds: selectedSchoolIds,
             ),
             const SizedBox(height: 12),
-            // Turnos vêm das escolas (schools_has_shifts): exibição
-            // read-only — o motorista não escolhe mais turno por bairro.
             _SchoolShiftSummary(
               schoolOptions: schoolsAsync.value!,
               shiftOptions: shiftOptions,
               selectedSchoolIds: selectedSchoolIds,
               schoolShiftMap: schoolShiftMap,
+              onShiftToggle: onSchoolShiftMapChanged,
             ),
           ],
           const SizedBox(height: 12),
@@ -398,21 +398,36 @@ class _CoverageChips extends StatelessWidget {
 }
 
 
-/// Resumo read-only dos turnos por escola: cada escola define os próprios
-/// turnos (schools_has_shifts) e o motorista apenas herda — a seleção de
-/// turno por bairro não existe mais.
+/// Seletor de turnos por escola. Para cada escola selecionada, o motorista
+/// escolhe quais turnos atende (schools_has_shifts).
 class _SchoolShiftSummary extends StatelessWidget {
   const _SchoolShiftSummary({
     required this.schoolOptions,
     required this.shiftOptions,
     required this.selectedSchoolIds,
     required this.schoolShiftMap,
+    required this.onShiftToggle,
   });
 
   final List<CatalogOption> schoolOptions;
   final List<CatalogOption> shiftOptions;
   final Set<int> selectedSchoolIds;
   final Map<int, Set<int>> schoolShiftMap;
+  final ValueChanged<Map<int, Set<int>>> onShiftToggle;
+
+  void _toggleShift(int schoolId, int shiftId) {
+    final next = <int, Set<int>>{
+      for (final entry in schoolShiftMap.entries) entry.key: Set<int>.from(entry.value),
+    };
+    final selected = next.putIfAbsent(schoolId, () => <int>{});
+    if (!selected.add(shiftId)) {
+      selected.remove(shiftId);
+    }
+    if (selected.isEmpty) {
+      next.remove(schoolId);
+    }
+    onShiftToggle(next);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -421,7 +436,6 @@ class _SchoolShiftSummary extends StatelessWidget {
     if (selectedSchoolIds.isEmpty) return const SizedBox.shrink();
 
     final schoolById = {for (final s in schoolOptions) s.id: s};
-    final shiftById = {for (final s in shiftOptions) s.id: s};
     final sortedIds = selectedSchoolIds.toList(growable: false)
       ..sort((a, b) {
         final aName = schoolById[a]?.name ?? a.toString();
@@ -442,7 +456,7 @@ class _SchoolShiftSummary extends StatelessWidget {
             const SizedBox(width: AppSpacing.xs),
             Expanded(
               child: Text(
-                'Turnos por escola (definidos pela escola)',
+                'Turnos atendidos por escola',
                 style: theme.textTheme.labelMedium?.copyWith(
                   fontWeight: FontWeight.w800,
                   color: AppColors.slate,
@@ -455,10 +469,8 @@ class _SchoolShiftSummary extends StatelessWidget {
         const SizedBox(height: 8),
         ...sortedIds.map((schoolId) {
           final school = schoolById[schoolId];
-          final shiftIds = schoolShiftMap[schoolId] ?? const <int>{};
-          final shiftNames = shiftIds
-              .map((id) => shiftById[id]?.name ?? 'Turno #$id')
-              .toList(growable: false);
+          final schoolShifts = school?.shifts ?? const <CatalogOption>[];
+          final selectedShiftIds = schoolShiftMap[schoolId] ?? const <int>{};
 
           return Container(
             margin: const EdgeInsets.only(bottom: AppSpacing.sm),
@@ -471,7 +483,7 @@ class _SchoolShiftSummary extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(AppRadius.lg),
               border: Border.all(
-                color: shiftIds.isNotEmpty
+                color: selectedShiftIds.isNotEmpty
                     ? AppColors.success.withValues(alpha: 0.3)
                     : AppColors.border,
               ),
@@ -486,7 +498,7 @@ class _SchoolShiftSummary extends StatelessWidget {
                       width: 28,
                       height: 28,
                       decoration: BoxDecoration(
-                        color: shiftIds.isNotEmpty
+                        color: selectedShiftIds.isNotEmpty
                             ? AppColors.success.withValues(alpha: 0.12)
                             : AppColors.surfaceSoft,
                         borderRadius: BorderRadius.circular(AppRadius.sm),
@@ -494,7 +506,7 @@ class _SchoolShiftSummary extends StatelessWidget {
                       child: Icon(
                         Icons.school_rounded,
                         size: 15,
-                        color: shiftIds.isNotEmpty
+                        color: selectedShiftIds.isNotEmpty
                             ? AppColors.success
                             : AppColors.muted,
                       ),
@@ -511,9 +523,9 @@ class _SchoolShiftSummary extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: AppSpacing.sm),
-                if (shiftNames.isEmpty)
+                if (schoolShifts.isEmpty)
                   Text(
-                    'Nenhum turno definido pela escola.',
+                    'Nenhum turno cadastrado para esta escola.',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: AppColors.muted,
                       fontStyle: FontStyle.italic,
@@ -523,32 +535,40 @@ class _SchoolShiftSummary extends StatelessWidget {
                   Wrap(
                     spacing: AppSpacing.sm,
                     runSpacing: AppSpacing.sm,
-                    children: shiftNames
-                        .map(
-                          (name) => Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.md,
-                              vertical: AppSpacing.sm - 1,
+                    children: schoolShifts.map((shift) {
+                      final selected = selectedShiftIds.contains(shift.id);
+                      return InkWell(
+                        onTap: () => _toggleShift(schoolId, shift.id),
+                        borderRadius: BorderRadius.circular(AppRadius.full),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.md,
+                            vertical: AppSpacing.sm - 1,
+                          ),
+                          decoration: BoxDecoration(
+                            color: selected
+                                ? AppColors.yellow.withValues(alpha: 0.15)
+                                : AppColors.surfaceSoft,
+                            borderRadius: BorderRadius.circular(
+                              AppRadius.full,
                             ),
-                            decoration: BoxDecoration(
-                              color: AppColors.yellow.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(
-                                AppRadius.full,
-                              ),
-                              border: Border.all(
-                                color: AppColors.yellow.withValues(alpha: 0.5),
-                              ),
-                            ),
-                            child: Text(
-                              name,
-                              style: theme.textTheme.labelMedium?.copyWith(
-                                color: AppColors.ink,
-                                fontWeight: FontWeight.w600,
-                              ),
+                            border: Border.all(
+                              color: selected
+                                  ? AppColors.yellow.withValues(alpha: 0.5)
+                                  : AppColors.border,
                             ),
                           ),
-                        )
-                        .toList(growable: false),
+                          child: Text(
+                            shift.name,
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: selected ? AppColors.ink : AppColors.slate,
+                              fontWeight:
+                                  selected ? FontWeight.w600 : FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(growable: false),
                   ),
               ],
             ),

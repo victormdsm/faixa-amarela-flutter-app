@@ -39,18 +39,10 @@ class EnrollmentsController extends AsyncNotifier<List<Enrollment>> {
     _invalidatePortalLists();
   }
 
-  Future<void> cancel(int id) async {
-    final repo = ref.read(enrollmentsRepositoryProvider);
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
-      await repo.cancelEnrollment(id);
-      return _load();
-    });
-    _invalidatePortalLists();
-  }
-
-  /// APP-16: accept/reject/cancel mudam rotas, embarques e a lista de
-  /// crianças do responsável — invalida as listagens derivadas.
+  /// APP-16: accept/reject mudam rotas, embarques e a lista de crianças do
+  /// responsável — invalida as listagens derivadas.
+  /// Cancelamento de matrícula ativa pelo pai foi removido (o endpoint
+  /// PUT /parent/enrollments/:id/cancel deixará de existir).
   void _invalidatePortalLists() {
     if (state.hasError) return;
     ref.invalidate(parentRoutesProvider);

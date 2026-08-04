@@ -119,8 +119,8 @@ void main() {
     });
   });
 
-  group('submitRequest contato público + descrição (aprovação)', () {
-    test('includes the 3 fields when provided', () async {
+  group('submitRequest contato público (aprovação)', () {
+    test('includes the 2 fields when provided', () async {
       await repository.submitRequest(
         schoolIds: const [1],
         districtIds: const [10],
@@ -129,16 +129,14 @@ void main() {
         },
         requestedPublicContactName: 'Van Escolar do Carlos',
         requestedPublicContactPhone: '45988887777',
-        requestedDescription: 'Motorista há 10 anos em Foz.',
       );
 
       final payload = capturePayload();
       expect(payload['requestedPublicContactName'], 'Van Escolar do Carlos');
       expect(payload['requestedPublicContactPhone'], '45988887777');
-      expect(payload['requestedDescription'], 'Motorista há 10 anos em Foz.');
     });
 
-    test('omits the 3 fields when not provided', () async {
+    test('omits the 2 fields when not provided', () async {
       await repository.submitRequest(
         schoolIds: const [1],
         districtIds: const [10],

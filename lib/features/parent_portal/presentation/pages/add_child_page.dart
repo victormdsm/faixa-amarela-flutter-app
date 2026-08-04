@@ -114,7 +114,7 @@ class _AddChildPageState extends ConsumerState<AddChildPage> {
       final addresses = await repo.getChildAddresses(c.id);
       if (addresses.isNotEmpty && mounted) {
         bool isDefault(Map<String, dynamic> a) {
-          final raw = a['isDefault'] ?? a['is_default'];
+          final raw = a['isDefault'];
           return raw == true || raw == 1;
         }
 

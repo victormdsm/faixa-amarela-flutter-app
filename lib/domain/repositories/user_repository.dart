@@ -14,4 +14,11 @@ abstract interface class UserRepository {
     required String currentPassword,
     required String newPassword,
   });
+
+  /// Solicita alteração de e-mail. O backend envia um link de confirmação
+  /// para o novo e-mail; o app não precisa de tela de confirmação.
+  Future<void> requestEmailChange({
+    required String newEmail,
+    required String currentPassword,
+  });
 }

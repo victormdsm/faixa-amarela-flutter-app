@@ -83,4 +83,19 @@ class NestjsUserRepository implements UserRepository {
       throw ApiException.fromDio(error);
     }
   }
+
+  @override
+  Future<void> requestEmailChange({
+    required String newEmail,
+    required String currentPassword,
+  }) async {
+    try {
+      await _dio.post<Map<String, dynamic>>(
+        '/auth/email-change/request',
+        data: {'newEmail': newEmail, 'currentPassword': currentPassword},
+      );
+    } catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
 }

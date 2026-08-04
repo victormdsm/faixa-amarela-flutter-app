@@ -46,24 +46,26 @@ void main() {
     bool detect({
       Set<int>? selectedSchoolIds,
       Set<int>? originalSelectedSchoolIds,
+      Map<int, Set<int>>? schoolShiftMap,
+      Map<int, Set<int>>? originalSchoolShiftMap,
       Set<int>? selectedDistrictIds,
       Set<int>? originalSelectedDistrictIds,
       bool hasNewAvatarImage = false,
       bool hasNewVehicleImage = false,
       bool vehicleEdited = false,
       bool publicContactEdited = false,
-      bool descriptionEdited = false,
     }) {
       return hasCoverageChanges(
         selectedSchoolIds: selectedSchoolIds ?? const {1, 2},
         originalSelectedSchoolIds: originalSelectedSchoolIds ?? const {1, 2},
+        schoolShiftMap: schoolShiftMap ?? const {1: {1}, 2: {2}},
+        originalSchoolShiftMap: originalSchoolShiftMap ?? const {1: {1}, 2: {2}},
         selectedDistrictIds: selectedDistrictIds ?? const {10},
         originalSelectedDistrictIds: originalSelectedDistrictIds ?? const {10},
         hasNewAvatarImage: hasNewAvatarImage,
         hasNewVehicleImage: hasNewVehicleImage,
         hasVehicleDataChanges: vehicleEdited,
         hasPublicContactChanges: publicContactEdited,
-        hasDescriptionChanges: descriptionEdited,
       );
     }
 
@@ -73,6 +75,13 @@ void main() {
 
     test('returns true when schools changed', () {
       expect(detect(selectedSchoolIds: const {1, 3}), isTrue);
+    });
+
+    test('returns true when school shift map changed', () {
+      expect(
+        detect(schoolShiftMap: const {1: {1, 2}, 2: {2}}),
+        isTrue,
+      );
     });
 
     test('returns true when a district was added', () {
@@ -101,13 +110,9 @@ void main() {
     test('returns true for public contact edit (vai para aprovação)', () {
       expect(detect(publicContactEdited: true), isTrue);
     });
-
-    test('returns true for description edit (vai para aprovação)', () {
-      expect(detect(descriptionEdited: true), isTrue);
-    });
   });
 
-  group('hasPublicContactChanges / hasDescriptionChanges', () {
+  group('hasPublicContactChanges', () {
     test('contato: false quando nada mudou, true quando nome ou fone mudou', () {
       expect(
         hasPublicContactChanges(
@@ -137,23 +142,6 @@ void main() {
         isTrue,
       );
     });
-
-    test('descrição: false quando igual, true quando editada', () {
-      expect(
-        hasDescriptionChanges(
-          description: 'Bio',
-          originalDescription: 'Bio',
-        ),
-        isFalse,
-      );
-      expect(
-        hasDescriptionChanges(
-          description: 'Bio nova',
-          originalDescription: 'Bio',
-        ),
-        isTrue,
-      );
-    });
   });
 
   group('validatePublicContactField (obrigatório)', () {
@@ -170,6 +158,34 @@ void main() {
     test('preenchido → sem erro', () {
       expect(validatePublicContactField('Van do Carlos'), isNull);
       expect(validatePublicContactField('45999990000'), isNull);
+    });
+  });
+
+  group('hasSchoolShiftMapChanges', () {
+    bool detect({
+      Map<int, Set<int>>? schoolShiftMap,
+      Map<int, Set<int>>? originalSchoolShiftMap,
+    }) {
+      return hasSchoolShiftMapChanges(
+        schoolShiftMap: schoolShiftMap ?? const {1: {1}, 2: {2}},
+        originalSchoolShiftMap: originalSchoolShiftMap ?? const {1: {1}, 2: {2}},
+      );
+    }
+
+    test('returns false when nothing changed', () {
+      expect(detect(), isFalse);
+    });
+
+    test('returns true when a shift is added', () {
+      expect(detect(schoolShiftMap: const {1: {1, 2}, 2: {2}}), isTrue);
+    });
+
+    test('returns true when a shift is removed', () {
+      expect(detect(schoolShiftMap: const {1: {1}, 2: {}}), isTrue);
+    });
+
+    test('returns true when a school is removed from map', () {
+      expect(detect(schoolShiftMap: const {1: {1}}), isTrue);
     });
   });
 

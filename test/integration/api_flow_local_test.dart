@@ -362,7 +362,10 @@ void main() {
 
           // ── Notificações ──
           await routesRepo.notifyParent(routeId, childId, 'arrived');
-          await routesRepo.alertAll(routeId, 'emergency');
+          await routesRepo.alertAll(
+            routeId,
+            message: 'Emergência na rota.',
+          );
 
           dio.options.headers['Authorization'] =
               'Bearer ${parentSession.accessToken}';

@@ -28,7 +28,7 @@ class CatalogOption {
 
     return CatalogOption(
       id: id,
-      name: (json['name'] ?? json['shiftName'] ?? '').toString(),
+      name: (json['name'] ?? '').toString(),
       shifts: shifts,
     );
   }

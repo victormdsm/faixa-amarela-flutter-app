@@ -10,8 +10,6 @@ abstract interface class EnrollmentsRepository {
 
   Future<void> rejectEnrollment(int id);
 
-  Future<void> cancelEnrollment(int id);
-
   // Driver actions
 
   /// Lookup da criança SOMENTE pelo código público (UUID v4) exibido no
@@ -22,6 +20,14 @@ abstract interface class EnrollmentsRepository {
   Future<void> requestEnrollment(int childId);
 
   Future<List<Enrollment>> getMyEnrollments();
+}
+
+/// Contrato do motorista: estende as operações de [EnrollmentsRepository]
+/// incluindo o desvínculo de matrículas (operação que o responsável não
+/// possui mais).
+abstract interface class DriverEnrollmentsRepository
+    implements EnrollmentsRepository {
+  Future<void> cancelEnrollment(int id);
 }
 
 class ChildLookupResult {

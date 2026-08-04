@@ -38,7 +38,11 @@ abstract interface class RoutesRepository {
     String? message,
   });
 
-  Future<void> alertAll(int routeId, String type, {String? message});
+  Future<void> alertAll(
+    int routeId, {
+    required String message,
+    String? title,
+  });
 }
 
 class RoutePlanningOptions {

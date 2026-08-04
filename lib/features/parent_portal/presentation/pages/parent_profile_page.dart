@@ -7,6 +7,7 @@ import '../../../../app/theme/app_theme.dart';
 import '../../../../core/error/app_error_reporter.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/presentation/widgets/app_feedback.dart';
+import '../../../../core/presentation/widgets/change_email_dialog.dart';
 import '../../../../core/presentation/widgets/change_password_dialog.dart';
 import '../../../../core/presentation/widgets/faixa_app_bar.dart';
 import '../../../../core/presentation/widgets/faixa_profile_hero.dart';
@@ -209,18 +210,36 @@ class _ParentProfilePageState extends ConsumerState<ParentProfilePage> {
                 FaixaSectionCard(
                   icon: Icons.lock_outline_rounded,
                   title: 'Segurança',
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(
-                      Icons.lock_outline_rounded,
-                      color: AppColors.ink,
-                    ),
-                    title: const Text('Alterar senha'),
-                    trailing: const Icon(
-                      Icons.chevron_right_rounded,
-                      color: AppColors.muted,
-                    ),
-                    onTap: _isSaving ? null : () => _changePassword(context),
+                  child: Column(
+                    children: [
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(
+                          Icons.lock_outline_rounded,
+                          color: AppColors.ink,
+                        ),
+                        title: const Text('Alterar senha'),
+                        trailing: const Icon(
+                          Icons.chevron_right_rounded,
+                          color: AppColors.muted,
+                        ),
+                        onTap: _isSaving ? null : () => _changePassword(context),
+                      ),
+                      const Divider(height: 1),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(
+                          Icons.mail_outline_rounded,
+                          color: AppColors.ink,
+                        ),
+                        title: const Text('Alterar e-mail'),
+                        trailing: const Icon(
+                          Icons.chevron_right_rounded,
+                          color: AppColors.muted,
+                        ),
+                        onTap: _isSaving ? null : () => _changeEmail(context),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: AppSpacing.lg),
@@ -282,6 +301,42 @@ class _ParentProfilePageState extends ConsumerState<ParentProfilePage> {
       showAppSnackBar(
         context,
         message: 'Falha ao alterar a senha.',
+        type: AppFeedbackType.error,
+      );
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  Future<void> _changeEmail(BuildContext context) async {
+    final result = await showDialog<EmailChangeResult>(
+      context: context,
+      builder: (_) => const ChangeEmailDialog(),
+    );
+    if (result == null || !context.mounted) return;
+
+    setState(() => _isSaving = true);
+    try {
+      await ref
+          .read(userRepositoryProvider)
+          .requestEmailChange(
+            newEmail: result.newEmail,
+            currentPassword: result.currentPassword,
+          );
+      if (!context.mounted) return;
+      showAppSnackBar(
+        context,
+        message: 'Enviamos um link de confirmação para o novo e-mail.',
+        type: AppFeedbackType.success,
+      );
+    } on ApiException catch (e) {
+      if (!context.mounted) return;
+      showAppSnackBar(context, message: e.message, type: AppFeedbackType.error);
+    } catch (_) {
+      if (!context.mounted) return;
+      showAppSnackBar(
+        context,
+        message: 'Falha ao solicitar a alteração de e-mail.',
         type: AppFeedbackType.error,
       );
     } finally {

@@ -98,18 +98,6 @@ class NestjsEnrollmentsRepository implements EnrollmentsRepository {
     }
   }
 
-  @override
-  Future<void> cancelEnrollment(int id) async {
-    try {
-      await _dio.put(
-        '/parent/enrollments/$id/cancel',
-        data: const <String, dynamic>{},
-      );
-    } catch (e) {
-      throw _mapException(e);
-    }
-  }
-
   // ── Driver-only operations (not supported on parent-side repository) ──
 
   @override

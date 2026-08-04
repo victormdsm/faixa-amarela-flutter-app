@@ -5,7 +5,7 @@ import '../../../data/dto/enrollment_dto.dart';
 import '../../../domain/models/enrollment.dart';
 import '../../../domain/repositories/enrollments_repository.dart';
 
-class NestjsDriverEnrollmentsRepository implements EnrollmentsRepository {
+class NestjsDriverEnrollmentsRepository implements DriverEnrollmentsRepository {
   NestjsDriverEnrollmentsRepository(this._dio);
 
   final Dio _dio;

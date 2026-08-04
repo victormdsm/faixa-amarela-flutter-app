@@ -151,8 +151,8 @@ class DriverProfileDto {
       vanColor: effectiveVanColor,
       vanYear: effectiveVanYear,
       vanImageUrl: effectiveVanImageUrl,
-      publicContactName: (van['publicContactName'] ?? van['public_contact_name'])?.toString(),
-      publicContactPhone: (van['publicContactPhone'] ?? van['public_contact_phone'])?.toString(),
+      publicContactName: van['publicContactName']?.toString(),
+      publicContactPhone: van['publicContactPhone']?.toString(),
       coverageArea: (json['coverageArea'] ?? '').toString(),
       isActive: json['isActive'] == true || json['isActive'] == 1,
       status: json['status']?.toString(),
@@ -269,8 +269,8 @@ class DriverProfileDto {
     return raw.whereType<Map>().map(Map<String, dynamic>.from).toList();
   }
 
-  /// Converte um mapa id→turnos do contrato (`coverage.districtShiftMap`
-  /// legado ou `coverage.schoolShiftMap`) para `{id: [shiftIds]}`.
+  /// Converte um mapa id→turnos do contrato (`coverage.schoolShiftMap`)
+  /// para `{id: [shiftIds]}`.
   /// Tolera as duas serializações: objeto `{"10": [1, 2]}` e lista
   /// `[{districtId|schoolId: 10, shiftIds: [1, 2]}]` (a forma que o app
   /// envia no submit de solicitação de alteração).
@@ -292,16 +292,10 @@ class DriverProfileDto {
     } else if (raw is List) {
       for (final item in raw.whereType<Map>()) {
         final id = toId(
-          item['districtId'] ??
-              item['district_id'] ??
-              item['schoolId'] ??
-              item['school_id'] ??
-              item['id'],
+          item['districtId'] ?? item['schoolId'] ?? item['id'],
         );
         if (id <= 0) continue;
-        result[id] = toIntList(
-          item['shiftIds'] ?? item['shift_ids'] ?? item['shifts'],
-        );
+        result[id] = toIntList(item['shiftIds'] ?? item['shifts']);
       }
     }
     return result;

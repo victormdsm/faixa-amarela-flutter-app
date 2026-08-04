@@ -163,7 +163,7 @@ class AddChildController extends AsyncNotifier<void> {
         final addresses = await repo.getChildAddresses(id);
         if (addresses.isNotEmpty) {
           bool isDefault(Map<String, dynamic> a) {
-            final raw = a['isDefault'] ?? a['is_default'];
+            final raw = a['isDefault'];
             return raw == true || raw == 1;
           }
 

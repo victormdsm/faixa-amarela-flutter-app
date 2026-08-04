@@ -12,14 +12,13 @@ void main() {
     id: 7,
     name: 'José Motorista da Silva',
     cellPhone: '11999998888',
-    information: null,
+    information: 'Van com cadeirinha e monitora inclusa.',
     avatarUrl: null,
     vehicleImageUrl: null,
     schools: ['Escola Municipal A', 'Escola Municipal B'],
     districts: ['Centro'],
     shiftIds: [1, 2],
     cnh: '01234567890',
-    description: 'Van com cadeirinha e monitora inclusa.',
     publicContactName: 'Tio Zé',
     publicContactPhone: '11988887777',
     vehicleDescription: 'Fiat Ducato • Branca • 2020',
@@ -40,14 +39,14 @@ void main() {
     );
   }
 
-  group('PublicTransportDriver.fromJson (cnh/description)', () {
+  group('PublicTransportDriver.fromJson (cnh/information)', () {
     test('faz o parse dos campos novos do contrato público', () {
       final parsed = PublicTransportDriver.fromJson(const {
         'id': 7,
         'name': 'Tio Zé',
         'phone': '11988887777',
         'cnh': '01234567890',
-        'description': 'Van com cadeirinha.',
+        'information': 'Van com cadeirinha.',
         'publicContactName': 'Tio Zé',
         'publicContactPhone': '11988887777',
         'vehicleDescription': 'Fiat Ducato • Branca • 2020',
@@ -58,7 +57,8 @@ void main() {
       });
 
       expect(parsed.cnh, '01234567890');
-      expect(parsed.description, 'Van com cadeirinha.');
+      expect(parsed.information, 'Van com cadeirinha.');
+      expect(parsed.about, 'Van com cadeirinha.');
       expect(parsed.publicContactPhone, '11988887777');
       expect(parsed.vehicleDescription, 'Fiat Ducato • Branca • 2020');
       expect(parsed.shifts, ['Manhã']);
@@ -74,11 +74,11 @@ void main() {
       });
 
       expect(parsed.cnh, isNull);
-      expect(parsed.description, isNull);
+      expect(parsed.information, 'Van amarela');
       expect(parsed.shifts, isEmpty);
       // Contato cai no `phone` (que o backend já envia como público).
       expect(parsed.contactPhone, '11988887777');
-      // Descrição cai no campo legado `information`.
+      // Sobre é o campo `information`.
       expect(parsed.about, 'Van amarela');
     });
   });
@@ -154,11 +154,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(BottomSheet), findsOneWidget);
-      expect(find.text('CNH 01234567890'), findsOneWidget);
-      expect(
-        find.text('Van com cadeirinha e monitora inclusa.'),
-        findsOneWidget,
-      );
+      // Contato público só aparece no detalhe (card mostra resumo).
+      expect(find.text('Chamar Tio Zé no WhatsApp'), findsOneWidget);
     });
   });
 }

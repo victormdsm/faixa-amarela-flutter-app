@@ -41,6 +41,8 @@ class CatalogRepository {
 
   static const _boxName = 'catalog_cache';
   static const _ttlMs = 24 * 60 * 60 * 1000; // 24 hours
+  static const _cacheSchemaVersion = 2;
+  static const _schemaVersionKey = 'schema_version';
 
   static Future<void> openCacheBox() => Hive.openBox<dynamic>(_boxName);
 
@@ -68,12 +70,23 @@ class CatalogRepository {
       _cachedList('provinces', '/catalogs/provinces');
 
   Future<List<CatalogOption>> _cachedList(String cacheKey, String path) async {
+    await _ensureSchemaVersion();
     final cached = _loadFromCache(cacheKey);
     if (cached != null) return cached;
 
     final result = await _loadList(path);
     await _saveToCache(cacheKey, result);
     return result;
+  }
+
+  Future<void> _ensureSchemaVersion() async {
+    try {
+      final stored = _box.get(_schemaVersionKey) as int?;
+      if (stored != _cacheSchemaVersion) {
+        await _box.clear();
+        await _box.put(_schemaVersionKey, _cacheSchemaVersion);
+      }
+    } catch (_) {}
   }
 
   List<CatalogOption>? _loadFromCache(String key) {
@@ -100,10 +113,23 @@ class CatalogRepository {
       await _box.put(
         '${key}_data',
         items
-            .map((e) => <String, dynamic>{'id': e.id, 'name': e.name})
+            .map(
+              (e) => <String, dynamic>{
+                'id': e.id,
+                'name': e.name,
+                // Sempre grava shifts (mesmo vazio) para escolas: caches
+                // antigos sem a chave causavam "nenhum turno cadastrado".
+                'shifts': e.shifts
+                    .map(
+                      (s) => <String, dynamic>{'id': s.id, 'name': s.name},
+                    )
+                    .toList(growable: false),
+              },
+            )
             .toList(growable: false),
       );
       await _box.put('${key}_at', DateTime.now().millisecondsSinceEpoch);
+      await _box.put(_schemaVersionKey, _cacheSchemaVersion);
     } catch (_) {}
   }
 

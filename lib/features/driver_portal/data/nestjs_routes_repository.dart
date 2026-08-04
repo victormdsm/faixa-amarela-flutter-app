@@ -198,11 +198,20 @@ class NestjsRoutesRepository implements RoutesRepository {
   }
 
   @override
-  Future<void> alertAll(int routeId, String type, {String? message}) async {
+  Future<void> alertAll(
+    int routeId, {
+    required String message,
+    String? title,
+  }) async {
     try {
+      final payload = <String, dynamic>{'message': message.trim()};
+      final trimmedTitle = title?.trim();
+      if (trimmedTitle != null && trimmedTitle.isNotEmpty) {
+        payload['title'] = trimmedTitle;
+      }
       await _dio.post<Map<String, dynamic>>(
         '/driver/routes/$routeId/alert-all',
-        data: _messagePayload({'type': type}, message),
+        data: payload,
       );
     } catch (error) {
       throw ApiException.fromDio(error);

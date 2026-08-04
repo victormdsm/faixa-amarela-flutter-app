@@ -8,9 +8,10 @@ import '../../domain/entities/public_transport_driver.dart';
 import 'public_transport_driver_detail_sheet.dart';
 
 /// Card de um motorista de transporte escolar publico encontrado na busca.
-/// Toque no card abre o bottom sheet de detalhe (CNH, descrição, van,
-/// cobertura e contato público); o botão "Solicitar" segue direto no
-/// WhatsApp (contato público — o backend nunca expõe o celular pessoal).
+/// Exibe resumo do veículo, contato público, CNH, sobre (information),
+/// escolas e bairros. Toque no card abre o bottom sheet completo; o botão
+/// "Solicitar" segue direto no WhatsApp (contato público — o backend nunca
+/// expõe o celular pessoal).
 class PublicTransportDriverCard extends StatelessWidget {
   const PublicTransportDriverCard({super.key, required this.driver});
 
@@ -55,6 +56,85 @@ class PublicTransportDriverCard extends StatelessWidget {
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                  if ((driver.vehicleDescription ?? '').isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.xs),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.directions_bus_outlined,
+                          size: 13,
+                          color: AppColors.muted,
+                        ),
+                        const SizedBox(width: AppSpacing.xs),
+                        Expanded(
+                          child: Text(
+                            [
+                              driver.vehicleDescription!,
+                              if ((driver.vehiclePlate ?? '').isNotEmpty)
+                                driver.vehiclePlate!.toUpperCase(),
+                            ].join(' • '),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: AppColors.slate,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  if ((driver.publicContactName ?? '').isNotEmpty ||
+                      (driver.publicContactPhone ?? '').isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.xs),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.phone_in_talk_outlined,
+                          size: 13,
+                          color: AppColors.muted,
+                        ),
+                        const SizedBox(width: AppSpacing.xs),
+                        Expanded(
+                          child: Text(
+                            [
+                              if ((driver.publicContactName ?? '').isNotEmpty)
+                                driver.publicContactName!,
+                              if ((driver.publicContactPhone ?? '').isNotEmpty)
+                                driver.publicContactPhone!,
+                            ].join(' • '),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: AppColors.slate,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  if ((driver.cnh ?? '').isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.xs),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.badge_outlined,
+                          size: 13,
+                          color: AppColors.muted,
+                        ),
+                        const SizedBox(width: AppSpacing.xs),
+                        Expanded(
+                          child: Text(
+                            'CNH ${driver.cnh}',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: AppColors.slate,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                   if (driver.schools.isNotEmpty) ...[

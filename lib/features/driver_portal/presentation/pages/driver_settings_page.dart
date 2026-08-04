@@ -11,6 +11,7 @@ import '../../../../core/models/catalog_option.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/presentation/widgets/app_feedback.dart';
 import '../../../../core/presentation/widgets/app_shared_widgets.dart';
+import '../../../../core/presentation/widgets/change_email_dialog.dart';
 import '../../../../core/presentation/widgets/change_password_dialog.dart';
 import '../../../../core/presentation/widgets/faixa_app_bar.dart';
 import '../../../../core/presentation/widgets/faixa_image_picker.dart';
@@ -47,7 +48,6 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _infoController = TextEditingController();
-  final _descriptionController = TextEditingController();
   final _cnhController = TextEditingController();
   final _vehicleBrandController = TextEditingController();
   final _vehicleColorController = TextEditingController();
@@ -72,9 +72,9 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
   final Set<int> _selectedDistrictIds = <int>{};
   Set<int> _originalSelectedSchoolIds = <int>{};
   Set<int> _originalSelectedDistrictIds = <int>{};
-  /// Turnos por escola herdados do servidor (schools_has_shifts): apenas
-  /// exibição — o motorista não escolhe mais turno por bairro.
+  /// Turnos por escola selecionados pelo motorista.
   final Map<int, Set<int>> _schoolShiftMap = <int, Set<int>>{};
+  Map<int, Set<int>> _originalSchoolShiftMap = <int, Set<int>>{};
   late final ProviderSubscription<AsyncValue<Map<String, dynamic>>>
   _profileSubscription;
   // Valores carregados do servidor: base para detectar edições do motorista
@@ -86,7 +86,6 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
   String _originalVehiclePlate = '';
   String _originalPublicContactName = '';
   String _originalPublicContactPhone = '';
-  String _originalDescription = '';
 
   @override
   void initState() {
@@ -120,7 +119,6 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
     _emailController.dispose();
     _phoneController.dispose();
     _infoController.dispose();
-    _descriptionController.dispose();
     _cnhController.dispose();
     _vehicleBrandController.dispose();
     _vehicleColorController.dispose();
@@ -276,16 +274,17 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                     const SizedBox(height: AppSpacing.md),
                     TextFormField(
                       controller: _emailController,
-                      // APP-06: troca de e-mail exige verificação fora do app —
-                      // o campo é somente leitura para não dar a ilusão de
-                      // que o "Salvar" persiste um novo e-mail.
+                      // APP-06: troca de e-mail é feita por solicitação na
+                      // seção Segurança (link de confirmação enviado por
+                      // e-mail) — o campo é somente leitura para não dar a
+                      // ilusão de que o "Salvar" persiste um novo e-mail.
                       readOnly: true,
                       enabled: !_isSaving,
                       keyboardType: TextInputType.emailAddress,
                       decoration: const InputDecoration(
                         labelText: 'E-mail',
                         prefixIcon: Icon(Icons.mail_outline_rounded),
-                        helperText: 'Para alterar o e-mail, fale com o suporte.',
+                        helperText: 'Use "Alterar e-mail" em Segurança.',
                       ),
                     ),
                     const SizedBox(height: AppSpacing.md),
@@ -393,19 +392,38 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
               FaixaSectionCard(
                 icon: Icons.lock_outline_rounded,
                 title: 'Segurança',
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(
-                    Icons.lock_outline_rounded,
-                    color: AppColors.ink,
-                  ),
-                  title: const Text('Alterar senha'),
-                  subtitle: const Text('Senha atual + nova senha'),
-                  trailing: const Icon(
-                    Icons.chevron_right_rounded,
-                    color: AppColors.muted,
-                  ),
-                  onTap: _isSaving ? null : () => _changePassword(context),
+                child: Column(
+                  children: [
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(
+                        Icons.lock_outline_rounded,
+                        color: AppColors.ink,
+                      ),
+                      title: const Text('Alterar senha'),
+                      subtitle: const Text('Senha atual + nova senha'),
+                      trailing: const Icon(
+                        Icons.chevron_right_rounded,
+                        color: AppColors.muted,
+                      ),
+                      onTap: _isSaving ? null : () => _changePassword(context),
+                    ),
+                    const Divider(height: 1),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(
+                        Icons.mail_outline_rounded,
+                        color: AppColors.ink,
+                      ),
+                      title: const Text('Alterar e-mail'),
+                      subtitle: const Text('Envia link de confirmação'),
+                      trailing: const Icon(
+                        Icons.chevron_right_rounded,
+                        color: AppColors.muted,
+                      ),
+                      onTap: _isSaving ? null : () => _changeEmail(context),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: AppSpacing.lg),
@@ -425,8 +443,10 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                   _selectedSchoolIds
                     ..clear()
                     ..addAll(value);
-                  // Turnos de escolas novas: completa o mapa local a
-                  // partir do catálogo (que já embute shifts por escola).
+                  // Escolas removidas saem do mapa de turnos.
+                  _schoolShiftMap.removeWhere((id, _) => !value.contains(id));
+                  // Escolas novas: pré-seleciona todos os turnos da escola
+                  // (o motorista pode desmarcar depois).
                   final catalog = schoolsAsync.value ?? const <CatalogOption>[];
                   for (final schoolId in value) {
                     if (!_schoolShiftMap.containsKey(schoolId)) {
@@ -445,6 +465,13 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                   _selectedDistrictIds
                     ..clear()
                     ..addAll(value);
+                }),
+                onSchoolShiftMapChanged: (value) => setState(() {
+                  _schoolShiftMap
+                    ..clear()
+                    ..addAll(
+                      value.map((k, v) => MapEntry(k, Set<int>.from(v))),
+                    );
                 }),
               ),
               const SizedBox(height: AppSpacing.lg),
@@ -490,8 +517,6 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
     _emailController.text = (_email ?? '');
     _phoneController.text = (data['cellPhone'] ?? '').toString();
     _infoController.text = (data['information'] ?? '').toString();
-    _descriptionController.text = (data['description'] ?? '').toString();
-    _originalDescription = _descriptionController.text.trim();
     _cnhController.text = (data['cnh'] ?? '').toString();
     _originalCnh = _cnhController.text.trim();
     _avatarImageUrl = data['avatarUrl']?.toString();
@@ -521,8 +546,8 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
         ).map((e) => (e['id'] as num?)?.toInt() ?? 0).where((id) => id > 0),
       );
 
-    // Turnos por escola (herdados, informativos): o DTO embute os shiftIds
-    // de coverage.schoolShiftMap em cada escola.
+    // Turnos por escola: o DTO embute os shiftIds de coverage.schoolShiftMap
+    // em cada escola.
     _schoolShiftMap.clear();
     for (final school in _listOfMaps(data['schools'])) {
       final schoolId = (school['id'] as num?)?.toInt() ?? 0;
@@ -532,6 +557,10 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
           .where((id) => id > 0)
           .toSet();
     }
+    _originalSchoolShiftMap = <int, Set<int>>{
+      for (final entry in _schoolShiftMap.entries)
+        entry.key: Set<int>.from(entry.value),
+    };
 
     _selectedDistrictIds
       ..clear()
@@ -714,6 +743,46 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
     }
   }
 
+  /// Solicita alteração de e-mail: o backend valida a senha atual e envia um
+  /// link de confirmação para o novo e-mail. O app não precisa de tela de
+  /// confirmação. Respostas: 401 (senha incorreta), 409 (e-mail em uso),
+  /// 400 (validação) — as mensagens vêm do backend.
+  Future<void> _changeEmail(BuildContext context) async {
+    final result = await showDialog<EmailChangeResult>(
+      context: context,
+      builder: (_) => const ChangeEmailDialog(),
+    );
+    if (result == null || !context.mounted) return;
+
+    setState(() => _isSaving = true);
+    try {
+      await ref
+          .read(userRepositoryProvider)
+          .requestEmailChange(
+            newEmail: result.newEmail,
+            currentPassword: result.currentPassword,
+          );
+      if (!context.mounted) return;
+      showAppSnackBar(
+        context,
+        message: 'Enviamos um link de confirmação para o novo e-mail.',
+        type: AppFeedbackType.success,
+      );
+    } on ApiException catch (e) {
+      if (!context.mounted) return;
+      showAppSnackBar(context, message: e.message, type: AppFeedbackType.error);
+    } catch (_) {
+      if (!context.mounted) return;
+      showAppSnackBar(
+        context,
+        message: 'Falha ao solicitar a alteração de e-mail.',
+        type: AppFeedbackType.error,
+      );
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
   Future<void> _confirmSignOut() async {
     final shouldSignOut = await showDialog<bool>(
       context: context,
@@ -756,23 +825,18 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
     );
   }
 
-  /// Contato público da van (contrato novo do backend). Só hidrata quando a
-  /// chave veio no payload — o DriverProfileDto local ainda não serializa
-  /// esses campos; sem esse cuidado, o re-hydrate pós-save apagaria da tela
-  /// os valores recém-salvos.
+  /// Contato público da van (contrato camelCase do backend). Só hidrata
+  /// quando a chave veio no payload — sem esse cuidado, o re-hydrate
+  /// pós-save apagaria da tela os valores recém-salvos.
   void _hydratePublicContact(Map<String, dynamic> van) {
-    if (van.containsKey('publicContactName') ||
-        van.containsKey('public_contact_name')) {
+    if (van.containsKey('publicContactName')) {
       _publicContactNameController.text =
-          (van['publicContactName'] ?? van['public_contact_name'] ?? '')
-              .toString();
+          (van['publicContactName'] ?? '').toString();
       _originalPublicContactName = _publicContactNameController.text.trim();
     }
-    if (van.containsKey('publicContactPhone') ||
-        van.containsKey('public_contact_phone')) {
+    if (van.containsKey('publicContactPhone')) {
       _publicContactPhoneController.text =
-          (van['publicContactPhone'] ?? van['public_contact_phone'] ?? '')
-              .toString();
+          (van['publicContactPhone'] ?? '').toString();
       _originalPublicContactPhone = _publicContactPhoneController.text.trim();
     }
   }
@@ -787,25 +851,18 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
     );
   }
 
-  /// Edição na descrição pública do motorista (drivers.description).
-  bool _hasDescriptionChanges() {
-    return hasDescriptionChanges(
-      description: _descriptionController.text.trim(),
-      originalDescription: _originalDescription,
-    );
-  }
-
   bool _hasCoverageChanges() {
     return hasCoverageChanges(
       selectedSchoolIds: _selectedSchoolIds,
       originalSelectedSchoolIds: _originalSelectedSchoolIds,
+      schoolShiftMap: _schoolShiftMap,
+      originalSchoolShiftMap: _originalSchoolShiftMap,
       selectedDistrictIds: _selectedDistrictIds,
       originalSelectedDistrictIds: _originalSelectedDistrictIds,
       hasNewAvatarImage: _avatarImageLocalPath != null,
       hasNewVehicleImage: _vehicleImageLocalPath != null,
       hasVehicleDataChanges: _hasVehicleDataChanges(),
       hasPublicContactChanges: _hasPublicContactChanges(),
-      hasDescriptionChanges: _hasDescriptionChanges(),
     );
   }
 
@@ -844,16 +901,19 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
     final cnhChanged = cnh != _originalCnh;
 
     final hasCoverageChanges = _hasCoverageChanges();
-    // Contato público e descrição só entram no submit quando editados (mesma
-    // regra dos dados da van) — a edição deles já aciona hasCoverageChanges.
+    // Contato público só entra no submit quando editado (mesma regra dos
+    // dados da van) — a edição dele já aciona hasCoverageChanges.
     final publicContactEdited = _hasPublicContactChanges();
-    final descriptionEdited = _hasDescriptionChanges();
-    // Cobertura (escolas/bairros) só é enviada quando o motorista editou
-    // de fato — antes, uma troca de foto/avatar reenviava tudo.
+    // Cobertura (escolas/bairros/turnos) só é enviada quando o motorista
+    // editou de fato — antes, uma troca de foto/avatar reenviava tudo.
     final coverageEdited =
         hasSchoolChanges(
           selectedSchoolIds: _selectedSchoolIds,
           originalSelectedSchoolIds: _originalSelectedSchoolIds,
+        ) ||
+        hasSchoolShiftMapChanges(
+          schoolShiftMap: _schoolShiftMap,
+          originalSchoolShiftMap: _originalSchoolShiftMap,
         ) ||
         hasDistrictChanges(
           selectedDistrictIds: _selectedDistrictIds,
@@ -886,9 +946,8 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
           districtIds: coverageEdited
               ? (_selectedDistrictIds.toList()..sort())
               : null,
-          // Turnos são herdados das escolas (read-only no app): o mapa
-          // escola→turnos acompanha a seleção de escolas quando a cobertura
-          // foi editada; ausente = backend não toca na cobertura.
+          // Mapa escola→turnos escolhido pelo motorista; enviado junto da
+          // cobertura quando esta foi editada.
           schoolShiftMap: coverageEdited
               ? {
                   for (final schoolId in _selectedSchoolIds)
@@ -908,16 +967,13 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
           requestedVehicleMarca: hasVehicleChanges ? vehicleBrand : null,
           requestedVehicleCor: hasVehicleChanges ? vehicleColor : null,
           requestedVehicleAno: hasVehicleChanges ? vehicleYear : null,
-          // Contato público e descrição seguem o mesmo fluxo de aprovação
-          // (aplicados em vehicles.public_contact_* e drivers.description).
+          // Contato público segue o mesmo fluxo de aprovação (aplicado em
+          // vehicles.public_contact_*).
           requestedPublicContactName: publicContactEdited
               ? _publicContactNameController.text.trim()
               : null,
           requestedPublicContactPhone: publicContactEdited
               ? _publicContactPhoneController.text.trim()
-              : null,
-          requestedDescription: descriptionEdited
-              ? _descriptionController.text.trim()
               : null,
         );
         coverageRequestSubmitted = true;

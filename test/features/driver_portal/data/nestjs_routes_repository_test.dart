@@ -160,6 +160,77 @@ void main() {
     });
   });
 
+  group('alertAll', () {
+    test('sends message and optional title without type', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/driver/routes/42/alert-all',
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer(
+        (_) async => Response<Map<String, dynamic>>(
+          data: const <String, dynamic>{},
+          statusCode: 200,
+          requestOptions: RequestOptions(path: '/driver/routes/42/alert-all'),
+        ),
+      );
+
+      await repository.alertAll(
+        42,
+        message: 'Pneu furou.',
+        title: 'Pneu furou',
+      );
+
+      final captured = verify(
+        () => dio.post<Map<String, dynamic>>(
+          '/driver/routes/42/alert-all',
+          data: captureAny(named: 'data'),
+          options: captureAny(named: 'options'),
+        ),
+      ).captured;
+
+      expect(
+        captured[0],
+        equals(const <String, dynamic>{
+          'message': 'Pneu furou.',
+          'title': 'Pneu furou',
+        }),
+      );
+    });
+
+    test('sends only message when title is null', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/driver/routes/42/alert-all',
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer(
+        (_) async => Response<Map<String, dynamic>>(
+          data: const <String, dynamic>{},
+          statusCode: 200,
+          requestOptions: RequestOptions(path: '/driver/routes/42/alert-all'),
+        ),
+      );
+
+      await repository.alertAll(42, message: 'Atraso geral.');
+
+      final captured = verify(
+        () => dio.post<Map<String, dynamic>>(
+          '/driver/routes/42/alert-all',
+          data: captureAny(named: 'data'),
+          options: captureAny(named: 'options'),
+        ),
+      ).captured;
+
+      expect(
+        captured[0],
+        equals(const <String, dynamic>{'message': 'Atraso geral.'}),
+      );
+    });
+  });
+
   group('removeStudent', () {
     test('posts childId to the remove-student endpoint', () async {
       when(

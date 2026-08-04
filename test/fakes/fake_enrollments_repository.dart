@@ -1,7 +1,7 @@
 import 'package:app_faixa_amarela/domain/models/enrollment.dart';
 import 'package:app_faixa_amarela/domain/repositories/enrollments_repository.dart';
 
-class FakeEnrollmentsRepository implements EnrollmentsRepository {
+class FakeEnrollmentsRepository implements DriverEnrollmentsRepository {
   final List<Enrollment> _enrollments = [];
   ChildLookupResult? _lookupResult;
 
