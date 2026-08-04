@@ -66,17 +66,23 @@ class _RouteBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final boardedCount = route.stops
+    // Stops de escola (type "school") são a âncora da viagem — aparecem no
+    // mapa, mas não são paradas acionáveis (sem embarque/desembarque/
+    // remoção), então saem da lista e dos contadores.
+    final boardingStops = route.stops
+        .where((s) => !s.isSchoolAnchor)
+        .toList(growable: false);
+    final boardedCount = boardingStops
         .where((s) => s.status == StopStatus.boarded)
         .length;
-    final pendingCount = route.stops
+    final pendingCount = boardingStops
         .where((s) => s.status == StopStatus.pending)
         .length;
 
     return Column(
       children: [
         RouteExecutionStatsHeader(
-          totalStops: route.stops.length,
+          totalStops: boardingStops.length,
           boardedCount: boardedCount,
           pendingCount: pendingCount,
         ),
@@ -94,7 +100,7 @@ class _RouteBody extends ConsumerWidget {
           ),
         const SizedBox(height: AppSpacing.md),
         Expanded(
-          child: route.stops.isEmpty
+          child: boardingStops.isEmpty
               ? const FaixaEmptyState(
                   message: 'Nenhuma parada nesta rota.',
                   icon: Icons.route_rounded,
@@ -103,9 +109,9 @@ class _RouteBody extends ConsumerWidget {
                   padding: const EdgeInsets.symmetric(
                     horizontal: AppSpacing.lg,
                   ),
-                  itemCount: route.stops.length,
+                  itemCount: boardingStops.length,
                   itemBuilder: (context, index) {
-                    final stop = route.stops[index];
+                    final stop = boardingStops[index];
                     return RouteExecutionStopCard(
                       stop: stop,
                       showRemoveButton: true,

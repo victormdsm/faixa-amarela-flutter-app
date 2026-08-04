@@ -54,6 +54,7 @@ class RouteStop {
     required this.address,
     required this.sequence,
     required this.status,
+    this.type,
     this.latitude,
     this.longitude,
     this.boardedAt,
@@ -70,10 +71,19 @@ class RouteStop {
   final String address;
   final int sequence;
   final StopStatus status;
+
+  /// Tipo do stop no manifesto ("pickup", "school"). Stops "school" são a
+  /// âncora da viagem (embarque na escola na volta / chegada na ida) — não
+  /// têm criança nem ações de embarque.
+  final String? type;
   final double? latitude;
   final double? longitude;
   final DateTime? boardedAt;
   final DateTime? disembarkedAt;
+
+  /// Stop de escola (âncora da viagem): não é acionável (sem embarque/
+  /// desembarque/remoção) — aparece apenas como ponto no mapa.
+  bool get isSchoolAnchor => (type ?? '').toLowerCase() == 'school';
 }
 
 class RouteManifest {

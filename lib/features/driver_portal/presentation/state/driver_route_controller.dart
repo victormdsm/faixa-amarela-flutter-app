@@ -134,6 +134,7 @@ class DriverRouteController extends AsyncNotifier<RouteManifest?> {
                     address: s.address,
                     sequence: s.sequence,
                     status: status,
+                    type: s.type,
                     latitude: s.latitude,
                     longitude: s.longitude,
                     boardedAt: s.boardedAt,

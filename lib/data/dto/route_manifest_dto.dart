@@ -161,6 +161,7 @@ class RouteStopDto {
     required this.address,
     required this.sequence,
     required this.status,
+    this.type,
     this.latitude,
     this.longitude,
     this.boardedAt,
@@ -175,6 +176,7 @@ class RouteStopDto {
   final String address;
   final int sequence;
   final StopStatus status;
+  final String? type;
   final double? latitude;
   final double? longitude;
   final DateTime? boardedAt;
@@ -238,6 +240,7 @@ class RouteStopDto {
           ? toInt(json['sequence'])
           : toInt(json['order']),
       status: StopStatus.fromJson((json['status'] ?? 'pending').toString()),
+      type: json['type']?.toString(),
       latitude: toDouble(json['latitude']) ??
           (childData['address'] is Map
               ? toDouble((childData['address'] as Map)['latitude'])
@@ -265,6 +268,7 @@ class RouteStopDto {
       'address': address,
       'sequence': sequence,
       'status': status.toJson(),
+      if (type != null) 'type': type,
       if (latitude != null) 'latitude': latitude,
       if (longitude != null) 'longitude': longitude,
       if (boardedAt != null) 'boardedAt': boardedAt!.toIso8601String(),
@@ -283,6 +287,7 @@ class RouteStopDto {
       address: address,
       sequence: sequence,
       status: status,
+      type: type,
       latitude: latitude,
       longitude: longitude,
       boardedAt: boardedAt,
@@ -300,6 +305,7 @@ class RouteStopDto {
       address: stop.address,
       sequence: stop.sequence,
       status: stop.status,
+      type: stop.type,
       latitude: stop.latitude,
       longitude: stop.longitude,
       boardedAt: stop.boardedAt,

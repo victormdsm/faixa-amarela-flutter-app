@@ -173,7 +173,12 @@ class _ParentRoutesPageState extends ConsumerState<ParentRoutesPage>
 
           return Stack(
             children: [
-              Positioned.fill(child: DriverLocationMap(driverPos: driverPos)),
+              Positioned.fill(
+                child: DriverLocationMap(
+                  driverPos: driverPos,
+                  schoolPoints: _extractSchoolStopPointsFromManifest(manifest),
+                ),
+              ),
               if (activeRoutes.length > 1)
                 Positioned(
                   top: 0,
@@ -245,4 +250,26 @@ Set<int> _extractChildIdsFromManifest(Map<String, dynamic>? manifest) {
   }
 
   return ids;
+}
+
+/// Pontos das escolas da rota (stops type "school" com coordenadas) para o
+/// mapa do responsável exibir a âncora da viagem durante o percurso.
+List<LatLng> _extractSchoolStopPointsFromManifest(
+  Map<String, dynamic>? manifest,
+) {
+  if (manifest == null) return const [];
+  final stops = manifest['stops'];
+  if (stops is! List) return const [];
+
+  final points = <LatLng>[];
+  for (final stop in stops) {
+    if (stop is! Map) continue;
+    final map = Map<String, dynamic>.from(stop);
+    if (map['type']?.toString().toLowerCase() != 'school') continue;
+    final lat = (map['latitude'] as num?)?.toDouble();
+    final lng = (map['longitude'] as num?)?.toDouble();
+    if (lat == null || lng == null) continue;
+    points.add(LatLng(lat, lng));
+  }
+  return points;
 }

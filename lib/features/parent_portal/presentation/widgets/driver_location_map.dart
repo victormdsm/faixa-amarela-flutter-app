@@ -4,15 +4,21 @@ import 'package:latlong2/latlong.dart';
 
 import '../../../../app/theme/app_theme.dart';
 
-/// Mapa full-screen com a localização atual do motorista.
+/// Mapa full-screen com a localização atual do motorista e a(s) escola(s)
+/// da rota (âncora da viagem).
 class DriverLocationMap extends StatelessWidget {
-  const DriverLocationMap({super.key, this.driverPos});
+  const DriverLocationMap({super.key, this.driverPos, this.schoolPoints = const []});
 
   final LatLng? driverPos;
 
+  /// Coordenadas das escolas da rota (stops type "school" do manifesto).
+  final List<LatLng> schoolPoints;
+
   @override
   Widget build(BuildContext context) {
-    final center = driverPos ?? const LatLng(-25.5401, -54.5854);
+    final center = driverPos ??
+        (schoolPoints.isNotEmpty ? schoolPoints.first : null) ??
+        const LatLng(-25.5401, -54.5854);
 
     return FlutterMap(
       options: MapOptions(
@@ -30,6 +36,18 @@ class DriverLocationMap extends StatelessWidget {
           urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
           userAgentPackageName: 'br.com.faixaamarela.app',
         ),
+        if (schoolPoints.isNotEmpty)
+          MarkerLayer(
+            markers: [
+              for (final point in schoolPoints)
+                Marker(
+                  point: point,
+                  width: 44,
+                  height: 44,
+                  child: const _SchoolMarker(),
+                ),
+            ],
+          ),
         if (driverPos != null)
           MarkerLayer(
             markers: [
@@ -42,6 +60,37 @@ class DriverLocationMap extends StatelessWidget {
             ],
           ),
       ],
+    );
+  }
+}
+
+/// Marcador da escola: pin ink com borda branca e glyph de escola — distinto
+/// da van (amarela), seguindo o padrão dos pins de parada do mapa do motorista.
+class _SchoolMarker extends StatelessWidget {
+  const _SchoolMarker();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: AppColors.ink,
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 2.5),
+        boxShadow: const [
+          BoxShadow(
+            color: AppColors.shadowDark,
+            blurRadius: 10,
+            offset: Offset(0, 3),
+          ),
+        ],
+      ),
+      child: const Icon(
+        Icons.school_rounded,
+        color: Colors.white,
+        size: 22,
+      ),
     );
   }
 }

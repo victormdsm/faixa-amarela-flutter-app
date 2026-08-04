@@ -182,6 +182,65 @@ void main() {
       expect(dto.manifestId, 'manifest-uuid-789');
     });
 
+    test('fromJson parses school anchor stop (no child, type school)', () {
+      final json = <String, dynamic>{
+        'id': 'manifest-uuid-school',
+        'routeId': 4,
+        'driverId': 5,
+        'vanId': 2,
+        'status': 'active',
+        'document': <String, dynamic>{
+          'children': <Map<String, dynamic>>[
+            <String, dynamic>{
+              'childId': 10,
+              'name': 'Ana Silva',
+              'schoolId': 3,
+              'schoolName': 'Escola Primavera',
+            },
+          ],
+        },
+        'stops': [
+          <String, dynamic>{
+            'childId': 10,
+            'order': 1,
+            'type': 'pickup',
+            'status': 'pending',
+            'latitude': -25.5,
+            'longitude': -54.5,
+          },
+          <String, dynamic>{
+            'childId': null,
+            'order': 2,
+            'type': 'school',
+            'status': 'pending',
+            'name': 'Escola Primavera',
+            'schoolId': 3,
+            'schoolName': 'Escola Primavera',
+            'latitude': -25.52,
+            'longitude': -54.52,
+          },
+        ],
+      };
+
+      final dto = RouteManifestDto.fromJson(json);
+
+      expect(dto.stops.length, 2);
+      final schoolStop = dto.stops[1];
+      expect(schoolStop.type, 'school');
+      expect(schoolStop.childId, 0);
+      expect(schoolStop.schoolId, 3);
+      expect(schoolStop.schoolName, 'Escola Primavera');
+      expect(schoolStop.latitude, -25.52);
+      expect(schoolStop.longitude, -54.52);
+      expect(schoolStop.sequence, 2);
+      expect(schoolStop.status, StopStatus.pending);
+
+      final domain = schoolStop.toDomain();
+      expect(domain.type, 'school');
+      expect(domain.isSchoolAnchor, isTrue);
+      expect(dto.stops.first.toDomain().isSchoolAnchor, isFalse);
+    });
+
     test('toJson serializes camelCase keys', () {
       final dto = RouteManifestDto(
         id: 1,
