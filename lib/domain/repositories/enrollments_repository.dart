@@ -13,7 +13,11 @@ abstract interface class EnrollmentsRepository {
   Future<void> cancelEnrollment(int id);
 
   // Driver actions
-  Future<ChildLookupResult> lookupChildByCpf(String cpf);
+
+  /// Lookup da criança SOMENTE pelo código público (UUID v4) exibido no
+  /// perfil da criança no app do responsável. CPF/RG foram removidos do
+  /// fluxo (LGPD): o backend responde 400 para documentos.
+  Future<ChildLookupResult> lookupChildByCode(String code);
 
   Future<void> requestEnrollment(int childId);
 

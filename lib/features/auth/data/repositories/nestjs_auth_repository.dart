@@ -24,17 +24,13 @@ class NestjsAuthRepository implements AuthRepository {
     required UserRole role,
   }) async {
     try {
-      final normalizedLogin = email.trim();
-      final payload = _isEmail(normalizedLogin)
-          ? <String, dynamic>{'email': normalizedLogin, 'password': password}
-          : <String, dynamic>{
-              'cpf': _digitsOnly(normalizedLogin),
-              'password': password,
-            };
-
+      // Login somente por e-mail — o app não envia mais CPF/telefone.
       final response = await _dio.post<Map<String, dynamic>>(
         _loginEndpoint(role),
-        data: payload,
+        data: <String, dynamic>{
+          'email': email.trim(),
+          'password': password,
+        },
       );
 
       final responseData = response.data;

@@ -113,8 +113,8 @@ class NestjsEnrollmentsRepository implements EnrollmentsRepository {
   // ── Driver-only operations (not supported on parent-side repository) ──
 
   @override
-  Future<ChildLookupResult> lookupChildByCpf(String cpf) async {
-    throw UnsupportedError('lookupChildByCpf is a driver-only operation.');
+  Future<ChildLookupResult> lookupChildByCode(String code) async {
+    throw UnsupportedError('lookupChildByCode is a driver-only operation.');
   }
 
   @override

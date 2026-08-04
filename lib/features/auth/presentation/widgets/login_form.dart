@@ -6,7 +6,6 @@ import '../../../../app/router/app_router.dart';
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/presentation/widgets/app_shared_widgets.dart';
 import '../../../../core/presentation/widgets/e2e_keys.dart';
-import '../../domain/entities/user_role.dart';
 import '../state/login_controller.dart';
 import 'login_anonymous_search.dart';
 import 'login_role_selector.dart';
@@ -34,16 +33,12 @@ class LoginForm extends ConsumerWidget {
         const SizedBox(height: AppSpacing.xl),
         _AuthTextField(
           key: E2EKeys.emailInput,
-          keyboardType: state.role == UserRole.parent
-              ? TextInputType.emailAddress
-              : TextInputType.text,
+          keyboardType: TextInputType.emailAddress,
           textInputAction: TextInputAction.next,
           enabled: !state.isLoading,
           onChanged: controller.setEmail,
-          labelText: state.role == UserRole.parent ? 'E-mail' : 'E-mail ou CPF',
-          prefixIcon: state.role == UserRole.parent
-              ? Icons.mail_outline_rounded
-              : Icons.badge_rounded,
+          labelText: 'E-mail',
+          prefixIcon: Icons.mail_outline_rounded,
         ),
         const SizedBox(height: AppSpacing.md),
         _AuthTextField(

@@ -19,9 +19,9 @@ class DriverAddClientPage extends ConsumerStatefulWidget {
 }
 
 class _DriverAddClientPageState extends ConsumerState<DriverAddClientPage> {
-  final _cpfController = TextEditingController();
+  final _codeController = TextEditingController();
 
-  bool _lookingUpCpf = false;
+  bool _lookingUp = false;
   bool _submitting = false;
 
   ChildLookupResult? _lookupResult;
@@ -30,7 +30,7 @@ class _DriverAddClientPageState extends ConsumerState<DriverAddClientPage> {
 
   @override
   void dispose() {
-    _cpfController.dispose();
+    _codeController.dispose();
     super.dispose();
   }
 
@@ -48,20 +48,23 @@ class _DriverAddClientPageState extends ConsumerState<DriverAddClientPage> {
           padding: const EdgeInsets.all(AppSpacing.lg),
           children: [
             FaixaSectionCard(
-              title: 'Vinculo por CPF ou codigo',
+              title: 'Vinculo por codigo',
               subtitle:
-                  'Busque a crianca pelo CPF ou pelo codigo compartilhado pelo responsavel para solicitar o vinculo ao seu veiculo.',
+                  'Busque a crianca pelo codigo compartilhado pelo responsavel para solicitar o vinculo ao seu veiculo.',
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   TextField(
-                    controller: _cpfController,
+                    controller: _codeController,
                     keyboardType: TextInputType.text,
                     enabled: !_submitting,
                     onChanged: (_) => _resetLookup(),
                     decoration: const InputDecoration(
-                      labelText: 'CPF ou codigo da crianca',
-                      hintText: '000.000.000-00 ou codigo (UUID)',
+                      labelText: 'Codigo da crianca',
+                      hintText:
+                          'Peca ao responsavel o codigo que aparece no perfil da crianca no app',
+                      helperText:
+                          'Perfil da crianca -> codigo para compartilhar',
                       prefixIcon: Icon(Icons.badge_outlined),
                     ),
                   ),
@@ -69,10 +72,10 @@ class _DriverAddClientPageState extends ConsumerState<DriverAddClientPage> {
 
                   // Lookup button
                   OutlinedButton.icon(
-                    onPressed: (_lookingUpCpf || _submitting)
+                    onPressed: (_lookingUp || _submitting)
                         ? null
-                        : _lookupByCpf,
-                    icon: _lookingUpCpf
+                        : _lookupByCode,
+                    icon: _lookingUp
                         ? const SizedBox(
                             width: 16,
                             height: 16,
@@ -99,7 +102,7 @@ class _DriverAddClientPageState extends ConsumerState<DriverAddClientPage> {
                             result.found
                                 ? (result.childName ?? 'Crianca encontrada')
                                 : (result.childName ??
-                                      'Nenhuma crianca encontrada para este CPF.'),
+                                      'Nenhuma crianca encontrada para este codigo.'),
                             style: theme.textTheme.titleSmall?.copyWith(
                               fontWeight: FontWeight.w700,
                             ),
@@ -218,18 +221,20 @@ class _DriverAddClientPageState extends ConsumerState<DriverAddClientPage> {
     }
   }
 
-  Future<void> _lookupByCpf() async {
-    final query = _cpfController.text.trim();
-    final isUuid = Validators.isUuid(query);
-    final digits = query.replaceAll(RegExp(r'\D'), '');
-    if (!isUuid && digits.length != 11) {
-      setState(() => _error = 'Informe um CPF valido ou o codigo da crianca.');
+  Future<void> _lookupByCode() async {
+    // Lookup somente pelo codigo da crianca (UUID v4) — CPF/RG foram
+    // removidos do fluxo; o backend responde 400 para documentos.
+    final code = _codeController.text.trim();
+    if (!Validators.isUuid(code)) {
+      setState(
+        () => _error =
+            'Use o codigo da crianca para buscar. Peca ao responsavel que compartilhe o codigo no aplicativo.',
+      );
       return;
     }
-    final lookup = isUuid ? query.toLowerCase() : digits;
 
     setState(() {
-      _lookingUpCpf = true;
+      _lookingUp = true;
       _error = null;
       _inadimplencyWarning = null;
       _lookupResult = null;
@@ -238,7 +243,7 @@ class _DriverAddClientPageState extends ConsumerState<DriverAddClientPage> {
     try {
       final result = await ref
           .read(driverEnrollmentsRepositoryProvider)
-          .lookupChildByCpf(lookup);
+          .lookupChildByCode(code.toLowerCase());
 
       setState(() {
         _lookupResult = result;
@@ -252,7 +257,7 @@ class _DriverAddClientPageState extends ConsumerState<DriverAddClientPage> {
     } catch (_) {
       setState(() => _error = 'Falha ao buscar a crianca.');
     } finally {
-      if (mounted) setState(() => _lookingUpCpf = false);
+      if (mounted) setState(() => _lookingUp = false);
     }
   }
 

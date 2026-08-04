@@ -104,8 +104,11 @@ void main() {
       await tester.tap(find.text('Tio da Van'));
       await tester.pumpAndSettle();
 
-      // Fill credentials.
-      await tester.enterText(find.byKey(const Key('email_input')), 'driver');
+      // Fill credentials (login somente por e-mail).
+      await tester.enterText(
+        find.byKey(const Key('email_input')),
+        'driver@email.com',
+      );
       await tester.enterText(
         find.byKey(const Key('password_input')),
         'anypassword',

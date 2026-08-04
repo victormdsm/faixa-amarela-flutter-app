@@ -202,11 +202,16 @@ void main() {
           final children = await childrenRepo.getChildren();
           expect(children.any((c) => c.id == createdChild.id), isTrue);
 
-          // 4. Motorista busca criança por CPF
+          // 4. Motorista busca criança pelo código (UUID) — CPF foi removido
+          // do lookup (backend responde 400 para documentos).
           dio.options.headers['Authorization'] =
               'Bearer ${driverSession.accessToken}';
-          final lookup = await driverEnrollmentsRepo.lookupChildByCpf(
-            uniqueCpf,
+          final childCode = children
+              .firstWhere((c) => c.id == createdChild.id)
+              .uuid;
+          expect(childCode, isNotNull, reason: 'Criança sem código (uuid)');
+          final lookup = await driverEnrollmentsRepo.lookupChildByCode(
+            childCode!,
           );
           expect(lookup.found, isTrue);
           expect(lookup.childId, createdChild.id);

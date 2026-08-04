@@ -80,7 +80,7 @@ class FakeEnrollmentsRepository implements EnrollmentsRepository {
   }
 
   @override
-  Future<ChildLookupResult> lookupChildByCpf(String cpf) async {
+  Future<ChildLookupResult> lookupChildByCode(String code) async {
     return _lookupResult ?? const ChildLookupResult(found: false);
   }
 

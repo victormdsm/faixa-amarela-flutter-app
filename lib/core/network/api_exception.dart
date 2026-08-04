@@ -76,6 +76,7 @@ class ApiException implements Exception {
     'token expirado.',
     'token inválido ou expirado.',
     'token já utilizado.',
+    'use o código da criança para buscar. peça ao responsável que compartilhe o código no aplicativo.',
     'usuário não autenticado.',
     'usuário não encontrado.',
     'usuário não possui conta ativada.',

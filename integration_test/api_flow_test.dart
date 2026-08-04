@@ -213,10 +213,17 @@ void main() {
         final children = await childrenRepo.getChildren();
         expect(children.any((c) => c.id == createdChild.id), isTrue);
 
-        // 4. Motorista busca criança por CPF.
+        // 4. Motorista busca criança pelo código (UUID) — CPF foi removido
+        // do lookup (backend responde 400 para documentos).
         dio.options.headers['Authorization'] =
             'Bearer ${driverSession.accessToken}';
-        final lookup = await driverEnrollmentsRepo.lookupChildByCpf(uniqueCpf);
+        final childCode = children
+            .firstWhere((c) => c.id == createdChild.id)
+            .uuid;
+        expect(childCode, isNotNull, reason: 'Criança sem código (uuid)');
+        final lookup = await driverEnrollmentsRepo.lookupChildByCode(
+          childCode!,
+        );
         expect(lookup.found, isTrue);
         expect(lookup.childId, createdChild.id);
         expect(lookup.childName, 'Criança Integração');
@@ -431,10 +438,9 @@ void main() {
             data: {
               'lat': -25.5163,
               'lng': -54.5854,
-              'routeId': routeId,
-              'routeManifestId': 'route.$routeId',
-              'radiusMeters': 50,
-              'limit': 10,
+              // Contrato novo: o backend decide o raio por regra (casa 500m
+              // / escola 50m) e deriva a rota do token — radiusMeters,
+              // limit, routeId e routeManifestId saíram do payload.
             },
           );
         } on DioException catch (e) {
@@ -508,14 +514,16 @@ void main() {
       final shifts = await catalogRepo.listShifts();
 
       final schoolIds = schools.isNotEmpty ? [schools.first.id] : <int>[];
-      final districtShiftMap = <int, List<int>>{};
-      if (districts.isNotEmpty && shifts.isNotEmpty) {
-        districtShiftMap[districts.first.id] = [shifts.first.id];
+      final districtIds = districts.isNotEmpty ? [districts.first.id] : <int>[];
+      final schoolShiftMap = <int, List<int>>{};
+      if (schools.isNotEmpty && shifts.isNotEmpty) {
+        schoolShiftMap[schools.first.id] = [shifts.first.id];
       }
 
       final result = await profileChangeRepo.submitRequest(
         schoolIds: schoolIds,
-        districtShiftMap: districtShiftMap,
+        districtIds: districtIds,
+        schoolShiftMap: schoolShiftMap,
         requestNote: 'Solicitação de teste de integração',
       );
 

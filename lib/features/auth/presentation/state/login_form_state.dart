@@ -27,10 +27,9 @@ abstract class LoginFormState with _$LoginFormState {
   );
 
   bool get canSubmit {
-    final loginOk = switch (role) {
-      UserRole.parent => Validators.isValidEmail(email),
-      UserRole.driver => Validators.loginIdentifier(email) == null,
-    };
-    return loginOk && password.trim().length >= 6 && !isLoading;
+    // Login somente por e-mail (CPF/telefone foram removidos do fluxo).
+    return Validators.isValidEmail(email) &&
+        password.trim().length >= 6 &&
+        !isLoading;
   }
 }

@@ -30,7 +30,7 @@ void main() {
     await Hive.close();
   });
 
-  testWidgets('driver: login -> lookup child by CPF -> request enrollment', (
+  testWidgets('driver: login -> lookup child by code (UUID) -> request enrollment', (
     tester,
   ) async {
     final enrollmentsRepo = FakeEnrollmentsRepository();
@@ -79,7 +79,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(TextField).first, '12345678901');
+    await tester.enterText(
+      find.byType(TextField).first,
+      'a1b2c3d4-e5f6-4a1b-8c2d-9e0f1a2b3c4d',
+    );
     await tester.pump(const Duration(milliseconds: 700));
     await tester.pumpAndSettle();
 

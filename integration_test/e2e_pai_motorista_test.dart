@@ -179,6 +179,14 @@ void main() {
 
     expect(find.text(childName), findsOneWidget);
 
+    // O lookup do motorista agora e somente pelo codigo (UUID) da crianca;
+    // busca o codigo via API (o pai ve o mesmo codigo no perfil da crianca).
+    final childUuid = await _fetchChildUuid(
+      parentEmail: parentEmail,
+      password: password,
+      childName: childName,
+    );
+
     // -------------------------------------------------------------------------
     // 4. LOGOUT PAI
     // -------------------------------------------------------------------------
@@ -203,14 +211,14 @@ void main() {
     await _logState(tester, 'login motorista ok');
 
     // -------------------------------------------------------------------------
-    // 6. BUSCAR CRIANCA POR CPF E SOLICITAR MATRICULA
+    // 6. BUSCAR CRIANCA PELO CODIGO (UUID) E SOLICITAR MATRICULA
     // -------------------------------------------------------------------------
     await _safeTap(tester, find.byKey(E2EKeys.driverLookupButton));
     await tester.pumpAndSettle(const Duration(seconds: 2));
     expect(find.text('Buscar crianca'), findsOneWidget);
     await _logState(tester, 'tela buscar crianca');
 
-    await tester.enterText(find.byKey(E2EKeys.driverCpfInput), childCpf);
+    await tester.enterText(find.byKey(E2EKeys.driverCpfInput), childUuid);
     await tester.pumpAndSettle();
 
     await _safeTap(tester, find.byKey(E2EKeys.driverSearchChildButton));
@@ -484,6 +492,55 @@ String _generateValidCpf() {
   final d2 = digit([...digits, d1], 11);
 
   return '${digits.join()}$d1$d2';
+}
+
+Future<String> _fetchChildUuid({
+  required String parentEmail,
+  required String password,
+  required String childName,
+}) async {
+  const baseUrl = 'https://api.faixaamarela.com.br/api/v1';
+  final client = HttpClient();
+  try {
+    final loginReq = await client.postUrl(
+      Uri.parse('$baseUrl/auth/user/login'),
+    );
+    loginReq.headers.contentType = ContentType.json;
+    loginReq.write(
+      jsonEncode(<String, String>{'email': parentEmail, 'password': password}),
+    );
+    final loginRes = await loginReq.close();
+    final loginBody = jsonDecode(
+      await loginRes.transform(utf8.decoder).join(),
+    ) as Map<String, dynamic>;
+    final data = loginBody['data'] as Map<String, dynamic>?;
+    final accessToken = data?['accessToken'] as String?;
+    if (accessToken == null) {
+      throw Exception('Login da API falhou ao buscar o codigo da crianca');
+    }
+
+    final listReq = await client.getUrl(
+      Uri.parse('$baseUrl/parent/children'),
+    );
+    listReq.headers.set(HttpHeaders.authorizationHeader, 'Bearer $accessToken');
+    final listRes = await listReq.close();
+    final listBody = jsonDecode(
+      await listRes.transform(utf8.decoder).join(),
+    ) as Map<String, dynamic>;
+    final children =
+        (listBody['data'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ??
+            [];
+
+    for (final child in children) {
+      if (child['name'] == childName) {
+        final uuid = child['uuid'] as String?;
+        if (uuid != null && uuid.isNotEmpty) return uuid;
+      }
+    }
+    throw Exception('Crianca $childName sem codigo (uuid) na API');
+  } finally {
+    client.close();
+  }
 }
 
 Future<void> _cleanupE2EChildren({

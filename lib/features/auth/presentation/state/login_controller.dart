@@ -34,10 +34,8 @@ class LoginController extends _$LoginController {
   }
 
   Future<bool> submit() async {
-    final loginError = switch (state.role) {
-      UserRole.parent => Validators.email(state.email),
-      UserRole.driver => Validators.loginIdentifier(state.email),
-    };
+    // Login somente por e-mail (CPF/telefone foram removidos do fluxo).
+    final loginError = Validators.email(state.email);
     final passwordError = Validators.password(state.password);
     if (loginError != null) {
       state = state.copyWith(errorMessage: loginError);

@@ -31,6 +31,16 @@ void main() {
       expect(e.message, 'Credenciais inválidas.');
     });
 
+    test('mantém a mensagem real do 400 do lookup por código (UUID-only)', () {
+      const backendMessage =
+          'Use o código da criança para buscar. Peça ao responsável que compartilhe o código no aplicativo.';
+      final e = ApiException.fromDio(
+        _dioError(statusCode: 400, data: {'message': backendMessage}),
+      );
+      expect(e.message, backendMessage);
+      expect(e.statusCode, 400);
+    });
+
     test('traduz Internal server error', () {
       final e = ApiException.fromDio(
         _dioError(statusCode: 500, data: {'message': 'Internal server error'}),

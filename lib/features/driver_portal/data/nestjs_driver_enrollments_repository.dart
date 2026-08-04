@@ -11,11 +11,13 @@ class NestjsDriverEnrollmentsRepository implements EnrollmentsRepository {
   final Dio _dio;
 
   @override
-  Future<ChildLookupResult> lookupChildByCpf(String cpf) async {
+  Future<ChildLookupResult> lookupChildByCode(String code) async {
     try {
+      // Contrato novo: o endpoint aceita APENAS o código UUID v4 da criança
+      // (CPF/RG retornam 400). O nome do parâmetro na wire foi mantido.
       final response = await _dio.get<Map<String, dynamic>>(
         '/driver/children/lookup-by-cpf',
-        queryParameters: {'cpf': cpf},
+        queryParameters: {'cpf': code},
       );
       final data = response.data ?? const <String, dynamic>{};
       return ChildLookupResult.fromJson(data);

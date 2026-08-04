@@ -21,17 +21,12 @@ class DriverLookupChildPage extends ConsumerStatefulWidget {
 }
 
 class _DriverLookupChildPageState extends ConsumerState<DriverLookupChildPage> {
-  final TextEditingController _cpfController = TextEditingController();
+  final TextEditingController _codeController = TextEditingController();
 
   @override
   void dispose() {
-    _cpfController.dispose();
+    _codeController.dispose();
     super.dispose();
-  }
-
-  String _maskCpf(String cpf) {
-    if (cpf.length != 11) return cpf;
-    return '${cpf.substring(0, 3)}.***.***-${cpf.substring(9)}';
   }
 
   /// O controller converte `found == false` em erro genérico; distinguimos o
@@ -92,16 +87,19 @@ class _DriverLookupChildPageState extends ConsumerState<DriverLookupChildPage> {
           children: [
             TextField(
               key: E2EKeys.driverCpfInput,
-              controller: _cpfController,
+              controller: _codeController,
               keyboardType: TextInputType.text,
               inputFormatters: [LengthLimitingTextInputFormatter(36)],
               decoration: InputDecoration(
-                hintText: 'Digite o CPF ou o código da criança',
+                labelText: 'Código da criança',
+                hintText:
+                    'Peça ao responsável o código que aparece no perfil da criança no app',
+                helperText: 'Perfil da criança → código para compartilhar',
                 prefixIcon: const Icon(Icons.search_rounded),
-                suffixIcon: _cpfController.text.isNotEmpty
+                suffixIcon: _codeController.text.isNotEmpty
                     ? IconButton(
                         onPressed: () {
-                          _cpfController.clear();
+                          _codeController.clear();
                           ref
                               .read(driverLookupControllerProvider.notifier)
                               .clear();
@@ -121,7 +119,7 @@ class _DriverLookupChildPageState extends ConsumerState<DriverLookupChildPage> {
                     ? null
                     : () => ref
                           .read(driverLookupControllerProvider.notifier)
-                          .search(_cpfController.text),
+                          .search(_codeController.text),
                 icon: lookupAsync.isLoading
                     ? const SizedBox(
                         width: 18,
@@ -151,16 +149,16 @@ class _DriverLookupChildPageState extends ConsumerState<DriverLookupChildPage> {
           message: AppErrorReporter.messageFor(error),
           onRetry: () => ref
               .read(driverLookupControllerProvider.notifier)
-              .search(_cpfController.text),
+              .search(_codeController.text),
         );
       },
       data: (result) {
         if (result == null) {
           return const FaixaEmptyState(
-            message: 'Digite o CPF ou o código da criança para buscar.',
+            message: 'Digite o código da criança para buscar.',
             icon: Icons.child_care_rounded,
             subtitle:
-                'Você poderá solicitar a matrícula após localizar a criança.',
+                'O responsável encontra o código no perfil da criança no aplicativo.',
           );
         }
 
@@ -186,7 +184,7 @@ class _DriverLookupChildPageState extends ConsumerState<DriverLookupChildPage> {
                 message: 'Matrícula solicitada com sucesso!',
                 type: AppFeedbackType.success,
               );
-              _cpfController.clear();
+              _codeController.clear();
               ref.read(driverLookupControllerProvider.notifier).clear();
             } catch (e) {
               if (!mounted) return;
@@ -200,7 +198,6 @@ class _DriverLookupChildPageState extends ConsumerState<DriverLookupChildPage> {
               );
             }
           },
-          maskCpf: _maskCpf,
         );
       },
     );
@@ -208,17 +205,17 @@ class _DriverLookupChildPageState extends ConsumerState<DriverLookupChildPage> {
 }
 
 /// Estado exibido quando o backend responde `found == false` (ou nulo):
-/// nenhuma criança localizada para o CPF informado.
+/// nenhuma criança localizada para o código informado.
 class _ChildNotFoundState extends StatelessWidget {
   const _ChildNotFoundState();
 
   @override
   Widget build(BuildContext context) {
     return const FaixaEmptyState(
-      message: 'Nenhuma criança encontrada para este CPF ou código.',
+      message: 'Nenhuma criança encontrada para este código.',
       icon: Icons.person_search_rounded,
       subtitle:
-          'Verifique se o CPF ou código informado é o da criança e se o responsável já cadastrou o dependente.',
+          'Verifique se o código informado é o da criança e se o responsável já cadastrou o dependente.',
     );
   }
 }
@@ -227,12 +224,10 @@ class _ChildResultCard extends StatelessWidget {
   const _ChildResultCard({
     required this.result,
     required this.onRequestEnrollment,
-    required this.maskCpf,
   });
 
   final ChildLookupResult result;
   final VoidCallback onRequestEnrollment;
-  final String Function(String) maskCpf;
 
   @override
   Widget build(BuildContext context) {

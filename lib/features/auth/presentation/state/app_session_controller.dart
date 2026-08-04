@@ -136,7 +136,7 @@ class AppSessionController extends Notifier<AppSessionState> {
     ref.invalidate(driverDashboardControllerProvider);
     ref.invalidate(driverRouteControllerProvider);
     ref.invalidate(driverEnrollmentsControllerProvider);
-    // Lookup de criança por CPF/código: guarda PII da criança pesquisada.
+    // Lookup de criança pelo código (UUID): guarda dados da criança pesquisada.
     ref.invalidate(driverLookupControllerProvider);
     ref.invalidate(driverRoutesProvider);
     ref.invalidate(driverProfileChangeRequestsProvider);
