@@ -102,7 +102,7 @@ void main() {
       }
     });
 
-    test('trava o crop em ~2.8:1 para a foto da van (banner público)',
+    test('trava o crop em 4:3 para a foto da van (banner público)',
         () async {
       final cropper = _FakeImageCropper(resultPath: '/tmp/cropped.jpg');
       await pickCropCompressImage(
@@ -112,8 +112,8 @@ void main() {
         cropper: cropper,
       );
 
-      expect(cropper.capturedAspectRatio?.ratioX, closeTo(2.8, 0.001));
-      expect(cropper.capturedAspectRatio?.ratioY, 1);
+      expect(cropper.capturedAspectRatio?.ratioX, 4);
+      expect(cropper.capturedAspectRatio?.ratioY, 3);
     });
 
     test('sempre aplica compressão quality 85 e limite 1600px', () async {
@@ -137,7 +137,7 @@ void main() {
       expect(FaixaCropProfile.child.ratioX / FaixaCropProfile.child.ratioY, 1);
       expect(
         FaixaCropProfile.vehicle.ratioX / FaixaCropProfile.vehicle.ratioY,
-        closeTo(2.8, 0.001),
+        closeTo(4 / 3, 0.001),
       );
     });
   });

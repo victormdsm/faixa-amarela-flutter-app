@@ -157,5 +157,26 @@ void main() {
       // Contato público só aparece no detalhe (card mostra resumo).
       expect(find.text('Chamar Tio Zé no WhatsApp'), findsOneWidget);
     });
+
+    testWidgets('banner da van usa proporção 4:3', (tester) async {
+      const driverWithVehicle = PublicTransportDriver(
+        id: 7,
+        name: 'José Motorista da Silva',
+        cellPhone: '11999998888',
+        information: null,
+        avatarUrl: null,
+        vehicleImageUrl: 'https://example.com/van.jpg',
+        schools: [],
+        districts: [],
+        shiftIds: [],
+      );
+      await tester.pumpWidget(
+        app(const PublicTransportDriverDetailSheet(driver: driverWithVehicle)),
+      );
+      await tester.pumpAndSettle();
+
+      final aspectRatio = tester.widget<AspectRatio>(find.byType(AspectRatio));
+      expect(aspectRatio.aspectRatio, closeTo(4 / 3, 0.001));
+    });
   });
 }

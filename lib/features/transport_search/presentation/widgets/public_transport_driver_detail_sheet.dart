@@ -223,16 +223,18 @@ class _DriverDetailContent extends StatelessWidget {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(AppRadius.lg),
-                child: (driver.vehicleImageUrl ?? '').trim().isNotEmpty
-                    ? Image.network(
-                        driver.vehicleImageUrl!,
-                        height: 140,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) =>
-                            const VehicleBannerFallback(),
-                      )
-                    : const VehicleBannerFallback(),
+                child: AspectRatio(
+                  aspectRatio: 4 / 3,
+                  child: (driver.vehicleImageUrl ?? '').trim().isNotEmpty
+                      ? Image.network(
+                          driver.vehicleImageUrl!,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) =>
+                              const VehicleBannerFallback(),
+                        )
+                      : const VehicleBannerFallback(),
+                ),
               ),
               Positioned(
                 top: 8,

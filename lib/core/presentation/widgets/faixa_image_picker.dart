@@ -14,7 +14,10 @@ enum FaixaImagePickerVariant {
   /// Quadrado 120x120 com borda 24, indicadores de loading e falha de upload.
   child,
 
-  /// Retângulo 180px de altura com overlay de "Trocar foto", usado para veículo.
+  /// Retângulo 4:3 com overlay de "Trocar foto", usado para veículo.
+  ///
+  /// A altura é derivada da largura via [AspectRatio] para espelhar a
+  /// exibição no detalhe público (WYSIWYG).
   vehicle,
 }
 
@@ -244,60 +247,63 @@ class FaixaImagePicker extends StatelessWidget {
   Widget _buildVehicle(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Stack(
-        children: [
-          Container(
-            height: 180,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(AppRadius.lg),
-              border: Border.all(color: AppColors.border),
-              color: AppColors.surface,
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: _imageContent(context, vehicleEmpty: true),
-          ),
-          Positioned(
-            bottom: 10,
-            right: 10,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      child: AspectRatio(
+        aspectRatio: 4 / 3,
+        child: Stack(
+          children: [
+            Container(
+              width: double.infinity,
+              height: double.infinity,
               decoration: BoxDecoration(
-                color: AppColors.ink.withValues(alpha: 0.72),
-                borderRadius: BorderRadius.circular(AppRadius.full),
+                borderRadius: BorderRadius.circular(AppRadius.lg),
+                border: Border.all(color: AppColors.border),
+                color: AppColors.surface,
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.camera_alt_rounded,
-                    size: 14,
-                    color: Colors.white,
-                  ),
-                  const SizedBox(width: 5),
-                  Text(
-                    overlayLabel ?? 'Trocar foto',
-                    style: const TextStyle(
+              clipBehavior: Clip.antiAlias,
+              child: _imageContent(context, vehicleEmpty: true),
+            ),
+            Positioned(
+              bottom: 10,
+              right: 10,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.ink.withValues(alpha: 0.72),
+                  borderRadius: BorderRadius.circular(AppRadius.full),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.camera_alt_rounded,
+                      size: 14,
                       color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 5),
+                    Text(
+                      overlayLabel ?? 'Trocar foto',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-          // Botão "olho": abre a foto completa com zoom. Botão separado do
-          // GestureDetector de troca de foto (não dispara o onTap).
-          Positioned(
-            top: 10,
-            right: 10,
-            child: FullImageViewerEyeButton(
-              imageUrl: imageUrl,
-              localPath: localPath,
+            // Botão "olho": abre a foto completa com zoom. Botão separado do
+            // GestureDetector de troca de foto (não dispara o onTap).
+            Positioned(
+              top: 10,
+              right: 10,
+              child: FullImageViewerEyeButton(
+                imageUrl: imageUrl,
+                localPath: localPath,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

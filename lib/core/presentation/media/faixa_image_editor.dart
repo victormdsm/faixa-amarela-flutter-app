@@ -11,12 +11,13 @@ import '../../../app/theme/app_theme.dart';
 /// A proporção é travada na razão em que a imagem será EXIBIDA no app, para
 /// que o preview do editor de corte seja fiel ao resultado final:
 /// - [avatar] e [child]: 1:1 (avatar circular / quadrado da criança).
-/// - [vehicle]: ~2.8:1 (banner da van exibido com largura de tela x 140px de
-///   altura no detalhe público — ver public_transport_driver_detail_sheet).
+/// - [vehicle]: 4:3 (foto da van exibida em `AspectRatio(4/3)` no detalhe
+///   público e no picker — ver public_transport_driver_detail_sheet e
+///   faixa_image_picker).
 enum FaixaCropProfile {
   avatar(ratioX: 1, ratioY: 1),
   child(ratioX: 1, ratioY: 1),
-  vehicle(ratioX: 2.8, ratioY: 1);
+  vehicle(ratioX: 4, ratioY: 3);
 
   const FaixaCropProfile({required this.ratioX, required this.ratioY});
 

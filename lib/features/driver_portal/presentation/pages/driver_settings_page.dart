@@ -694,7 +694,7 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
   }
 
   /// Pipeline: galeria → crop travado na proporção de exibição (avatar 1:1,
-  /// van ~2.8:1) → compressão → arquivo pronto para o upload multipart.
+  /// van 4:3) → compressão → arquivo pronto para o upload multipart.
   Future<void> _pickImage({required FaixaCropProfile profile}) async {
     final file = await pickCropCompressImage(
       source: ImageSource.gallery,
