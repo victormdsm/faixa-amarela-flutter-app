@@ -8,6 +8,7 @@ import 'package:latlong2/latlong.dart';
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/error/app_error_reporter.dart';
 import '../../../../core/models/catalog_option.dart';
+import '../../../../core/presentation/media/faixa_image_editor.dart';
 import '../../../../core/presentation/widgets/app_feedback.dart';
 import '../../../../core/presentation/widgets/app_shared_widgets.dart';
 import '../../../../core/presentation/widgets/e2e_keys.dart';
@@ -46,7 +47,6 @@ class _AddChildPageState extends ConsumerState<AddChildPage> {
   late final TextEditingController _districtCtrl;
   late final TextEditingController _zipCodeCtrl;
 
-  final _picker = ImagePicker();
   CatalogOption? _shift;
   CatalogOption? _school;
   String? _photoLocalPath;
@@ -342,11 +342,11 @@ class _AddChildPageState extends ConsumerState<AddChildPage> {
   static const _maxPhotoBytes = 5 * 1024 * 1024; // 5 MB
 
   Future<void> _pickPhoto() async {
-    final file = await _picker.pickImage(
+    // Pipeline: galeria → crop travado 1:1 (proporção do quadrado da
+    // criança) → compressão.
+    final file = await pickCropCompressImage(
       source: ImageSource.gallery,
-      maxWidth: 900,
-      maxHeight: 900,
-      imageQuality: 75,
+      profile: FaixaCropProfile.child,
     );
     if (file == null || !mounted) return;
 

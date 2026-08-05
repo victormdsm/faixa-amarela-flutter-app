@@ -64,6 +64,12 @@
                 <data android:scheme="https" android:host="api.faixaamarela.com.br" android:pathPrefix="/activation"/>
             </intent-filter>
         </activity>
+        <!-- image_cropper (uCrop): editor de corte nativo usado no pipeline
+             pick -> crop travado na proporção de exibição -> compressão. -->
+        <activity
+            android:name="com.yalantis.ucrop.UCropActivity"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar"/>
         <!-- Default FCM notification channel (must match the channel created
              in PushNotifications.init and the backend payload channel_id). -->
         <meta-data

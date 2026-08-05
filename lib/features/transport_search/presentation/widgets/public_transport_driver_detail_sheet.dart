@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/presentation/widgets/app_feedback.dart';
 import '../../../../core/presentation/widgets/app_shared_widgets.dart';
+import '../../../../core/presentation/widgets/full_image_viewer.dart';
 import '../../../../core/utils/whatsapp_launcher.dart';
 import '../../domain/entities/public_transport_driver.dart';
 import '../providers/transport_search_providers.dart';
@@ -155,10 +156,22 @@ class _DriverDetailContent extends StatelessWidget {
         children: [
           // ── Cabeçalho: foto grande + nome ──────────────────────────
           Center(
-            child: AppNetworkAvatar(
-              name: driver.name,
-              imageUrl: driver.avatarUrl,
-              radius: 44,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                AppNetworkAvatar(
+                  name: driver.name,
+                  imageUrl: driver.avatarUrl,
+                  radius: 44,
+                ),
+                Positioned(
+                  right: -6,
+                  top: -6,
+                  child: FullImageViewerEyeButton(
+                    imageUrl: driver.avatarUrl,
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: AppSpacing.md),
@@ -206,18 +219,29 @@ class _DriverDetailContent extends StatelessWidget {
 
           // ── Van ────────────────────────────────────────────────────
           const SizedBox(height: AppSpacing.xl),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(AppRadius.lg),
-            child: (driver.vehicleImageUrl ?? '').trim().isNotEmpty
-                ? Image.network(
-                    driver.vehicleImageUrl!,
-                    height: 140,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) =>
-                        const VehicleBannerFallback(),
-                  )
-                : const VehicleBannerFallback(),
+          Stack(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(AppRadius.lg),
+                child: (driver.vehicleImageUrl ?? '').trim().isNotEmpty
+                    ? Image.network(
+                        driver.vehicleImageUrl!,
+                        height: 140,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) =>
+                            const VehicleBannerFallback(),
+                      )
+                    : const VehicleBannerFallback(),
+              ),
+              Positioned(
+                top: 8,
+                right: 8,
+                child: FullImageViewerEyeButton(
+                  imageUrl: driver.vehicleImageUrl,
+                ),
+              ),
+            ],
           ),
           if (vehicleDescription.isNotEmpty || vehiclePlate.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.sm),

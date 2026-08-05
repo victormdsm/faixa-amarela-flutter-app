@@ -9,6 +9,7 @@ import '../../../../app/router/app_router.dart';
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/models/catalog_option.dart';
 import '../../../../core/network/api_exception.dart';
+import '../../../../core/presentation/media/faixa_image_editor.dart';
 import '../../../../core/presentation/widgets/app_feedback.dart';
 import '../../../../core/presentation/widgets/app_shared_widgets.dart';
 import '../../../../core/presentation/widgets/change_email_dialog.dart';
@@ -55,7 +56,6 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
   final _vehiclePlateController = TextEditingController();
   final _publicContactNameController = TextEditingController();
   final _publicContactPhoneController = TextEditingController();
-  final _picker = ImagePicker();
 
   bool _hydrated = false;
   bool _isSaving = false;
@@ -658,34 +658,19 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
   }
 
   Future<void> _pickVehicleImage() async {
-    await _pickImage(
-      isAvatar: false,
-      imageQuality: 62,
-      maxWidth: 1280,
-      maxHeight: 1280,
-    );
+    await _pickImage(profile: FaixaCropProfile.vehicle);
   }
 
   Future<void> _pickAvatarImage() async {
-    await _pickImage(
-      isAvatar: true,
-      imageQuality: 58,
-      maxWidth: 900,
-      maxHeight: 900,
-    );
+    await _pickImage(profile: FaixaCropProfile.avatar);
   }
 
-  Future<void> _pickImage({
-    required bool isAvatar,
-    required int imageQuality,
-    required double maxWidth,
-    required double maxHeight,
-  }) async {
-    final file = await _picker.pickImage(
+  /// Pipeline: galeria → crop travado na proporção de exibição (avatar 1:1,
+  /// van ~2.8:1) → compressão → arquivo pronto para o upload multipart.
+  Future<void> _pickImage({required FaixaCropProfile profile}) async {
+    final file = await pickCropCompressImage(
       source: ImageSource.gallery,
-      imageQuality: imageQuality,
-      maxWidth: maxWidth,
-      maxHeight: maxHeight,
+      profile: profile,
     );
     if (file == null || !mounted) return;
 
@@ -703,7 +688,7 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
     }
 
     setState(() {
-      if (isAvatar) {
+      if (profile == FaixaCropProfile.avatar) {
         _avatarImageLocalPath = file.path;
       } else {
         _vehicleImageLocalPath = file.path;

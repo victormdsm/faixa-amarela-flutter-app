@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/error/app_error_reporter.dart';
 import '../../../../core/network/api_exception.dart';
+import '../../../../core/presentation/media/faixa_image_editor.dart';
 import '../../../../core/presentation/widgets/app_feedback.dart';
 import '../../../../core/presentation/widgets/change_email_dialog.dart';
 import '../../../../core/presentation/widgets/change_password_dialog.dart';
@@ -32,7 +33,6 @@ class _ParentProfilePageState extends ConsumerState<ParentProfilePage> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
-  final _picker = ImagePicker();
 
   bool _hydrated = false;
   bool _isSaving = false;
@@ -345,11 +345,10 @@ class _ParentProfilePageState extends ConsumerState<ParentProfilePage> {
   }
 
   Future<void> _pickAvatar() async {
-    final file = await _picker.pickImage(
+    // Pipeline: galeria → crop travado 1:1 (proporção do avatar) → compressão.
+    final file = await pickCropCompressImage(
       source: ImageSource.gallery,
-      imageQuality: 58,
-      maxWidth: 900,
-      maxHeight: 900,
+      profile: FaixaCropProfile.avatar,
     );
     if (file == null || !mounted) return;
 

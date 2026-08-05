@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../app/theme/app_theme.dart';
+import 'full_image_viewer.dart';
 import 'skeleton_image_placeholder.dart';
 
 enum FaixaImagePickerVariant {
@@ -194,6 +195,16 @@ class FaixaImagePicker extends StatelessWidget {
             ),
           ),
         ),
+        // Botão "olho": abre a foto completa com zoom. Botão separado do
+        // GestureDetector de troca de foto (não dispara o onTap).
+        Positioned(
+          right: 0,
+          top: 0,
+          child: FullImageViewerEyeButton(
+            imageUrl: imageUrl,
+            localPath: localPath,
+          ),
+        ),
       ],
     );
 
@@ -274,6 +285,16 @@ class FaixaImagePicker extends StatelessWidget {
                   ),
                 ],
               ),
+            ),
+          ),
+          // Botão "olho": abre a foto completa com zoom. Botão separado do
+          // GestureDetector de troca de foto (não dispara o onTap).
+          Positioned(
+            top: 10,
+            right: 10,
+            child: FullImageViewerEyeButton(
+              imageUrl: imageUrl,
+              localPath: localPath,
             ),
           ),
         ],
