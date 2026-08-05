@@ -208,4 +208,157 @@ void main() {
       expect(schoolShiftIdsOf(dto.schools[0]), [1, 2, 3]);
     });
   });
+
+  group('DriverProfileDto coverage.schools (maps reais do NestJS)', () {
+    Map<String, dynamic> baseJson({
+      dynamic schools,
+      dynamic schoolShiftMap,
+      dynamic districtShiftMap,
+    }) {
+      return <String, dynamic>{
+        'id': 1,
+        'userId': 10,
+        'name': 'Tio Joao',
+        'coverage': <String, dynamic>{
+          'schools': schools,
+          'districts': [59, 178],
+          'shifts': [1, 2, 3, 4],
+          'schoolShiftMap': schoolShiftMap,
+          'districtShiftMap': districtShiftMap,
+        },
+      };
+    }
+
+    List<int> schoolShiftIdsOf(Map<String, dynamic> school) =>
+        (school['shiftIds'] as List).cast<int>();
+
+    test(
+        'parseia payload real de produção (schools como maps com '
+        'schoolId/name/shiftIds)', () {
+      final dto = DriverProfileDto.fromJson(
+        baseJson(
+          schools: [
+            <String, dynamic>{
+              'schoolId': 307,
+              'name': 'APAE Melvin Jones Unidade I',
+              'shiftIds': [4],
+            },
+            <String, dynamic>{
+              'schoolId': 275,
+              'name': 'APMI',
+              'shiftIds': [2],
+            },
+          ],
+          schoolShiftMap: <String, dynamic>{
+            '136': [2],
+            '229': [1],
+            '307': [1, 3],
+          },
+          districtShiftMap: <String, dynamic>{
+            '59': [1, 3, 4],
+            '178': [2, 4],
+          },
+        ),
+      );
+
+      expect(dto.schools, hasLength(2));
+      expect(dto.schools[0]['id'], 307);
+      expect(dto.schools[0]['name'], 'APAE Melvin Jones Unidade I');
+      expect(schoolShiftIdsOf(dto.schools[0]), [4]);
+      expect(dto.schools[1]['id'], 275);
+      expect(dto.schools[1]['name'], 'APMI');
+      expect(schoolShiftIdsOf(dto.schools[1]), [2]);
+      expect(dto.districtShiftMap, {
+        59: [1, 3, 4],
+        178: [2, 4],
+      });
+    });
+
+    test('escola sem shiftIds cai no schoolShiftMap[id]', () {
+      final dto = DriverProfileDto.fromJson(
+        baseJson(
+          schools: [
+            <String, dynamic>{
+              'schoolId': 136,
+              'name': 'Escola sem turnos no item',
+            },
+          ],
+          schoolShiftMap: <String, dynamic>{
+            '136': [2, 3],
+          },
+        ),
+      );
+
+      expect(dto.schools, hasLength(1));
+      expect(dto.schools[0]['id'], 136);
+      expect(schoolShiftIdsOf(dto.schools[0]), [2, 3]);
+    });
+
+    test('coverage.schools como lista de ints continua funcionando', () {
+      final dto = DriverProfileDto.fromJson(
+        baseJson(
+          schools: [1, 2],
+          schoolShiftMap: <String, dynamic>{
+            '1': [1, 2],
+            '2': [2],
+          },
+        ),
+      );
+
+      expect(dto.schools, hasLength(2));
+      expect(dto.schools[0]['id'], 1);
+      expect(schoolShiftIdsOf(dto.schools[0]), [1, 2]);
+      expect(dto.schools[1]['id'], 2);
+      expect(schoolShiftIdsOf(dto.schools[1]), [2]);
+    });
+
+    test('schools legadas (cache) têm precedência sobre coverage.schools', () {
+      final json = baseJson(
+        schools: [
+          <String, dynamic>{
+            'schoolId': 999,
+            'name': 'Do coverage',
+            'shiftIds': [1],
+          },
+        ],
+      );
+      json['schools'] = [
+        <String, dynamic>{
+          'id': 42,
+          'name': 'Do cache legado',
+          'shiftIds': [4, 5],
+        },
+      ];
+
+      final dto = DriverProfileDto.fromJson(json);
+
+      expect(dto.schools, hasLength(1));
+      expect(dto.schools[0]['id'], 42);
+      expect(dto.schools[0]['name'], 'Do cache legado');
+      expect(schoolShiftIdsOf(dto.schools[0]), [4, 5]);
+    });
+
+    test('districtShiftMap objeto string-keyed continua parseando (regressão)',
+        () {
+      final dto = DriverProfileDto.fromJson(
+        baseJson(
+          schools: [
+            <String, dynamic>{'schoolId': 1, 'shiftIds': [1]},
+          ],
+          districtShiftMap: <String, dynamic>{
+            '59': [1, 3, 4],
+            '178': [2, 4],
+          },
+        ),
+      );
+
+      expect(dto.districtShiftMap, {
+        59: [1, 3, 4],
+        178: [2, 4],
+      });
+      expect(dto.districts, hasLength(2));
+      expect((dto.districts[0]['shiftIds'] as List).cast<int>(), [1, 3, 4]);
+      expect((dto.districts[1]['shiftIds'] as List).cast<int>(), [2, 4]);
+    });
+  });
 }

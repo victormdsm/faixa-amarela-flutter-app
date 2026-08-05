@@ -73,31 +73,55 @@ class DriverProfileDto {
 
     final van = _map(json['van']);
 
-    // Contrato NestJS: coverage { schools: number[], districts: number[],
-    // shifts: number[], schoolShiftMap: {...} } — o legado districtShiftMap
-    // segue tolerado enquanto o backend convive com os dois formatos.
+    // Contrato NestJS real (GET /drivers/me):
+    // coverage {
+    //   schools: [{schoolId|id, name?, shiftIds?}, ...]  // também aceita number[] legado
+    //   districts: number[],
+    //   shifts: number[],
+    //   schoolShiftMap: {...},
+    //   districtShiftMap: {...}
+    // }
+    // O legado districtShiftMap continua tolerado enquanto o backend convive
+    // com os dois formatos.
     final coverage = _map(json['coverage']);
-    final coverageSchools = toIntList(coverage['schools']);
-    final coverageDistricts = toIntList(coverage['districts']);
     final districtShiftMap = _toShiftMap(coverage['districtShiftMap']);
     final schoolShiftMap = _toShiftMap(coverage['schoolShiftMap']);
+
+    List<Map<String, dynamic>> parseCoverageSchools(dynamic raw) {
+      if (raw is! List) return const [];
+      final result = <Map<String, dynamic>>[];
+      for (final item in raw) {
+        if (item is Map) {
+          final id = toInt(item['schoolId'] ?? item['id']);
+          if (id <= 0) continue;
+          final itemShiftIds = toIntList(item['shiftIds']);
+          result.add(<String, dynamic>{
+            'id': id,
+            if (item['name'] != null) 'name': item['name'].toString(),
+            'shiftIds': itemShiftIds.isNotEmpty
+                ? itemShiftIds
+                : (schoolShiftMap[id] ?? const <int>[]),
+          });
+        } else {
+          final id = toInt(item);
+          if (id <= 0) continue;
+          result.add(<String, dynamic>{
+            'id': id,
+            'shiftIds': schoolShiftMap[id] ?? const <int>[],
+          });
+        }
+      }
+      return result;
+    }
+
+    final coverageSchools = parseCoverageSchools(coverage['schools']);
+    final coverageDistricts = toIntList(coverage['districts']);
 
     // Fallback para listas de maps em camelCase (ex.: cache ou contratos antigos).
     final legacySchools = _listOfMaps(json['schools']);
     final legacyDistricts = _listOfMaps(json['districts']);
 
-    final schools = legacySchools.isNotEmpty
-        ? legacySchools
-        : coverageSchools
-            .map(
-              (id) => <String, dynamic>{
-                'id': id,
-                // Turnos vêm da escola (schools_has_shifts) via
-                // coverage.schoolShiftMap — informativos, não editáveis.
-                'shiftIds': schoolShiftMap[id] ?? const <int>[],
-              },
-            )
-            .toList();
+    final schools = legacySchools.isNotEmpty ? legacySchools : coverageSchools;
 
     final districts = legacyDistricts.isNotEmpty
         ? legacyDistricts
