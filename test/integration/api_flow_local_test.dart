@@ -531,11 +531,16 @@ void main() {
           if (schools.isNotEmpty && shifts.isNotEmpty) {
             schoolShiftMap[schools.first.id] = [shifts.first.id];
           }
+          final districtShiftMap = <int, List<int>>{};
+          if (districts.isNotEmpty && shifts.isNotEmpty) {
+            districtShiftMap[districts.first.id] = [shifts.first.id];
+          }
 
           final result = await profileChangeRepo.submitRequest(
             schoolIds: schoolIds,
             districtIds: districtIds,
             schoolShiftMap: schoolShiftMap,
+            districtShiftMap: districtShiftMap,
             requestNote: 'Solicitação de teste de integração',
           );
 

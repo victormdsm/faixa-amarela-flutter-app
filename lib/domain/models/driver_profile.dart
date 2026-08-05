@@ -23,6 +23,7 @@ class DriverProfile {
     this.avatarUrl,
     this.schools = const [],
     this.districts = const [],
+    this.districtShiftMap = const {},
   });
 
   final int id;
@@ -49,10 +50,15 @@ class DriverProfile {
   final List<Map<String, dynamic>> schools;
   final List<Map<String, dynamic>> districts;
 
+  /// Mapa real bairro→turnos exposto pelo backend (`coverage.districtShiftMap`).
+  /// Vazio quando o backend não o envia.
+  final Map<int, List<int>> districtShiftMap;
+
   factory DriverProfile.fromJson(Map<String, dynamic> json) {
     final van = json['van'] is Map
         ? Map<String, dynamic>.from(json['van'] as Map)
         : const <String, dynamic>{};
+    final districts = _listOfMaps(json['districts']);
 
     return DriverProfile(
       id: (json['id'] as num?)?.toInt() ?? 0,
@@ -93,7 +99,15 @@ class DriverProfile {
       email: json['email']?.toString(),
       avatarUrl: json['avatarUrl']?.toString(),
       schools: _listOfMaps(json['schools']),
-      districts: _listOfMaps(json['districts']),
+      districts: districts,
+      districtShiftMap: _toShiftMap(json['districtShiftMap']).isNotEmpty
+          ? _toShiftMap(json['districtShiftMap'])
+          : {
+              for (final district in districts)
+                if (((district['id'] as num?)?.toInt() ?? 0) > 0)
+                  (district['id'] as num).toInt():
+                      _toIntList(district['shiftIds']),
+            },
     );
   }
 
@@ -125,12 +139,56 @@ class DriverProfile {
       'cnhCategory': cnhCategory,
       'schools': schools,
       'districts': districts,
+      // Serializa com chaves string para garantir compatibilidade com JSON e
+      // com o cache local (Hive não aceita chaves int em mapas).
+      'districtShiftMap': districtShiftMap.map(
+        (key, value) => MapEntry(key.toString(), value),
+      ),
     };
   }
 
   static List<Map<String, dynamic>> _listOfMaps(dynamic raw) {
     if (raw is! List) return const [];
     return raw.whereType<Map>().map(Map<String, dynamic>.from).toList();
+  }
+
+  static List<int> _toIntList(dynamic raw) {
+    if (raw is! List) return const [];
+    return raw
+        .map((e) {
+          if (e is num) return e.toInt();
+          if (e is String) return int.tryParse(e);
+          return null;
+        })
+        .whereType<int>()
+        .toList();
+  }
+
+  static Map<int, List<int>> _toShiftMap(dynamic raw) {
+    final result = <int, List<int>>{};
+
+    int toId(dynamic value) {
+      if (value is num) return value.toInt();
+      if (value is String) return int.tryParse(value) ?? 0;
+      return 0;
+    }
+
+    if (raw is Map) {
+      for (final entry in raw.entries) {
+        final id = toId(entry.key);
+        if (id <= 0) continue;
+        result[id] = _toIntList(entry.value);
+      }
+    } else if (raw is List) {
+      for (final item in raw.whereType<Map>()) {
+        final id = toId(
+          item['districtId'] ?? item['schoolId'] ?? item['id'],
+        );
+        if (id <= 0) continue;
+        result[id] = _toIntList(item['shiftIds'] ?? item['shifts']);
+      }
+    }
+    return result;
   }
 
   /// Normaliza o id da van vindo do servidor ou do cache local: ids ausentes

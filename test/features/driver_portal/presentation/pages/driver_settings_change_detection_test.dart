@@ -50,6 +50,8 @@ void main() {
       Map<int, Set<int>>? originalSchoolShiftMap,
       Set<int>? selectedDistrictIds,
       Set<int>? originalSelectedDistrictIds,
+      Map<int, Set<int>>? districtShiftMap,
+      Map<int, Set<int>>? originalDistrictShiftMap,
       bool hasNewAvatarImage = false,
       bool hasNewVehicleImage = false,
       bool vehicleEdited = false,
@@ -62,6 +64,8 @@ void main() {
         originalSchoolShiftMap: originalSchoolShiftMap ?? const {1: {1}, 2: {2}},
         selectedDistrictIds: selectedDistrictIds ?? const {10},
         originalSelectedDistrictIds: originalSelectedDistrictIds ?? const {10},
+        districtShiftMap: districtShiftMap ?? const {10: {1}},
+        originalDistrictShiftMap: originalDistrictShiftMap ?? const {10: {1}},
         hasNewAvatarImage: hasNewAvatarImage,
         hasNewVehicleImage: hasNewVehicleImage,
         hasVehicleDataChanges: vehicleEdited,
@@ -90,6 +94,13 @@ void main() {
 
     test('returns true when a district was removed', () {
       expect(detect(selectedDistrictIds: const {}), isTrue);
+    });
+
+    test('returns true when district shift map changed', () {
+      expect(
+        detect(districtShiftMap: const {10: {1, 2}}),
+        isTrue,
+      );
     });
 
     test('returns true for new avatar image', () {
@@ -211,6 +222,35 @@ void main() {
 
     test('returns true when a district was removed', () {
       expect(detect(selectedDistrictIds: const {10}), isTrue);
+    });
+  });
+
+  group('hasDistrictShiftMapChanges', () {
+    bool detect({
+      Map<int, Set<int>>? districtShiftMap,
+      Map<int, Set<int>>? originalDistrictShiftMap,
+    }) {
+      return hasDistrictShiftMapChanges(
+        districtShiftMap: districtShiftMap ?? const {10: {1}, 20: {2}},
+        originalDistrictShiftMap:
+            originalDistrictShiftMap ?? const {10: {1}, 20: {2}},
+      );
+    }
+
+    test('returns false when nothing changed', () {
+      expect(detect(), isFalse);
+    });
+
+    test('returns true when a shift is added', () {
+      expect(detect(districtShiftMap: const {10: {1, 2}, 20: {2}}), isTrue);
+    });
+
+    test('returns true when a shift is removed', () {
+      expect(detect(districtShiftMap: const {10: {1}, 20: {}}), isTrue);
+    });
+
+    test('returns true when a district is removed from map', () {
+      expect(detect(districtShiftMap: const {10: {1}}), isTrue);
     });
   });
 }

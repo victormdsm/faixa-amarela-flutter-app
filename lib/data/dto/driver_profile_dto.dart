@@ -223,6 +223,7 @@ class DriverProfileDto {
       avatarUrl: avatarUrl,
       schools: schools,
       districts: districts,
+      districtShiftMap: districtShiftMap,
     );
   }
 
@@ -251,11 +252,13 @@ class DriverProfileDto {
       avatarUrl: profile.avatarUrl,
       schools: profile.schools,
       districts: profile.districts,
-      districtShiftMap: {
-        for (final district in profile.districts)
-          if (((district['id'] as num?)?.toInt() ?? 0) > 0)
-            (district['id'] as num).toInt(): toIntList(district['shiftIds']),
-      },
+      districtShiftMap: profile.districtShiftMap.isNotEmpty
+          ? profile.districtShiftMap
+          : {
+              for (final district in profile.districts)
+                if (((district['id'] as num?)?.toInt() ?? 0) > 0)
+                  (district['id'] as num).toInt(): toIntList(district['shiftIds']),
+            },
       schoolShiftMap: {
         for (final school in profile.schools)
           if (((school['id'] as num?)?.toInt() ?? 0) > 0)

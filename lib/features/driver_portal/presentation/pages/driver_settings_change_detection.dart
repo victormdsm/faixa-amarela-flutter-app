@@ -43,6 +43,15 @@ bool hasSchoolShiftMapChanges({
   return !equality.equals(schoolShiftMap, originalSchoolShiftMap);
 }
 
+/// Detecta edição no mapa bairro→turnos comparado ao carregado do servidor.
+bool hasDistrictShiftMapChanges({
+  required Map<int, Set<int>> districtShiftMap,
+  required Map<int, Set<int>> originalDistrictShiftMap,
+}) {
+  final equality = const DeepCollectionEquality();
+  return !equality.equals(districtShiftMap, originalDistrictShiftMap);
+}
+
 /// Detecta edição na lista de bairros atendidos comparada à carregada do
 /// servidor.
 ///
@@ -82,8 +91,8 @@ String? validatePublicContactField(String? value) {
 }
 
 /// Detecta alterações que exigem solicitação de aprovação do admin:
-/// escolas, bairros, turnos por escola, fotos (perfil/veículo), dados da van
-/// e contato público.
+/// escolas, bairros, turnos por escola, turnos por bairro, fotos
+/// (perfil/veículo), dados da van e contato público.
 bool hasCoverageChanges({
   required Set<int> selectedSchoolIds,
   required Set<int> originalSelectedSchoolIds,
@@ -91,6 +100,8 @@ bool hasCoverageChanges({
   required Map<int, Set<int>> originalSchoolShiftMap,
   required Set<int> selectedDistrictIds,
   required Set<int> originalSelectedDistrictIds,
+  required Map<int, Set<int>> districtShiftMap,
+  required Map<int, Set<int>> originalDistrictShiftMap,
   required bool hasNewAvatarImage,
   required bool hasNewVehicleImage,
   required bool hasVehicleDataChanges,
@@ -111,6 +122,12 @@ bool hasCoverageChanges({
   if (hasDistrictChanges(
     selectedDistrictIds: selectedDistrictIds,
     originalSelectedDistrictIds: originalSelectedDistrictIds,
+  )) {
+    return true;
+  }
+  if (hasDistrictShiftMapChanges(
+    districtShiftMap: districtShiftMap,
+    originalDistrictShiftMap: originalDistrictShiftMap,
   )) {
     return true;
   }

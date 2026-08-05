@@ -43,6 +43,9 @@ class NestjsDriverProfileChangeRequestRepository {
     /// herdados/informativos para o motorista). Null = motorista não editou
     /// escolas — a chave `requestedSchoolShiftMap` é omitida.
     required Map<int, List<int>>? schoolShiftMap,
+    /// Mapa bairro→turnos desejado. Null = motorista não editou bairros — a
+    /// chave `requestedDistrictShiftMap` é omitida.
+    required Map<int, List<int>>? districtShiftMap,
     String? avatarImagePath,
     String? vehicleImagePath,
     int? vehicleId,
@@ -68,12 +71,20 @@ class NestjsDriverProfileChangeRequestRepository {
                   .map((e) => {'schoolId': e.key, 'shiftIds': e.value})
                   .toList(growable: false),
             );
+      final districtShiftMapJson = districtShiftMap == null
+          ? null
+          : jsonEncode(
+              districtShiftMap.entries
+                  .map((e) => {'districtId': e.key, 'shiftIds': e.value})
+                  .toList(growable: false),
+            );
       final response = await _dio.post<Map<String, dynamic>>(
         '/driver/profile-change-requests',
         data: {
           'requestedSchoolIds': jsonEncode(schoolIds),
           'requestedDistrictIds': ?districtIdsJson,
           'requestedSchoolShiftMap': ?schoolShiftMapJson,
+          'requestedDistrictShiftMap': ?districtShiftMapJson,
           'requestedAvatarPath': avatarImagePath,
           'requestedVehicleImagePath': vehicleImagePath,
           'vehicleId': vehicleId,

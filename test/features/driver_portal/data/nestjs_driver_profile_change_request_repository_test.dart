@@ -57,6 +57,7 @@ void main() {
         schoolShiftMap: const {
           1: [1, 2],
         },
+        districtShiftMap: null,
         vehicleId: 7,
         requestedVehiclePlaca: 'ABC1D23',
         requestedVehicleMarca: 'Fiat Ducato',
@@ -91,6 +92,7 @@ void main() {
         schoolShiftMap: const {
           1: [1],
         },
+        districtShiftMap: null,
       );
 
       final payload = capturePayload();
@@ -107,6 +109,7 @@ void main() {
         schoolShiftMap: const {
           1: [1],
         },
+        districtShiftMap: null,
         requestedVehiclePlaca: 'ABC1234',
         requestedVehicleAno: '2021',
       );
@@ -127,6 +130,7 @@ void main() {
         schoolShiftMap: const {
           1: [1],
         },
+        districtShiftMap: null,
         requestedPublicContactName: 'Van Escolar do Carlos',
         requestedPublicContactPhone: '45988887777',
       );
@@ -143,6 +147,7 @@ void main() {
         schoolShiftMap: const {
           1: [1],
         },
+        districtShiftMap: null,
       );
 
       final payload = capturePayload();
@@ -152,20 +157,22 @@ void main() {
     });
   });
 
-  group('submitRequest cobertura (schoolShiftMap)', () {
+  group('submitRequest cobertura (schoolShiftMap e districtShiftMap)', () {
     test(
-      'omits requestedDistrictIds/requestedSchoolShiftMap when the driver did not edit coverage',
+      'omits coverage maps when the driver did not edit coverage',
       () async {
         await repository.submitRequest(
           schoolIds: const [1, 2],
           districtIds: null,
           schoolShiftMap: null,
+          districtShiftMap: null,
           avatarImagePath: 'https://cdn.example.com/avatar.jpg',
         );
 
         final payload = capturePayload();
         expect(payload.containsKey('requestedDistrictIds'), isFalse);
         expect(payload.containsKey('requestedSchoolShiftMap'), isFalse);
+        expect(payload.containsKey('requestedDistrictShiftMap'), isFalse);
         // Escolas e foto seguem no payload normalmente.
         expect(jsonDecode(payload['requestedSchoolIds'] as String), [1, 2]);
         expect(
@@ -176,7 +183,7 @@ void main() {
     );
 
     test(
-      'sends requestedDistrictIds and requestedSchoolShiftMap when the driver edited coverage',
+      'sends requestedDistrictIds, requestedSchoolShiftMap and requestedDistrictShiftMap when the driver edited coverage',
       () async {
         await repository.submitRequest(
           schoolIds: const [1, 3],
@@ -184,6 +191,10 @@ void main() {
           schoolShiftMap: const {
             1: [1, 3],
             3: [2],
+          },
+          districtShiftMap: const {
+            10: [1, 2],
+            20: [2],
           },
         );
 
@@ -203,8 +214,19 @@ void main() {
             },
           ],
         );
-        // A chave legada bairro→turnos não é mais enviada.
-        expect(payload.containsKey('requestedDistrictShiftMap'), isFalse);
+        expect(
+          jsonDecode(payload['requestedDistrictShiftMap'] as String),
+          [
+            {
+              'districtId': 10,
+              'shiftIds': [1, 2],
+            },
+            {
+              'districtId': 20,
+              'shiftIds': [2],
+            },
+          ],
+        );
       },
     );
   });

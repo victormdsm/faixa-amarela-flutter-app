@@ -75,6 +75,10 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
   /// Turnos por escola selecionados pelo motorista.
   final Map<int, Set<int>> _schoolShiftMap = <int, Set<int>>{};
   Map<int, Set<int>> _originalSchoolShiftMap = <int, Set<int>>{};
+
+  /// Turnos por bairro selecionados pelo motorista.
+  final Map<int, Set<int>> _districtShiftMap = <int, Set<int>>{};
+  Map<int, Set<int>> _originalDistrictShiftMap = <int, Set<int>>{};
   late final ProviderSubscription<AsyncValue<Map<String, dynamic>>>
   _profileSubscription;
   // Valores carregados do servidor: base para detectar edições do motorista
@@ -434,6 +438,7 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                 selectedSchoolIds: _selectedSchoolIds,
                 schoolShiftMap: _schoolShiftMap,
                 selectedDistrictIds: _selectedDistrictIds,
+                districtShiftMap: _districtShiftMap,
                 requestsAsync: changeRequestsAsync,
                 pendingRequest: _latestChangeRequest(
                   changeRequestsAsync.value,
@@ -465,9 +470,19 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                   _selectedDistrictIds
                     ..clear()
                     ..addAll(value);
+                  // Bairros removidos saem do mapa de turnos.
+                  _districtShiftMap
+                      .removeWhere((id, _) => !value.contains(id));
                 }),
                 onSchoolShiftMapChanged: (value) => setState(() {
                   _schoolShiftMap
+                    ..clear()
+                    ..addAll(
+                      value.map((k, v) => MapEntry(k, Set<int>.from(v))),
+                    );
+                }),
+                onDistrictShiftMapChanged: (value) => setState(() {
+                  _districtShiftMap
                     ..clear()
                     ..addAll(
                       value.map((k, v) => MapEntry(k, Set<int>.from(v))),
@@ -569,6 +584,36 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
           data['districts'],
         ).map((e) => (e['id'] as num?)?.toInt() ?? 0).where((id) => id > 0),
       );
+
+    // Turnos por bairro: preferência pelo mapa explícito do backend;
+    // fallback aos shiftIds embarcados em cada bairro.
+    _districtShiftMap.clear();
+    final explicitDistrictShiftMap = _map(data['districtShiftMap']);
+    if (explicitDistrictShiftMap.isNotEmpty) {
+      for (final entry in explicitDistrictShiftMap.entries) {
+        final districtId = int.tryParse(entry.key.toString()) ?? 0;
+        if (districtId <= 0) continue;
+        _districtShiftMap[districtId] =
+            ((entry.value as List?) ?? const [])
+                .map((e) => (e as num?)?.toInt() ?? 0)
+                .where((id) => id > 0)
+                .toSet();
+      }
+    } else {
+      for (final district in _listOfMaps(data['districts'])) {
+        final districtId = (district['id'] as num?)?.toInt() ?? 0;
+        if (districtId <= 0) continue;
+        _districtShiftMap[districtId] =
+            ((district['shiftIds'] as List?) ?? const [])
+                .map((e) => (e as num?)?.toInt() ?? 0)
+                .where((id) => id > 0)
+                .toSet();
+      }
+    }
+    _originalDistrictShiftMap = <int, Set<int>>{
+      for (final entry in _districtShiftMap.entries)
+        entry.key: Set<int>.from(entry.value),
+    };
 
     _originalSelectedSchoolIds = Set<int>.from(_selectedSchoolIds);
     _originalSelectedDistrictIds = Set<int>.from(_selectedDistrictIds);
@@ -859,6 +904,8 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
       originalSchoolShiftMap: _originalSchoolShiftMap,
       selectedDistrictIds: _selectedDistrictIds,
       originalSelectedDistrictIds: _originalSelectedDistrictIds,
+      districtShiftMap: _districtShiftMap,
+      originalDistrictShiftMap: _originalDistrictShiftMap,
       hasNewAvatarImage: _avatarImageLocalPath != null,
       hasNewVehicleImage: _vehicleImageLocalPath != null,
       hasVehicleDataChanges: _hasVehicleDataChanges(),
@@ -918,6 +965,10 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
         hasDistrictChanges(
           selectedDistrictIds: _selectedDistrictIds,
           originalSelectedDistrictIds: _originalSelectedDistrictIds,
+        ) ||
+        hasDistrictShiftMapChanges(
+          districtShiftMap: _districtShiftMap,
+          originalDistrictShiftMap: _originalDistrictShiftMap,
         );
 
     setState(() => _isSaving = true);
@@ -953,6 +1004,17 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                   for (final schoolId in _selectedSchoolIds)
                     schoolId:
                         ((_schoolShiftMap[schoolId] ?? const <int>{})
+                            .toList()
+                          ..sort()),
+                }
+              : null,
+          // Mapa bairro→turnos escolhido pelo motorista; enviado junto da
+          // cobertura quando esta foi editada.
+          districtShiftMap: coverageEdited
+              ? {
+                  for (final districtId in _selectedDistrictIds)
+                    districtId:
+                        ((_districtShiftMap[districtId] ?? const <int>{})
                             .toList()
                           ..sort()),
                 }

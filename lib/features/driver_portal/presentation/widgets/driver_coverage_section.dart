@@ -21,12 +21,14 @@ class DriverCoverageSection extends StatelessWidget {
     required this.selectedSchoolIds,
     required this.schoolShiftMap,
     required this.selectedDistrictIds,
+    required this.districtShiftMap,
     required this.requestsAsync,
     this.pendingRequest,
     required this.isSaving,
     required this.onSchoolsChanged,
     required this.onDistrictsChanged,
     required this.onSchoolShiftMapChanged,
+    required this.onDistrictShiftMapChanged,
   });
 
   final AsyncValue<List<CatalogOption>> schoolsAsync;
@@ -37,19 +39,23 @@ class DriverCoverageSection extends StatelessWidget {
   /// Turnos por escola selecionados pelo motorista.
   final Map<int, Set<int>> schoolShiftMap;
   final Set<int> selectedDistrictIds;
+
+  /// Turnos por bairro selecionados pelo motorista.
+  final Map<int, Set<int>> districtShiftMap;
   final AsyncValue<List<DriverProfileChangeRequest>> requestsAsync;
   final DriverProfileChangeRequest? pendingRequest;
   final bool isSaving;
   final ValueChanged<Set<int>> onSchoolsChanged;
   final ValueChanged<Set<int>> onDistrictsChanged;
   final ValueChanged<Map<int, Set<int>>> onSchoolShiftMapChanged;
+  final ValueChanged<Map<int, Set<int>>> onDistrictShiftMapChanged;
 
   @override
   Widget build(BuildContext context) {
     return FaixaSectionCard(
       icon: Icons.map_rounded,
       title: 'Cobertura',
-      subtitle: 'Escolas, bairros e turnos atendidos por escola.',
+      subtitle: 'Escolas, bairros e turnos atendidos.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -122,6 +128,15 @@ class DriverCoverageSection extends StatelessWidget {
             _CoverageChips(
               options: districtsAsync.value!,
               selectedIds: selectedDistrictIds,
+            ),
+            const SizedBox(height: 12),
+            _DistrictShiftEditor(
+              districtOptions: districtsAsync.value!,
+              shiftOptions: shiftOptions,
+              selectedDistrictIds: selectedDistrictIds,
+              districtShiftMap: districtShiftMap,
+              enabled: !isSaving,
+              onChanged: onDistrictShiftMapChanged,
             ),
           ],
         ],
@@ -570,6 +585,182 @@ class _SchoolShiftSummary extends StatelessWidget {
                       );
                     }).toList(growable: false),
                   ),
+              ],
+            ),
+          );
+        }),
+      ],
+    );
+  }
+}
+
+/// Seletor de turnos por bairro. Para cada bairro selecionado, o motorista
+/// escolhe quais turnos atende (contrato `coverage.districtShiftMap`).
+class _DistrictShiftEditor extends StatelessWidget {
+  const _DistrictShiftEditor({
+    required this.districtOptions,
+    required this.shiftOptions,
+    required this.selectedDistrictIds,
+    required this.districtShiftMap,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final List<CatalogOption> districtOptions;
+  final List<CatalogOption> shiftOptions;
+  final Set<int> selectedDistrictIds;
+  final Map<int, Set<int>> districtShiftMap;
+  final bool enabled;
+  final ValueChanged<Map<int, Set<int>>> onChanged;
+
+  void _toggleShift(int districtId, int shiftId) {
+    final next = <int, Set<int>>{
+      for (final entry in districtShiftMap.entries)
+        entry.key: Set<int>.from(entry.value),
+    };
+    final selected = next.putIfAbsent(districtId, () => <int>{});
+    if (!selected.add(shiftId)) {
+      selected.remove(shiftId);
+    }
+    if (selected.isEmpty) {
+      next.remove(districtId);
+    }
+    onChanged(next);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    if (selectedDistrictIds.isEmpty) return const SizedBox.shrink();
+
+    final districtById = {for (final d in districtOptions) d.id: d};
+    final sortedIds = selectedDistrictIds.toList(growable: false)
+      ..sort((a, b) {
+        final aName = districtById[a]?.name ?? a.toString();
+        final bName = districtById[b]?.name ?? b.toString();
+        return aName.compareTo(bName);
+      });
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(
+              Icons.schedule_rounded,
+              size: 15,
+              color: AppColors.muted,
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            Expanded(
+              child: Text(
+                'Turnos atendidos por bairro',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.slate,
+                  letterSpacing: 0.4,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ...sortedIds.map((districtId) {
+          final district = districtById[districtId];
+          final selectedShiftIds = districtShiftMap[districtId] ?? const <int>{};
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.sm,
+              AppSpacing.md,
+              AppSpacing.md,
+            ),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+              border: Border.all(
+                color: selectedShiftIds.isNotEmpty
+                    ? AppColors.success.withValues(alpha: 0.3)
+                    : AppColors.border,
+              ),
+              color: AppColors.surface,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: selectedShiftIds.isNotEmpty
+                            ? AppColors.success.withValues(alpha: 0.12)
+                            : AppColors.surfaceSoft,
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                      ),
+                      child: Icon(
+                        Icons.location_city_rounded,
+                        size: 15,
+                        color: selectedShiftIds.isNotEmpty
+                            ? AppColors.success
+                            : AppColors.muted,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Text(
+                        district?.name ?? 'Bairro #$districtId',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.sm,
+                  children: shiftOptions.map((shift) {
+                    final selected = selectedShiftIds.contains(shift.id);
+                    return InkWell(
+                      onTap: enabled
+                          ? () => _toggleShift(districtId, shift.id)
+                          : null,
+                      borderRadius: BorderRadius.circular(AppRadius.full),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.md,
+                          vertical: AppSpacing.sm - 1,
+                        ),
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? AppColors.yellow.withValues(alpha: 0.15)
+                              : AppColors.surfaceSoft,
+                          borderRadius: BorderRadius.circular(
+                            AppRadius.full,
+                          ),
+                          border: Border.all(
+                            color: selected
+                                ? AppColors.yellow.withValues(alpha: 0.5)
+                                : AppColors.border,
+                          ),
+                        ),
+                        child: Text(
+                          shift.name,
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: selected ? AppColors.ink : AppColors.slate,
+                            fontWeight:
+                                selected ? FontWeight.w600 : FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(growable: false),
+                ),
               ],
             ),
           );
