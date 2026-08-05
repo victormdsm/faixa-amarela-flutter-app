@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/presentation/widgets/app_shared_widgets.dart';
-import '../../../../core/presentation/widgets/searchable_select_field.dart';
+import '../../../../core/presentation/widgets/faixa_searchable_single_select.dart';
 import '../../domain/entities/public_transport_driver.dart';
 import '../../domain/entities/service_period.dart';
 import '../state/transport_search_filters_state.dart';
@@ -77,9 +77,11 @@ class TransportSearchFilters extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.md + 2),
-          SearchableSelectField(
+          FaixaSearchableSingleSelect(
             label: 'Escola',
             hintText: 'Selecione a escola',
+            title: 'Selecione a escola',
+            searchHint: 'Buscar escola',
             value: filters.school,
             options: schools,
             onSelected: onSchoolSelected,
@@ -89,9 +91,11 @@ class TransportSearchFilters extends StatelessWidget {
             emptyResultsText: 'Nenhuma escola carregada da API.',
           ),
           const SizedBox(height: AppSpacing.sm + 2),
-          SearchableSelectField(
+          FaixaSearchableSingleSelect(
             label: 'Bairro',
             hintText: 'Selecione o bairro',
+            title: 'Selecione o bairro',
+            searchHint: 'Buscar bairro',
             value: filters.neighborhood,
             options: neighborhoods,
             onSelected: onNeighborhoodSelected,
