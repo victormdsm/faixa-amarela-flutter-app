@@ -60,7 +60,9 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
   bool _hydrated = false;
   bool _isSaving = false;
   bool _isSyncing = false;
+  bool _personalEditMode = false;
   bool _vehicleEditMode = false;
+  bool _coverageEditMode = false;
   int? _vehicleId;
   String? _avatarImageUrl;
   String? _avatarImageLocalPath;
@@ -83,6 +85,9 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
   _profileSubscription;
   // Valores carregados do servidor: base para detectar edições do motorista
   // e não enviar campos intocados (CNH) ou incompletos (veículo sem placa).
+  String _originalName = '';
+  String _originalPhone = '';
+  String _originalInfo = '';
   String _originalCnh = '';
   String _originalVehicleBrand = '';
   String _originalVehicleColor = '';
@@ -240,22 +245,29 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                 icon: Icons.account_circle_rounded,
                 title: 'Perfil do tio da van',
                 subtitle: 'Dados de contato, foto e informações públicas.',
+                trailing: _buildSectionEditToggle(
+                  editMode: _personalEditMode,
+                  activeLabel: 'Editar dados pessoais',
+                  onToggle: _togglePersonalEditMode,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     FaixaImagePicker.avatar(
                       imageUrl: _avatarImageUrl,
                       localPath: _avatarImageLocalPath,
-                      onTap: _isSaving ? null : _pickAvatarImage,
+                      onTap: (_isSaving || !_personalEditMode)
+                          ? null
+                          : _pickAvatarImage,
                       label: 'Foto de perfil',
                     ),
                     if (_avatarImageLocalPath != null) ...[
                       const SizedBox(height: AppSpacing.sm),
                       TextButton.icon(
-                        onPressed: _isSaving
+                        onPressed: (_isSaving || !_personalEditMode)
                             ? null
                             : () =>
-                                  setState(() => _avatarImageLocalPath = null),
+                                setState(() => _avatarImageLocalPath = null),
                         icon: const Icon(Icons.undo_rounded),
                         label: const Text('Desfazer foto de perfil'),
                       ),
@@ -263,7 +275,8 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                     const SizedBox(height: AppSpacing.md),
                     TextFormField(
                       controller: _nameController,
-                      enabled: !_isSaving,
+                      enabled: !_isSaving && _personalEditMode,
+                      readOnly: !_personalEditMode,
                       decoration: const InputDecoration(
                         labelText: 'Nome',
                         prefixIcon: Icon(Icons.person_outline_rounded),
@@ -296,6 +309,7 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                       key: ValueKey('cpf-${_cpf ?? ''}'),
                       initialValue: _cpf ?? '',
                       enabled: false,
+                      readOnly: true,
                       decoration: const InputDecoration(
                         labelText: 'CPF',
                         prefixIcon: Icon(Icons.badge_rounded),
@@ -304,13 +318,35 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                     const SizedBox(height: AppSpacing.md),
                     TextFormField(
                       controller: _phoneController,
-                      enabled: !_isSaving,
+                      enabled: !_isSaving && _personalEditMode,
+                      readOnly: !_personalEditMode,
                       decoration: const InputDecoration(
                         labelText: 'Telefone / WhatsApp',
                         prefixIcon: Icon(Icons.phone_rounded),
                       ),
                     ),
-
+                    const SizedBox(height: AppSpacing.md),
+                    TextFormField(
+                      controller: _cnhController,
+                      enabled: !_isSaving && _personalEditMode,
+                      readOnly: !_personalEditMode,
+                      decoration: const InputDecoration(
+                        labelText: 'CNH',
+                        prefixIcon: Icon(Icons.credit_card_rounded),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    TextFormField(
+                      controller: _infoController,
+                      enabled: !_isSaving && _personalEditMode,
+                      readOnly: !_personalEditMode,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        labelText: 'Sobre / Informações adicionais',
+                        alignLabelWithHint: true,
+                        prefixIcon: Icon(Icons.info_outline_rounded),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -332,32 +368,9 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                       imageUrl: _vehicleImageUrl,
                       localPath: _vehicleImageLocalPath,
                       onPickImage: _pickVehicleImage,
-                      onToggleEdit: () =>
-                          setState(() => _vehicleEditMode = !_vehicleEditMode),
+                      onToggleEdit: _toggleVehicleEditMode,
                       onUndoImage: () =>
                           setState(() => _vehicleImageLocalPath = null),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    const Divider(height: 1),
-                    const SizedBox(height: AppSpacing.md),
-                    TextFormField(
-                      controller: _cnhController,
-                      enabled: !_isSaving,
-                      decoration: const InputDecoration(
-                        labelText: 'CNH',
-                        prefixIcon: Icon(Icons.credit_card_rounded),
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    TextFormField(
-                      controller: _infoController,
-                      enabled: !_isSaving,
-                      maxLines: 3,
-                      decoration: const InputDecoration(
-                        labelText: 'Sobre / Informações adicionais',
-                        alignLabelWithHint: true,
-                        prefixIcon: Icon(Icons.info_outline_rounded),
-                      ),
                     ),
                     const SizedBox(height: AppSpacing.md),
                     const Divider(height: 1),
@@ -367,7 +380,8 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                     // mais direto no PUT /drivers/me/vehicle).
                     TextFormField(
                       controller: _publicContactNameController,
-                      enabled: !_isSaving,
+                      enabled: !_isSaving && _vehicleEditMode,
+                      readOnly: !_vehicleEditMode,
                       decoration: const InputDecoration(
                         labelText: 'Nome de contato público (obrigatório)',
                         prefixIcon: Icon(Icons.badge_outlined),
@@ -379,7 +393,8 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                     const SizedBox(height: AppSpacing.md),
                     TextFormField(
                       controller: _publicContactPhoneController,
-                      enabled: !_isSaving,
+                      enabled: !_isSaving && _vehicleEditMode,
+                      readOnly: !_vehicleEditMode,
                       keyboardType: TextInputType.phone,
                       decoration: const InputDecoration(
                         labelText: 'Telefone público (obrigatório)',
@@ -398,34 +413,40 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                 title: 'Segurança',
                 child: Column(
                   children: [
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(
-                        Icons.lock_outline_rounded,
-                        color: AppColors.ink,
+                    Material(
+                      type: MaterialType.transparency,
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(
+                          Icons.lock_outline_rounded,
+                          color: AppColors.ink,
+                        ),
+                        title: const Text('Alterar senha'),
+                        subtitle: const Text('Senha atual + nova senha'),
+                        trailing: const Icon(
+                          Icons.chevron_right_rounded,
+                          color: AppColors.muted,
+                        ),
+                        onTap: _isSaving ? null : () => _changePassword(context),
                       ),
-                      title: const Text('Alterar senha'),
-                      subtitle: const Text('Senha atual + nova senha'),
-                      trailing: const Icon(
-                        Icons.chevron_right_rounded,
-                        color: AppColors.muted,
-                      ),
-                      onTap: _isSaving ? null : () => _changePassword(context),
                     ),
                     const Divider(height: 1),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(
-                        Icons.mail_outline_rounded,
-                        color: AppColors.ink,
+                    Material(
+                      type: MaterialType.transparency,
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(
+                          Icons.mail_outline_rounded,
+                          color: AppColors.ink,
+                        ),
+                        title: const Text('Alterar e-mail'),
+                        subtitle: const Text('Envia link de confirmação'),
+                        trailing: const Icon(
+                          Icons.chevron_right_rounded,
+                          color: AppColors.muted,
+                        ),
+                        onTap: _isSaving ? null : () => _changeEmail(context),
                       ),
-                      title: const Text('Alterar e-mail'),
-                      subtitle: const Text('Envia link de confirmação'),
-                      trailing: const Icon(
-                        Icons.chevron_right_rounded,
-                        color: AppColors.muted,
-                      ),
-                      onTap: _isSaving ? null : () => _changeEmail(context),
                     ),
                   ],
                 ),
@@ -444,6 +465,8 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                   changeRequestsAsync.value,
                 ),
                 isSaving: _isSaving,
+                editMode: _coverageEditMode,
+                onToggleEdit: _toggleCoverageEditMode,
                 onSchoolsChanged: (value) => setState(() {
                   _selectedSchoolIds
                     ..clear()
@@ -525,7 +548,9 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
 
   void _applyProfile(Map<String, dynamic> data) {
     _hydrated = true;
+    _personalEditMode = false;
     _vehicleEditMode = false;
+    _coverageEditMode = false;
     _email = data['email']?.toString();
     _cpf = data['cpf']?.toString();
     _nameController.text = (data['name'] ?? '').toString();
@@ -533,6 +558,9 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
     _phoneController.text = (data['cellPhone'] ?? '').toString();
     _infoController.text = (data['information'] ?? '').toString();
     _cnhController.text = (data['cnh'] ?? '').toString();
+    _originalName = _nameController.text.trim();
+    _originalPhone = _phoneController.text.trim();
+    _originalInfo = _infoController.text.trim();
     _originalCnh = _cnhController.text.trim();
     _avatarImageUrl = data['avatarUrl']?.toString();
     _avatarImageLocalPath = null;
@@ -1073,6 +1101,113 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
     } finally {
       if (context.mounted) setState(() => _isSaving = false);
     }
+  }
+
+  Widget _buildSectionEditToggle({
+    required bool editMode,
+    required String activeLabel,
+    required VoidCallback onToggle,
+  }) {
+    if (!editMode) {
+      return TextButton.icon(
+        onPressed: _isSaving ? null : onToggle,
+        icon: const Icon(Icons.edit_rounded, size: 16),
+        label: Text(activeLabel),
+      );
+    }
+    return TextButton.icon(
+      onPressed: _isSaving ? null : onToggle,
+      icon: const Icon(Icons.lock_outline_rounded, size: 16),
+      label: const Text('Cancelar edição'),
+      style: TextButton.styleFrom(foregroundColor: AppColors.slate),
+    );
+  }
+
+  void _togglePersonalEditMode() {
+    setState(() {
+      if (_personalEditMode) {
+        _restorePersonalFields();
+        _personalEditMode = false;
+      } else {
+        _restoreVehicleFields();
+        _vehicleEditMode = false;
+        _restoreCoverageFields();
+        _coverageEditMode = false;
+        _personalEditMode = true;
+      }
+    });
+  }
+
+  void _toggleCoverageEditMode() {
+    setState(() {
+      if (_coverageEditMode) {
+        _restoreCoverageFields();
+        _coverageEditMode = false;
+      } else {
+        _restorePersonalFields();
+        _personalEditMode = false;
+        _restoreVehicleFields();
+        _vehicleEditMode = false;
+        _coverageEditMode = true;
+      }
+    });
+  }
+
+  void _toggleVehicleEditMode() {
+    setState(() {
+      if (_vehicleEditMode) {
+        // Padrão da seção de veículo: o próprio widget já trava os campos;
+        // preservamos o comportamento anterior de não restaurar ao cancelar.
+        _vehicleEditMode = false;
+      } else {
+        _restorePersonalFields();
+        _personalEditMode = false;
+        _restoreCoverageFields();
+        _coverageEditMode = false;
+        _vehicleEditMode = true;
+      }
+    });
+  }
+
+  void _restorePersonalFields() {
+    _nameController.text = _originalName;
+    _phoneController.text = _originalPhone;
+    _cnhController.text = _originalCnh;
+    _infoController.text = _originalInfo;
+    _avatarImageLocalPath = null;
+  }
+
+  void _restoreCoverageFields() {
+    _selectedSchoolIds
+      ..clear()
+      ..addAll(_originalSelectedSchoolIds);
+    _selectedDistrictIds
+      ..clear()
+      ..addAll(_originalSelectedDistrictIds);
+    _schoolShiftMap
+      ..clear()
+      ..addAll(
+        _originalSchoolShiftMap.map(
+          (key, value) => MapEntry(key, Set<int>.from(value)),
+        ),
+      );
+    _districtShiftMap
+      ..clear()
+      ..addAll(
+        _originalDistrictShiftMap.map(
+          (key, value) => MapEntry(key, Set<int>.from(value)),
+        ),
+      );
+  }
+
+  void _restoreVehicleFields() {
+    _vehicleBrandController.text = _originalVehicleBrand;
+    _vehicleColorController.text = _originalVehicleColor;
+    _vehicleYearController.text = _originalVehicleYear;
+    _vehiclePlateController.text = _originalVehiclePlate;
+    _publicContactNameController.text = _originalPublicContactName;
+    _publicContactPhoneController.text = _originalPublicContactPhone;
+    _vehicleImageLocalPath = null;
   }
 
   Map<String, dynamic> _map(Object? raw) {

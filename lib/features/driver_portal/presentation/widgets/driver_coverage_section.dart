@@ -25,6 +25,8 @@ class DriverCoverageSection extends StatelessWidget {
     required this.requestsAsync,
     this.pendingRequest,
     required this.isSaving,
+    required this.editMode,
+    this.onToggleEdit,
     required this.onSchoolsChanged,
     required this.onDistrictsChanged,
     required this.onSchoolShiftMapChanged,
@@ -45,6 +47,8 @@ class DriverCoverageSection extends StatelessWidget {
   final AsyncValue<List<DriverProfileChangeRequest>> requestsAsync;
   final DriverProfileChangeRequest? pendingRequest;
   final bool isSaving;
+  final bool editMode;
+  final VoidCallback? onToggleEdit;
   final ValueChanged<Set<int>> onSchoolsChanged;
   final ValueChanged<Set<int>> onDistrictsChanged;
   final ValueChanged<Map<int, Set<int>>> onSchoolShiftMapChanged;
@@ -56,6 +60,7 @@ class DriverCoverageSection extends StatelessWidget {
       icon: Icons.map_rounded,
       title: 'Cobertura',
       subtitle: 'Escolas, bairros e turnos atendidos.',
+      trailing: _buildEditToggle(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -88,7 +93,7 @@ class DriverCoverageSection extends StatelessWidget {
             itemToName: (item) => item.name,
             title: 'Escolas atendidas',
             searchHint: 'Buscar escola',
-            enabled: !isSaving && schoolsAsync.hasValue,
+            enabled: editMode && !isSaving && schoolsAsync.hasValue,
             onConfirm: onSchoolsChanged,
           ),
           if (schoolsAsync.hasValue && selectedSchoolIds.isNotEmpty) ...[
@@ -103,6 +108,7 @@ class DriverCoverageSection extends StatelessWidget {
               shiftOptions: shiftOptions,
               selectedSchoolIds: selectedSchoolIds,
               schoolShiftMap: schoolShiftMap,
+              enabled: editMode && !isSaving,
               onShiftToggle: onSchoolShiftMapChanged,
             ),
           ],
@@ -117,7 +123,7 @@ class DriverCoverageSection extends StatelessWidget {
             itemToName: (item) => item.name,
             title: 'Bairros atendidos',
             searchHint: 'Buscar bairro',
-            enabled: !isSaving && districtsAsync.hasValue,
+            enabled: editMode && !isSaving && districtsAsync.hasValue,
             onConfirm: (value) {
               final keep = value.toSet();
               onDistrictsChanged(keep);
@@ -135,12 +141,28 @@ class DriverCoverageSection extends StatelessWidget {
               shiftOptions: shiftOptions,
               selectedDistrictIds: selectedDistrictIds,
               districtShiftMap: districtShiftMap,
-              enabled: !isSaving,
+              enabled: editMode && !isSaving,
               onChanged: onDistrictShiftMapChanged,
             ),
           ],
         ],
       ),
+    );
+  }
+
+  Widget _buildEditToggle(BuildContext context) {
+    if (!editMode) {
+      return TextButton.icon(
+        onPressed: isSaving ? null : onToggleEdit,
+        icon: const Icon(Icons.edit_rounded, size: 16),
+        label: const Text('Editar cobertura'),
+      );
+    }
+    return TextButton.icon(
+      onPressed: isSaving ? null : onToggleEdit,
+      icon: const Icon(Icons.lock_outline_rounded, size: 16),
+      label: const Text('Cancelar edição'),
+      style: TextButton.styleFrom(foregroundColor: AppColors.slate),
     );
   }
 }
@@ -421,6 +443,7 @@ class _SchoolShiftSummary extends StatelessWidget {
     required this.shiftOptions,
     required this.selectedSchoolIds,
     required this.schoolShiftMap,
+    required this.enabled,
     required this.onShiftToggle,
   });
 
@@ -428,6 +451,7 @@ class _SchoolShiftSummary extends StatelessWidget {
   final List<CatalogOption> shiftOptions;
   final Set<int> selectedSchoolIds;
   final Map<int, Set<int>> schoolShiftMap;
+  final bool enabled;
   final ValueChanged<Map<int, Set<int>>> onShiftToggle;
 
   void _toggleShift(int schoolId, int shiftId) {
@@ -553,7 +577,9 @@ class _SchoolShiftSummary extends StatelessWidget {
                     children: schoolShifts.map((shift) {
                       final selected = selectedShiftIds.contains(shift.id);
                       return InkWell(
-                        onTap: () => _toggleShift(schoolId, shift.id),
+                        onTap: enabled
+                            ? () => _toggleShift(schoolId, shift.id)
+                            : null,
                         borderRadius: BorderRadius.circular(AppRadius.full),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
