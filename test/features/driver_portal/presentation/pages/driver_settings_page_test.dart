@@ -19,6 +19,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  /// Os botões de edição de seção usam rótulos curtos ("Editar"/"Cancelar")
+  /// e carregam a ação completa no Tooltip — este finder localiza o botão
+  /// pela mensagem do tooltip (única por seção). O toque no Tooltip atinge
+  /// o botão filho (a área de hit é a mesma).
+  Finder editToggle(String tooltipMessage) => find.byWidgetPredicate(
+        (w) => w is Tooltip && w.message == tooltipMessage,
+      );
   const _profileJson = <String, dynamic>{
     'id': 1,
     'userId': 1,
@@ -153,7 +160,7 @@ void main() {
         (tester) async {
       await _pumpPage(tester);
 
-      await tester.tap(find.text('Editar dados pessoais'));
+      await tester.tap(editToggle('Editar dados pessoais'));
       await tester.pumpAndSettle();
 
       final nameField = tester.widget<TextFormField>(
@@ -193,7 +200,7 @@ void main() {
         (tester) async {
       await _pumpPage(tester);
 
-      await tester.tap(find.text('Editar cobertura'));
+      await tester.tap(editToggle('Editar cobertura'));
       await tester.pumpAndSettle();
 
       final selects = find.byType(FaixaSearchableSelect<CatalogOption>);
@@ -214,7 +221,7 @@ void main() {
     testWidgets('cancel personal edit restores original values', (tester) async {
       await _pumpPage(tester);
 
-      await tester.tap(find.text('Editar dados pessoais'));
+      await tester.tap(editToggle('Editar dados pessoais'));
       await tester.pumpAndSettle();
 
       await tester.enterText(
@@ -235,7 +242,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Cancelar edição'));
+      await tester.tap(editToggle('Cancelar edição'));
       await tester.pumpAndSettle();
 
       expect(
@@ -263,7 +270,7 @@ void main() {
       // Estado inicial: 1 escola e 1 bairro.
       expect(find.textContaining('1 escola(s) e 1 bairro(s)'), findsOneWidget);
 
-      await tester.tap(find.text('Editar cobertura'));
+      await tester.tap(editToggle('Editar cobertura'));
       await tester.pumpAndSettle();
 
       // Remove o bairro selecionado.
@@ -279,7 +286,7 @@ void main() {
       // Após remover: 1 escola e 0 bairros.
       expect(find.textContaining('1 escola(s) e 0 bairro(s)'), findsOneWidget);
 
-      await tester.tap(find.text('Cancelar edição'));
+      await tester.tap(editToggle('Cancelar edição'));
       await tester.pumpAndSettle();
 
       // Cancelamento restaura a seleção original.
@@ -289,7 +296,7 @@ void main() {
     testWidgets('save exits edit mode', (tester) async {
       await _pumpPage(tester);
 
-      await tester.tap(find.text('Editar dados pessoais'));
+      await tester.tap(editToggle('Editar dados pessoais'));
       await tester.pumpAndSettle();
 
       await tester.enterText(
@@ -301,8 +308,8 @@ void main() {
       await tester.tap(find.text('Salvar configurações'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Editar dados pessoais'), findsOneWidget);
-      expect(find.text('Cancelar edição'), findsNothing);
+      expect(editToggle('Editar dados pessoais'), findsOneWidget);
+      expect(editToggle('Cancelar edição'), findsNothing);
 
       final nameField = tester.widget<TextFormField>(
         find.widgetWithText(TextFormField, 'Nome'),

@@ -1108,18 +1108,27 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
     required String activeLabel,
     required VoidCallback onToggle,
   }) {
+    // Rótulos curtos: em telas estreitas o texto longo no trailing esmagava
+    // o título da seção, que quebrava palavra por palavra (texto enfileirado).
+    // A ação completa fica no tooltip/semântica.
     if (!editMode) {
-      return TextButton.icon(
-        onPressed: _isSaving ? null : onToggle,
-        icon: const Icon(Icons.edit_rounded, size: 16),
-        label: Text(activeLabel),
+      return Tooltip(
+        message: activeLabel,
+        child: TextButton.icon(
+          onPressed: _isSaving ? null : onToggle,
+          icon: const Icon(Icons.edit_rounded, size: 16),
+          label: const Text('Editar'),
+        ),
       );
     }
-    return TextButton.icon(
-      onPressed: _isSaving ? null : onToggle,
-      icon: const Icon(Icons.lock_outline_rounded, size: 16),
-      label: const Text('Cancelar edição'),
-      style: TextButton.styleFrom(foregroundColor: AppColors.slate),
+    return Tooltip(
+      message: 'Cancelar edição',
+      child: TextButton.icon(
+        onPressed: _isSaving ? null : onToggle,
+        icon: const Icon(Icons.lock_outline_rounded, size: 16),
+        label: const Text('Cancelar'),
+        style: TextButton.styleFrom(foregroundColor: AppColors.slate),
+      ),
     );
   }
 

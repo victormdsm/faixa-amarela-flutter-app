@@ -151,18 +151,26 @@ class DriverCoverageSection extends StatelessWidget {
   }
 
   Widget _buildEditToggle(BuildContext context) {
+    // Rótulos curtos (mesmo motivo das demais seções): texto longo esmagava
+    // o título em telas estreitas; a ação completa fica no tooltip.
     if (!editMode) {
-      return TextButton.icon(
-        onPressed: isSaving ? null : onToggleEdit,
-        icon: const Icon(Icons.edit_rounded, size: 16),
-        label: const Text('Editar cobertura'),
+      return Tooltip(
+        message: 'Editar cobertura',
+        child: TextButton.icon(
+          onPressed: isSaving ? null : onToggleEdit,
+          icon: const Icon(Icons.edit_rounded, size: 16),
+          label: const Text('Editar'),
+        ),
       );
     }
-    return TextButton.icon(
-      onPressed: isSaving ? null : onToggleEdit,
-      icon: const Icon(Icons.lock_outline_rounded, size: 16),
-      label: const Text('Cancelar edição'),
-      style: TextButton.styleFrom(foregroundColor: AppColors.slate),
+    return Tooltip(
+      message: 'Cancelar edição',
+      child: TextButton.icon(
+        onPressed: isSaving ? null : onToggleEdit,
+        icon: const Icon(Icons.lock_outline_rounded, size: 16),
+        label: const Text('Cancelar'),
+        style: TextButton.styleFrom(foregroundColor: AppColors.slate),
+      ),
     );
   }
 }

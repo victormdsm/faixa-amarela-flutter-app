@@ -42,17 +42,23 @@ class DriverVehicleSection extends StatelessWidget {
           children: [
             const Spacer(),
             if (!editMode)
-              TextButton.icon(
-                onPressed: isSaving ? null : onToggleEdit,
-                icon: const Icon(Icons.edit_rounded, size: 16),
-                label: const Text('Editar dados do veículo'),
+              Tooltip(
+                message: 'Editar dados do veículo',
+                child: TextButton.icon(
+                  onPressed: isSaving ? null : onToggleEdit,
+                  icon: const Icon(Icons.edit_rounded, size: 16),
+                  label: const Text('Editar'),
+                ),
               )
             else
-              TextButton.icon(
-                onPressed: isSaving ? null : onToggleEdit,
-                icon: const Icon(Icons.lock_outline_rounded, size: 16),
-                label: const Text('Cancelar edição'),
-                style: TextButton.styleFrom(foregroundColor: AppColors.slate),
+              Tooltip(
+                message: 'Cancelar edição',
+                child: TextButton.icon(
+                  onPressed: isSaving ? null : onToggleEdit,
+                  icon: const Icon(Icons.lock_outline_rounded, size: 16),
+                  label: const Text('Cancelar'),
+                  style: TextButton.styleFrom(foregroundColor: AppColors.slate),
+                ),
               ),
           ],
         ),
