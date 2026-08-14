@@ -1,3 +1,4 @@
+import 'package:app_faixa_amarela/core/models/paginated_result.dart';
 import 'package:app_faixa_amarela/features/parent_portal/data/parent_realtime_service.dart';
 import 'package:app_faixa_amarela/features/parent_portal/presentation/providers/parent_portal_providers.dart';
 import 'package:app_faixa_amarela/features/parent_portal/presentation/state/parent_realtime_controller.dart';
@@ -90,6 +91,70 @@ void main() {
 
         h.dispose();
       });
+    });
+
+    test('eventos de status do socket revalidam as rotas na hora', () async {
+      var routeBuilds = 0;
+      final sockets = <FakeParentRealtimeSocket>[];
+      final service = ParentRealtimeService(
+        baseUrl: 'http://localhost:3000',
+        socketFactory: ({required baseUrl, required token}) {
+          final socket = FakeParentRealtimeSocket();
+          sockets.add(socket);
+          return socket;
+        },
+      );
+      final container = ProviderContainer(
+        overrides: [
+          parentRealtimeServiceProvider.overrideWithValue(service),
+          parentRoutesProvider.overrideWith((ref) async {
+            routeBuilds++;
+            return PaginatedResult<Map<String, dynamic>>(
+              items: const [],
+              currentPage: 1,
+              lastPage: 1,
+              total: 0,
+            );
+          }),
+        ],
+      );
+      // Segura listeners para os providers autoDispose não serem
+      // descartados no meio do teste.
+      final ctrlSub = container.listen(
+        parentRealtimeControllerProvider,
+        (_, _) {},
+      );
+      // Segura um listener para o provider existir e contar os builds.
+      final routesSub = container.listen(parentRoutesProvider, (_, _) {});
+      await pumpEventQueue();
+      expect(routeBuilds, 1);
+
+      final controller = container.read(
+        parentRealtimeControllerProvider.notifier,
+      );
+      controller.watchRoute(routeId: 7, token: 'token-abc');
+      final socket = sockets.single;
+      socket.simulateConnect();
+      await pumpEventQueue();
+
+      // Fim de rota chega pelo socket e invalida a lista na hora (antes
+      // disso só o polling HTTP — em standby com socket vivo — descobria).
+      socket.simulateRouteStatus({'routeId': 7, 'status': 'finished'});
+      await pumpEventQueue();
+      expect(routeBuilds, 2);
+
+      // Embarque também revalida (status dos dependentes no overlay).
+      socket.simulateBoardingStatus({
+        'routeId': 7,
+        'childId': 10,
+        'status': 'boarded',
+      });
+      await pumpEventQueue();
+      expect(routeBuilds, 3);
+
+      routesSub.close();
+      ctrlSub.close();
+      container.dispose();
     });
   });
 }

@@ -48,7 +48,7 @@ void main() {
       await pumpCard(tester);
 
       expect(tester.takeException(), isNull);
-      expect(find.text('Solicitar'), findsOneWidget);
+      expect(find.text('Ver mais'), findsOneWidget);
 
       // Antes do fix, o FilledButton tinha largura mínima infinita (tema
       // global) e o Expanded do texto recebia largura 0 — o nome quebrava
@@ -83,7 +83,7 @@ void main() {
     },
   );
 
-  testWidgets('botão Solicitar define largura mínima finita', (tester) async {
+  testWidgets('botão Ver mais define largura mínima finita', (tester) async {
     await pumpCard(tester);
 
     final button = tester.widget<FilledButton>(find.byType(FilledButton));

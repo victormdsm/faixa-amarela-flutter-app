@@ -18,6 +18,7 @@ class ResetPasswordCodeDialog extends ConsumerStatefulWidget {
 
 class _ResetPasswordCodeDialogState
     extends ConsumerState<ResetPasswordCodeDialog> {
+  String _email = '';
   String _token = '';
   String _password = '';
   String _passwordConfirmation = '';
@@ -26,13 +27,18 @@ class _ResetPasswordCodeDialogState
   String? _successMessage;
 
   bool get _canSubmit {
-    return _token.trim().isNotEmpty &&
+    return _email.trim().isNotEmpty &&
+        _token.trim().isNotEmpty &&
         _password.isNotEmpty &&
         _passwordConfirmation.isNotEmpty &&
         !_isLoading;
   }
 
   Future<void> _submit() async {
+    if (_email.trim().isEmpty) {
+      setState(() => _errorMessage = 'Informe o e-mail cadastrado.');
+      return;
+    }
     if (_token.trim().isEmpty) {
       setState(() => _errorMessage = 'Informe o código recebido por e-mail.');
       return;
@@ -62,6 +68,7 @@ class _ResetPasswordCodeDialogState
       await ref
           .read(resetPasswordUseCaseProvider)
           .call(
+            email: _email.trim(),
             token: _token.trim(),
             password: _password,
             passwordConfirmation: _passwordConfirmation,
@@ -100,9 +107,23 @@ class _ResetPasswordCodeDialogState
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Text(
-              'Digite o código enviado para o seu e-mail e a nova senha.',
+              'Digite o e-mail cadastrado, o código enviado para o seu e-mail e a nova senha.',
             ),
             const SizedBox(height: AppSpacing.lg),
+            TextField(
+              enabled: !_isLoading,
+              keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.next,
+              onChanged: (value) => setState(() {
+                _email = value;
+                _errorMessage = null;
+              }),
+              decoration: const InputDecoration(
+                labelText: 'E-mail',
+                prefixIcon: Icon(Icons.mail_outline_rounded),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
             TextField(
               enabled: !_isLoading,
               textInputAction: TextInputAction.next,

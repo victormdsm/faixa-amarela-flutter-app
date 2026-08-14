@@ -16,7 +16,7 @@ import 'route_format_helpers.dart';
 import 'route_passengers_list.dart';
 import 'route_tracking_helpers.dart';
 
-/// Bottom sheet que exibe a lista de alunos na rota ativa ou as rotas salvas.
+/// Bottom sheet que exibe a lista de dependentes na rota ativa ou as rotas salvas.
 class RouteBottomSheet extends StatefulWidget {
   const RouteBottomSheet({
     super.key,
@@ -172,7 +172,7 @@ class _SheetHeader extends StatelessWidget {
       child: Row(
         children: [
           Text(
-            tracking.routeActive ? 'Alunos na rota' : 'Rotas salvas',
+            tracking.routeActive ? 'Dependentes na rota' : 'Rotas salvas',
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w800,
               color: AppColors.ink,
@@ -321,6 +321,10 @@ class _SavedRouteCard extends ConsumerWidget {
     final boardingsCount = _resolveBoardingsCount(route).toString();
     final tracking = ref.watch(driverTrackingControllerProvider);
     final isThisRoute = tracking.routeActive && tracking.routeId == routeId;
+    // Rota que o backend já considera em andamento, mas sem rastreamento
+    // local (app reaberto): "Iniciar" chamaria /start e tomaria 4xx. O que
+    // falta é religar o tracking.
+    final isRunningWithoutTracking = !isThisRoute && _isRunningStatus(status);
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
@@ -361,17 +365,14 @@ class _SavedRouteCard extends ConsumerWidget {
             runSpacing: AppSpacing.sm,
             children: [
               FilledButton.tonal(
-                onPressed: routeId <= 0
+                onPressed: routeId <= 0 || isThisRoute
                     ? null
                     : () => _handleAction(context, ref, true),
-                child: const Text('Iniciar'),
+                child: Text(isRunningWithoutTracking ? 'Retomar' : 'Iniciar'),
               ),
               OutlinedButton(
-                onPressed:
-                    routeId <= 0 ||
-                        (!isThisRoute &&
-                            status != 'in_progress' &&
-                            status != 'active')
+                onPressed: routeId <= 0 ||
+                        (!isThisRoute && !_isRunningStatus(status))
                     ? null
                     : () => _handleAction(context, ref, false),
                 child: const Text('Finalizar'),
@@ -381,6 +382,11 @@ class _SavedRouteCard extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  static bool _isRunningStatus(String status) {
+    final s = status.toLowerCase().trim();
+    return s == 'in_progress' || s == 'active' || s == 'started';
   }
 
   int _resolveBoardingsCount(DriverRouteSummary route) {
@@ -408,17 +414,37 @@ class _SavedRouteCard extends ConsumerWidget {
       if (session == null) throw ApiException(message: 'Sessão expirada.');
       final repo = ref.read(driverRoutesRepositoryProvider);
       final ctrl = ref.read(driverTrackingControllerProvider.notifier);
+      var resumedExisting = false;
 
       if (start) {
-        final response = await repo.startRoute();
-        if (!context.mounted) return;
-        await startTrackingFromResponse(
-          context,
-          ref,
-          response,
-          fallbackRouteId: routeId,
-        );
-        if (!context.mounted) return;
+        // Rota já em andamento no backend: religa o rastreamento a partir do
+        // manifesto ativo em vez de pedir uma nova rota (/start responderia
+        // erro por já existir rota ativa).
+        final running = _isRunningStatus(route.status)
+            ? await repo.getActiveRoute()
+            : null;
+        if (running != null && running.id == routeId) {
+          final resumed = await resumeTrackingFromManifest(ref, running);
+          if (!context.mounted) return;
+          if (!resumed) {
+            throw ApiException(
+              message:
+                  'Não foi possível retomar o rastreamento. '
+                  'Verifique as permissões de localização.',
+            );
+          }
+          resumedExisting = true;
+        } else {
+          final response = await repo.startRoute();
+          if (!context.mounted) return;
+          await startTrackingFromResponse(
+            context,
+            ref,
+            response,
+            fallbackRouteId: routeId,
+          );
+          if (!context.mounted) return;
+        }
       } else {
         if (routeId <= 0) throw ApiException(message: 'Rota invalida.');
         await repo.finishRoute(routeId);
@@ -432,7 +458,9 @@ class _SavedRouteCard extends ConsumerWidget {
       if (!context.mounted) return;
       showAppSnackBar(
         context,
-        message: start ? 'Rota iniciada.' : 'Rota finalizada.',
+        message: start
+            ? (resumedExisting ? 'Rota retomada.' : 'Rota iniciada.')
+            : 'Rota finalizada.',
         type: AppFeedbackType.success,
       );
     } catch (e) {

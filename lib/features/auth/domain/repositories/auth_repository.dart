@@ -8,6 +8,8 @@ abstract interface class AuthRepository {
     required UserRole role,
   });
 
+  Future<AuthSession?> refreshCurrentSession();
+
   Future<void> requestPasswordReset({required String email});
 
   Future<void> requestActivationLink({required String login});
@@ -32,6 +34,7 @@ abstract interface class AuthRepository {
   });
 
   Future<void> resetPassword({
+    required String email,
     required String token,
     required String password,
     required String passwordConfirmation,

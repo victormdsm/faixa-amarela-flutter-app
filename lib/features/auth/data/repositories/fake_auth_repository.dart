@@ -41,6 +41,9 @@ class FakeAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<AuthSession?> refreshCurrentSession() async => null;
+
+  @override
   Future<void> requestPasswordReset({required String email}) async {
     await Future<void>.delayed(const Duration(milliseconds: 700));
 
@@ -97,6 +100,7 @@ class FakeAuthRepository implements AuthRepository {
 
   @override
   Future<void> resetPassword({
+    required String email,
     required String token,
     required String password,
     required String passwordConfirmation,

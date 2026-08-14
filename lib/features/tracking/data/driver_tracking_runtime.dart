@@ -9,6 +9,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:hive/hive.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../../../core/storage/secure_token_storage.dart';
+
 const trackingCommandStart = 'tracking:start';
 const trackingCommandStop = 'tracking:stop';
 const trackingCommandSetMode = 'tracking:set_mode';
@@ -18,8 +20,16 @@ const trackingCommandFlushNow = 'tracking:flush_now';
 const trackingEventBufferCount = 'tracking:buffer_count';
 const trackingEventFlushSuccess = 'tracking:flush_success';
 const trackingEventError = 'tracking:error';
+const trackingEventAuthExpired = 'tracking:auth_expired';
 
 const _trackingPointsBoxName = 'tracking_telemetry_points_v1';
+
+const _maxFlushBackoffSeconds = 60;
+
+/// TTL dos pontos de telemetria no buffer local. Pontos mais antigos são
+/// removidos na abertura da caixa para evitar vazamento de dados antigos
+/// e corrupção de rotas anteriores.
+const _telemetryPointTtl = Duration(hours: 24);
 
 enum TrackingRunMode { foreground, background }
 
@@ -109,6 +119,10 @@ class _BackgroundTrackingRuntime {
   static int _pointKeySequence = 0;
   static bool _commandHandlersRegistered = false;
   static bool _isFlushing = false;
+  static int _authFailureStreak = 0;
+  static bool _flushHalted = false;
+  static final SecureTokenStorage _tokenStorage = SecureTokenStorage();
+  static void Function(String event, Map<String, dynamic> data)? _eventSink;
 
   static Future<void> start(ServiceInstance service) async {
     WidgetsFlutterBinding.ensureInitialized();
@@ -148,7 +162,15 @@ class _BackgroundTrackingRuntime {
             2,
             120,
           );
+      _authFailureStreak = 0;
+      _flushHalted = false;
       await _ensureTelemetryHttpClient();
+
+      // Descarta pontos pré-existentes ao iniciar uma nova rota. Evita que
+      // coordenadas da rota anterior sejam enviadas com os IDs da rota atual.
+      final box = await _ensurePointsBox();
+      await box.clear();
+      _emitBufferCount();
 
       final modeValue = (args['mode'] ?? 'foreground').toString();
       _mode = modeValue == 'background'
@@ -171,6 +193,10 @@ class _BackgroundTrackingRuntime {
       if (auth != null && auth.isNotEmpty) {
         _authHeader = auth;
         await _ensureTelemetryHttpClient();
+        _authFailureStreak = 0;
+        if (_routeActive && !_flushHalted && _flushTimer != null) {
+          _scheduleNextFlush();
+        }
       }
     });
 
@@ -243,15 +269,45 @@ class _BackgroundTrackingRuntime {
     await sub?.cancel();
   }
 
+  static int get _currentFlushDelaySeconds {
+    final base = _flushIntervalSeconds;
+    if (_authFailureStreak <= 0) return base;
+    var delay = base;
+    for (var i = 1; i < _authFailureStreak; i++) {
+      delay *= 2;
+      if (delay >= _maxFlushBackoffSeconds) return _maxFlushBackoffSeconds;
+    }
+    return delay > _maxFlushBackoffSeconds ? _maxFlushBackoffSeconds : delay;
+  }
+
   static void _startFlushTimer() {
     if (_flushTimer != null) return;
-    _flushTimer = Timer.periodic(Duration(seconds: _flushIntervalSeconds), (_) {
-      if (!_routeActive) {
-        _stopFlushTimer();
-        return;
-      }
-      unawaited(_flushTelemetryBatch());
+    _flushHalted = false;
+    _scheduleNextFlush();
+  }
+
+  static void _scheduleNextFlush() {
+    _flushTimer?.cancel();
+    if (_flushHalted || !_routeActive) {
+      _flushTimer = null;
+      return;
+    }
+    _flushTimer = Timer(Duration(seconds: _currentFlushDelaySeconds), () {
+      unawaited(_runScheduledFlush());
     });
+  }
+
+  static Future<void> _runScheduledFlush() async {
+    if (!_routeActive || _flushHalted) {
+      _stopFlushTimer();
+      return;
+    }
+    await _flushTelemetryBatch();
+    if (!_routeActive || _flushHalted) {
+      _stopFlushTimer();
+      return;
+    }
+    _scheduleNextFlush();
   }
 
   static void _stopFlushTimer() {
@@ -307,12 +363,26 @@ class _BackgroundTrackingRuntime {
 
       final status = response.statusCode ?? 0;
       if (status >= 200 && status < 300) {
+        _authFailureStreak = 0;
         await box.deleteAll(keys);
         _emitBufferCount();
-        _service?.invoke(trackingEventFlushSuccess, <String, dynamic>{
+        _emit(trackingEventFlushSuccess, <String, dynamic>{
           'sent_count': points.length,
           'remaining_count': box.length,
         });
+      } else if (status == 401) {
+        _handleUnauthorizedFlush();
+      } else if (status == 404) {
+        await _handleRouteNotFound(box);
+      }
+    } on DioException catch (e) {
+      final status = e.response?.statusCode ?? 0;
+      if (status == 401) {
+        _handleUnauthorizedFlush();
+      } else if (status == 404) {
+        await _handleRouteNotFound(box);
+      } else {
+        _emitError('Falha ao enviar lote em background: $e');
       }
     } catch (e) {
       _emitError('Falha ao enviar lote em background: $e');
@@ -321,46 +391,151 @@ class _BackgroundTrackingRuntime {
     }
   }
 
+  static void _handleUnauthorizedFlush() {
+    _authFailureStreak++;
+    _emit(trackingEventAuthExpired, <String, dynamic>{
+      'attempts': _authFailureStreak,
+      'next_retry_seconds': _currentFlushDelaySeconds,
+    });
+  }
+
+  static Future<void> _handleRouteNotFound(Box<dynamic> box) async {
+    _authFailureStreak = 0;
+    _flushHalted = true;
+    _stopFlushTimer();
+    try {
+      await box.clear();
+    } catch (_) {}
+    _emitBufferCount();
+    _emitError(
+      'Rota ativa nao encontrada no servidor: envio de telemetria encerrado.',
+    );
+  }
+
   static Future<Box<dynamic>> _ensurePointsBox() async {
     if (_pointsBox?.isOpen == true) return _pointsBox!;
 
     final dir = await getApplicationDocumentsDirectory();
     Hive.init(dir.path);
     _pointsBox = await Hive.openBox<dynamic>(_trackingPointsBoxName);
+    await _evictStalePoints(_pointsBox!);
     return _pointsBox!;
   }
 
-  static Future<void> _ensureTelemetryHttpClient() async {
-    if (_apiBaseUrl == null || _apiBaseUrl!.isEmpty) return;
-    _dio ??= Dio(
-      BaseOptions(
-        baseUrl: _apiBaseUrl!,
-        connectTimeout: const Duration(seconds: 10),
-        receiveTimeout: const Duration(seconds: 15),
-        sendTimeout: const Duration(seconds: 15),
-        headers: const <String, dynamic>{
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-      ),
-    );
+  /// Remove pontos com mais de [_telemetryPointTtl] ou sem timestamp válido.
+  /// Usa o campo `timestamp` do ponto (ISO 8601 UTC) para determinar a idade.
+  static Future<void> _evictStalePoints(Box<dynamic> box) async {
+    final cutoff = DateTime.now().toUtc().subtract(_telemetryPointTtl);
+    final keysToDelete = <dynamic>[];
 
-    _dio!.options.baseUrl = _apiBaseUrl!;
-    if (_authHeader != null && _authHeader!.isNotEmpty) {
-      _dio!.options.headers['Authorization'] = _authHeader!;
+    for (final entry in box.toMap().entries) {
+      if (entry.value is! Map) {
+        keysToDelete.add(entry.key);
+        continue;
+      }
+      final point = Map<String, dynamic>.from(entry.value as Map);
+      final ts = point['timestamp']?.toString();
+      if (ts == null || ts.isEmpty) {
+        keysToDelete.add(entry.key);
+        continue;
+      }
+      final parsed = DateTime.tryParse(ts);
+      if (parsed == null || parsed.isBefore(cutoff)) {
+        keysToDelete.add(entry.key);
+      }
+    }
+
+    if (keysToDelete.isNotEmpty) {
+      await box.deleteAll(keysToDelete);
+      _emitBufferCount();
+    }
+  }
+
+  /// Limpa a caixa de telemetria fora do ciclo de vida da rota. Usado no
+  /// sign-out para garantir que pontos não sejam deixados para a próxima conta.
+  /// Atenção: se o isolate de background ainda mantiver a caixa aberta, a
+  /// operação pode falhar silenciosamente; nesse caso os pontos serão limpos
+  /// quando o serviço parar.
+  static Future<void> clearTelemetryBox() async {
+    Box<dynamic>? box;
+    try {
+      // Não re-inicializa o Hive aqui: no isolate principal ele já foi
+      // configurado por Hive.initFlutter() (main.dart); em testes o setup
+      // inicializa um diretório temporário. Se a caixa estiver aberta em outro
+      // isolate, a abertura falhará e ignoramos silenciosamente (best effort).
+      box = await Hive.openBox<dynamic>(_trackingPointsBoxName);
+      await box.clear();
+    } catch (_) {
+      // Best effort: a caixa pode estar sob controle do isolate de background.
+    } finally {
+      try {
+        await box?.close();
+      } catch (_) {}
+      // NÃO fecha Hive.close() aqui — outras caixas da sessão podem estar
+      // abertas no isolate principal.
+    }
+  }
+
+  static Future<String?> _resolveAuthHeader() async {
+    try {
+      final token = await _tokenStorage.readAccessToken();
+      if (token != null && token.isNotEmpty) {
+        return 'Bearer $token';
+      }
+    } catch (_) {}
+
+    final cached = _authHeader;
+    if (cached != null && cached.isNotEmpty) return cached;
+    return null;
+  }
+
+  static Future<void> _ensureTelemetryHttpClient() async {
+    final baseUrl = _apiBaseUrl;
+    if (_dio == null) {
+      if (baseUrl == null || baseUrl.isEmpty) return;
+      _dio = Dio(
+        BaseOptions(
+          baseUrl: baseUrl,
+          connectTimeout: const Duration(seconds: 10),
+          receiveTimeout: const Duration(seconds: 15),
+          sendTimeout: const Duration(seconds: 15),
+          headers: const <String, dynamic>{
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+        ),
+      );
+    }
+
+    if (baseUrl != null && baseUrl.isNotEmpty) {
+      _dio!.options.baseUrl = baseUrl;
+    }
+
+    final header = await _resolveAuthHeader();
+    if (header != null && header.isNotEmpty) {
+      _dio!.options.headers['Authorization'] = header;
     } else {
       _dio!.options.headers.remove('Authorization');
     }
   }
 
+  static void _emit(String event, Map<String, dynamic> data) {
+    final sink = _eventSink;
+    if (sink != null) {
+      sink(event, data);
+      return;
+    }
+    _service?.invoke(event, data);
+  }
+
   static void _emitBufferCount() {
-    _service?.invoke(trackingEventBufferCount, <String, dynamic>{
+    _emit(trackingEventBufferCount, <String, dynamic>{
       'count': _pointsBox?.length ?? 0,
     });
   }
 
   static void _emitError(String message) {
-    _service?.invoke(trackingEventError, <String, dynamic>{'message': message});
+    _emit(trackingEventError, <String, dynamic>{'message': message});
   }
 
   static Future<void> _cleanupPointsStorage({
@@ -392,4 +567,78 @@ void trackingBackgroundOnStart(ServiceInstance service) {
 @pragma('vm:entry-point')
 Future<bool> trackingIosBackground(ServiceInstance service) async {
   return _BackgroundTrackingRuntime.handleIosBackgroundFetch(service);
+}
+
+/// Ponto de entrada público para limpar o buffer de telemetria fora do
+/// isolate de background (ex: durante sign-out).
+Future<void> clearDriverTrackingTelemetryBox() async {
+  await _BackgroundTrackingRuntime.clearTelemetryBox();
+}
+
+@visibleForTesting
+class DriverTrackingRuntimeTestHarness {
+  const DriverTrackingRuntimeTestHarness._();
+
+  static Future<Box<dynamic>> attachBox() async {
+    final box = await Hive.openBox<dynamic>(_trackingPointsBoxName);
+    _BackgroundTrackingRuntime._pointsBox = box;
+    return box;
+  }
+
+  static void startRoute({
+    required Dio dio,
+    required String apiBaseUrl,
+    required String routeManifestId,
+    required int vanId,
+    int flushIntervalSeconds = 2,
+    String? authHeader,
+  }) {
+    _BackgroundTrackingRuntime._dio = dio;
+    _BackgroundTrackingRuntime._apiBaseUrl = apiBaseUrl;
+    _BackgroundTrackingRuntime._routeManifestId = routeManifestId;
+    _BackgroundTrackingRuntime._vanId = vanId;
+    _BackgroundTrackingRuntime._flushIntervalSeconds = flushIntervalSeconds;
+    _BackgroundTrackingRuntime._authHeader = authHeader;
+    _BackgroundTrackingRuntime._routeActive = true;
+    _BackgroundTrackingRuntime._authFailureStreak = 0;
+    _BackgroundTrackingRuntime._flushHalted = false;
+  }
+
+  static set eventSink(
+    void Function(String event, Map<String, dynamic> data)? sink,
+  ) {
+    _BackgroundTrackingRuntime._eventSink = sink;
+  }
+
+  static Future<void> flushNow() =>
+      _BackgroundTrackingRuntime._flushTelemetryBatch();
+
+  static void startFlushTimer() =>
+      _BackgroundTrackingRuntime._startFlushTimer();
+
+  static bool get flushTimerActive =>
+      _BackgroundTrackingRuntime._flushTimer != null;
+
+  static bool get flushHalted => _BackgroundTrackingRuntime._flushHalted;
+
+  static int get nextFlushDelaySeconds =>
+      _BackgroundTrackingRuntime._currentFlushDelaySeconds;
+
+  static int get authFailureStreak =>
+      _BackgroundTrackingRuntime._authFailureStreak;
+
+  static Future<void> reset() async {
+    _BackgroundTrackingRuntime._stopFlushTimer();
+    _BackgroundTrackingRuntime._eventSink = null;
+    _BackgroundTrackingRuntime._dio = null;
+    _BackgroundTrackingRuntime._apiBaseUrl = null;
+    _BackgroundTrackingRuntime._routeManifestId = null;
+    _BackgroundTrackingRuntime._vanId = null;
+    _BackgroundTrackingRuntime._authHeader = null;
+    _BackgroundTrackingRuntime._routeActive = false;
+    _BackgroundTrackingRuntime._authFailureStreak = 0;
+    _BackgroundTrackingRuntime._flushHalted = false;
+    _BackgroundTrackingRuntime._isFlushing = false;
+    _BackgroundTrackingRuntime._pointsBox = null;
+  }
 }

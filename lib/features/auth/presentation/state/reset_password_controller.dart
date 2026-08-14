@@ -11,6 +11,14 @@ class ResetPasswordController extends _$ResetPasswordController {
   @override
   ResetPasswordState build() => ResetPasswordState.initial();
 
+  void setEmail(String value) {
+    state = state.copyWith(
+      email: value,
+      errorMessage: null,
+      successMessage: null,
+    );
+  }
+
   void setToken(String value) {
     state = state.copyWith(
       token: value.trim().toUpperCase(),
@@ -46,6 +54,13 @@ class ResetPasswordController extends _$ResetPasswordController {
   }
 
   Future<bool> submit() async {
+    final email = state.email.trim();
+    if (email.isEmpty) {
+      state = state.copyWith(
+        errorMessage: 'Informe o e-mail cadastrado.',
+      );
+      return false;
+    }
     final token = state.token.trim();
     if (token.isEmpty) {
       state = state.copyWith(
@@ -86,6 +101,7 @@ class ResetPasswordController extends _$ResetPasswordController {
       await ref
           .read(resetPasswordUseCaseProvider)
           .call(
+            email: email,
             token: token,
             password: state.password,
             passwordConfirmation: state.passwordConfirmation,

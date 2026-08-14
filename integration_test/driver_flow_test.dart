@@ -38,6 +38,7 @@ void main() {
       ChildLookupResult(
         found: true,
         childId: 10,
+        childUuid: 'a1b2c3d4-e5f6-4a1b-8c2d-9e0f1a2b3c4d',
         childName: 'Ana Silva',
         parentName: 'Maria Silva',
         address: 'Rua das Flores, 100',
@@ -88,7 +89,9 @@ void main() {
 
     expect(find.text('Ana Silva'), findsOneWidget);
 
-    await enrollmentsRepo.requestEnrollment(10);
+    await enrollmentsRepo.requestEnrollment(
+      'a1b2c3d4-e5f6-4a1b-8c2d-9e0f1a2b3c4d',
+    );
     final enrollments = await enrollmentsRepo.getMyEnrollments();
     expect(enrollments.length, 1);
     expect(enrollments.first.status, EnrollmentStatus.pending);

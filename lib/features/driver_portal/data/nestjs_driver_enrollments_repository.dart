@@ -27,11 +27,11 @@ class NestjsDriverEnrollmentsRepository implements DriverEnrollmentsRepository {
   }
 
   @override
-  Future<void> requestEnrollment(int childId) async {
+  Future<void> requestEnrollment(String childUuid) async {
     try {
       await _dio.post<Map<String, dynamic>>(
         '/driver/enrollments',
-        data: {'childId': childId},
+        data: {'child_uuid': childUuid},
       );
     } catch (error) {
       throw ApiException.fromDio(error);

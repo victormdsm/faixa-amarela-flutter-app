@@ -77,6 +77,8 @@ class ParentRealtimeController extends Notifier<ParentRealtimeState> {
   late final ParentRealtimeService _service;
   StreamSubscription<ParentVanLocation>? _locationSub;
   StreamSubscription<ParentRealtimeStatus>? _statusSub;
+  StreamSubscription<ParentRouteStatusEvent>? _routeStatusSub;
+  StreamSubscription<ParentBoardingStatusEvent>? _boardingStatusSub;
   Timer? _outageTimer;
 
   @override
@@ -84,10 +86,14 @@ class ParentRealtimeController extends Notifier<ParentRealtimeState> {
     _service = ref.watch(parentRealtimeServiceProvider);
     _locationSub = _service.locations.listen(_onLocation);
     _statusSub = _service.statusChanges.listen(_onStatus);
+    _routeStatusSub = _service.routeStatuses.listen(_onRouteStatus);
+    _boardingStatusSub = _service.boardingStatuses.listen(_onBoardingStatus);
     ref.onDispose(() {
       _outageTimer?.cancel();
       _locationSub?.cancel();
       _statusSub?.cancel();
+      _routeStatusSub?.cancel();
+      _boardingStatusSub?.cancel();
       _service.unwatch();
     });
     return const ParentRealtimeState();
@@ -149,6 +155,22 @@ class ParentRealtimeController extends Notifier<ParentRealtimeState> {
     if (!ref.mounted) return;
     state = state.copyWith(status: status);
     _syncOutageTimer();
+  }
+
+  /// Início/fim de rota chega por socket: a lista HTTP segue sendo a fonte
+  /// de verdade da tela, mas é revalidada na hora em vez de esperar o
+  /// polling de fallback (que fica em standby com o socket vivo).
+  void _onRouteStatus(ParentRouteStatusEvent event) {
+    if (!ref.mounted) return;
+    ref.invalidate(parentRoutesProvider);
+    ref.invalidate(parentChildrenProvider);
+  }
+
+  /// Embarque/desembarque muda o manifesto exibido no overlay — revalida as
+  /// rotas para refletir o status novo sem depender do polling.
+  void _onBoardingStatus(ParentBoardingStatusEvent event) {
+    if (!ref.mounted) return;
+    ref.invalidate(parentRoutesProvider);
   }
 
   /// Liga o timer de falha persistente enquanto há rota assinada sem

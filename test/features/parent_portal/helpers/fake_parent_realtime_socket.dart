@@ -73,4 +73,20 @@ class FakeParentRealtimeSocket implements ParentRealtimeSocket {
       handler(payload);
     }
   }
+
+  void simulateRouteStatus(Map<String, dynamic> payload) {
+    for (final handler
+        in handlers[ParentRealtimeService.eventRouteStatusUpdated] ??
+            const <void Function(dynamic)>[]) {
+      handler(payload);
+    }
+  }
+
+  void simulateBoardingStatus(Map<String, dynamic> payload) {
+    for (final handler
+        in handlers[ParentRealtimeService.eventBoardingStatusUpdated] ??
+            const <void Function(dynamic)>[]) {
+      handler(payload);
+    }
+  }
 }

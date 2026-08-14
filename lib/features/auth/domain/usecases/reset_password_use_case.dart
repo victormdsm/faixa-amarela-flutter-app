@@ -6,11 +6,13 @@ class ResetPasswordUseCase {
   final AuthRepository _repository;
 
   Future<void> call({
+    required String email,
     required String token,
     required String password,
     required String passwordConfirmation,
   }) {
     return _repository.resetPassword(
+      email: email,
       token: token,
       password: password,
       passwordConfirmation: passwordConfirmation,

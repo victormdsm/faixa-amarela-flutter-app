@@ -27,6 +27,7 @@ class _ParentRoutesPageState extends ConsumerState<ParentRoutesPage>
     with WidgetsBindingObserver {
   Timer? _refreshTimer;
   int _selectedRouteIndex = 0;
+  int _liveFallbackTicks = 0;
 
   @override
   void initState() {
@@ -56,10 +57,15 @@ class _ParentRoutesPageState extends ConsumerState<ParentRoutesPage>
     _refreshTimer = Timer.periodic(const Duration(seconds: 15), (_) {
       if (mounted &&
           WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
-        // Com o socket ao vivo o marcador já atualiza em tempo real — o
-        // polling HTTP vira apenas fallback para quando a conexão cai.
+        // Com o socket ao vivo o marcador já atualiza em tempo real — mas
+        // eventos de status podem se perder em janelas de reconexão, então o
+        // polling não desliga: vira um safety net espaçado (~60s).
         final realtime = ref.read(parentRealtimeControllerProvider);
-        if (realtime.isLive) return;
+        if (realtime.isLive) {
+          _liveFallbackTicks++;
+          if (_liveFallbackTicks < 4) return;
+        }
+        _liveFallbackTicks = 0;
         ref.invalidate(parentRoutesProvider);
         ref.invalidate(parentChildrenProvider);
       }
@@ -69,6 +75,7 @@ class _ParentRoutesPageState extends ConsumerState<ParentRoutesPage>
   void _stopRefreshTimer() {
     _refreshTimer?.cancel();
     _refreshTimer = null;
+    _liveFallbackTicks = 0;
   }
 
   @override
@@ -194,7 +201,10 @@ class _ParentRoutesPageState extends ConsumerState<ParentRoutesPage>
                         0,
                       ),
                       child: RouteSelectorBar(
-                        routes: activeRoutes,
+                        entries: _buildSelectorEntries(
+                          activeRoutes,
+                          children,
+                        ),
                         selectedIndex: _selectedRouteIndex,
                         onSelect: (i) =>
                             setState(() => _selectedRouteIndex = i),
@@ -226,6 +236,27 @@ class _ParentRoutesPageState extends ConsumerState<ParentRoutesPage>
       ),
     );
   }
+}
+
+/// Monta os rótulos do seletor: cada rota ativa é identificada pelos
+/// dependentes do responsável que estão naquele manifesto (e pelo motorista
+/// como informação secundária).
+List<RouteSelectorEntry> _buildSelectorEntries(
+  List<Map<String, dynamic>> routes,
+  List<Child> children,
+) {
+  return routes.map((route) {
+    final manifest = route['activeManifest'] as Map<String, dynamic>?;
+    final childIds = _extractChildIdsFromManifest(manifest);
+    return RouteSelectorEntry(
+      driverName: ((route['driver'] as Map?)?['name'] ?? 'Motorista')
+          .toString(),
+      dependentNames: children
+          .where((c) => childIds.contains(c.id))
+          .map((c) => c.name)
+          .toList(growable: false),
+    );
+  }).toList(growable: false);
 }
 
 Set<int> _extractChildIdsFromManifest(Map<String, dynamic>? manifest) {

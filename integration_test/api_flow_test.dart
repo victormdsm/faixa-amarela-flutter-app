@@ -229,7 +229,7 @@ void main() {
         expect(lookup.childName, 'Criança Integração');
 
         // 5. Motorista solicita matrícula.
-        await driverEnrollmentsRepo.requestEnrollment(createdChild.id);
+        await driverEnrollmentsRepo.requestEnrollment(childCode);
 
         // 6. Pai lista e aceita matrícula.
         dio.options.headers['Authorization'] =
@@ -337,10 +337,14 @@ void main() {
           ),
         );
         final childId = createdChild.id;
+        final childCode = (await childrenRepo.getChildren())
+            .firstWhere((c) => c.id == childId)
+            .uuid;
+        expect(childCode, isNotNull, reason: 'Criança sem código (uuid)');
 
         dio.options.headers['Authorization'] =
             'Bearer ${driverSession.accessToken}';
-        await driverEnrollmentsRepo.requestEnrollment(childId);
+        await driverEnrollmentsRepo.requestEnrollment(childCode!);
 
         dio.options.headers['Authorization'] =
             'Bearer ${parentSession.accessToken}';
@@ -609,10 +613,15 @@ void main() {
         );
 
         // Motorista solicita matrícula das duas.
+        final createdChildren = await childrenRepo.getChildren();
+        final code1 = createdChildren.firstWhere((c) => c.id == child1.id).uuid;
+        final code2 = createdChildren.firstWhere((c) => c.id == child2.id).uuid;
+        expect(code1, isNotNull, reason: 'Criança 1 sem código (uuid)');
+        expect(code2, isNotNull, reason: 'Criança 2 sem código (uuid)');
         dio.options.headers['Authorization'] =
             'Bearer ${driverSession.accessToken}';
-        await driverEnrollmentsRepo.requestEnrollment(child1.id);
-        await driverEnrollmentsRepo.requestEnrollment(child2.id);
+        await driverEnrollmentsRepo.requestEnrollment(code1!);
+        await driverEnrollmentsRepo.requestEnrollment(code2!);
 
         // Pai aceita as duas matrículas.
         dio.options.headers['Authorization'] =

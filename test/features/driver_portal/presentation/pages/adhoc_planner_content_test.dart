@@ -102,7 +102,7 @@ void main() {
     expect(boxes[0].value, isFalse);
     expect(boxes[1].value, isTrue);
     expect(boxes[2].value, isTrue);
-    expect(find.text('2 de 3 alunos na rota'), findsOneWidget);
+    expect(find.text('2 de 3 dependentes na rota'), findsOneWidget);
   });
 
   testWidgets('lista renderiza cabeçalho de escola ao mudar de escola', (
@@ -174,7 +174,7 @@ void main() {
     // Desmarca Bruno (id 2): Ana já vinha desmarcada por selectedByDefault.
     await tester.tap(find.byType(Checkbox).at(1));
     await tester.pumpAndSettle();
-    expect(find.text('1 de 3 alunos na rota'), findsOneWidget);
+    expect(find.text('1 de 3 dependentes na rota'), findsOneWidget);
 
     await tester.tap(find.widgetWithText(FilledButton, 'Iniciar rota'));
     await tester.pumpAndSettle();
@@ -198,6 +198,6 @@ void main() {
       find.widgetWithText(FilledButton, 'Iniciar rota'),
     );
     expect(button.onPressed, isNull);
-    expect(find.text('0 de 3 alunos na rota'), findsOneWidget);
+    expect(find.text('0 de 3 dependentes na rota'), findsOneWidget);
   });
 }

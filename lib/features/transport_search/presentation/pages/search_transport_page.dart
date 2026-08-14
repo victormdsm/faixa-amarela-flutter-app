@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/presentation/widgets/faixa_app_bar.dart';
+import '../../../../core/presentation/widgets/safe_bottom_inset.dart';
 import '../../../ads/domain/ad.dart';
 import '../../../ads/presentation/widgets/ad_banner_widget.dart';
 import '../providers/transport_search_providers.dart';
@@ -107,7 +108,12 @@ class SearchTransportPage extends ConsumerWidget {
               ),
             ),
           ],
-          const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xxl)),
+          // Respiro da barra de navegação do sistema (gestos/MIUI).
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: safeBottomInset(context, minimum: AppSpacing.xxl),
+            ),
+          ),
         ],
       ),
     );

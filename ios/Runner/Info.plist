@@ -26,6 +26,12 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>NSCameraUsageDescription</key>
+	<string>O Faixa Amarela usa a camera para voce tirar a foto de perfil e registrar fotos dos alunos e da van.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>O Faixa Amarela acessa suas fotos para voce escolher a foto de perfil e as imagens do cadastro.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>O Faixa Amarela usa sua localizacao para acompanhar a rota da van e mostrar aproximacao dos alunos.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>

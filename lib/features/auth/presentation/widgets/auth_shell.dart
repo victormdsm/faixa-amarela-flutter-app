@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_theme.dart';
+import '../../../../core/presentation/widgets/safe_bottom_inset.dart';
 
 /// Shell visual das telas de autenticação.
 ///
@@ -74,6 +75,11 @@ class AuthShell extends StatelessWidget {
                 ),
               ),
             ),
+          ),
+          // Barra de navegação do sistema (gestos/MIUI): sem este respiro o
+          // último botão do formulário fica embaixo dela.
+          SliverToBoxAdapter(
+            child: SizedBox(height: safeBottomInset(context)),
           ),
         ],
       ),

@@ -117,6 +117,7 @@ class DriverTrackingState {
     bool clearError = false,
     bool clearGeofence = false,
     bool clearRoutePreview = false,
+    bool clearPosition = false,
   }) {
     return DriverTrackingState(
       initialized: initialized ?? this.initialized,
@@ -130,11 +131,13 @@ class DriverTrackingState {
           ? null
           : (routeManifestId ?? this.routeManifestId),
       vanId: clearRoute ? null : (vanId ?? this.vanId),
-      lastPointAt: lastPointAt ?? this.lastPointAt,
-      lastLatitude: lastLatitude ?? this.lastLatitude,
-      lastLongitude: lastLongitude ?? this.lastLongitude,
-      lastSpeedKmh: lastSpeedKmh ?? this.lastSpeedKmh,
-      lastHeading: lastHeading ?? this.lastHeading,
+      lastPointAt: clearPosition ? null : (lastPointAt ?? this.lastPointAt),
+      lastLatitude: clearPosition ? null : (lastLatitude ?? this.lastLatitude),
+      lastLongitude: clearPosition
+          ? null
+          : (lastLongitude ?? this.lastLongitude),
+      lastSpeedKmh: clearPosition ? null : (lastSpeedKmh ?? this.lastSpeedKmh),
+      lastHeading: clearPosition ? null : (lastHeading ?? this.lastHeading),
       pendingBufferCount: pendingBufferCount ?? this.pendingBufferCount,
       geofenceRadiusMeters: geofenceRadiusMeters ?? this.geofenceRadiusMeters,
       nearbyCount: clearGeofence ? 0 : (nearbyCount ?? this.nearbyCount),

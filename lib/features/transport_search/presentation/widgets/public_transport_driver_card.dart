@@ -1,17 +1,15 @@
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_theme.dart';
-import '../../../../core/presentation/widgets/app_feedback.dart';
 import '../../../../core/presentation/widgets/app_shared_widgets.dart';
-import '../../../../core/utils/whatsapp_launcher.dart';
 import '../../domain/entities/public_transport_driver.dart';
 import 'public_transport_driver_detail_sheet.dart';
 
 /// Card de um motorista de transporte escolar publico encontrado na busca.
 /// Exibe resumo do veículo, contato público, CNH, sobre (information),
-/// escolas e bairros. Toque no card abre o bottom sheet completo; o botão
-/// "Solicitar" segue direto no WhatsApp (contato público — o backend nunca
-/// expõe o celular pessoal).
+/// escolas e bairros. Toque no card — ou no botão "Ver mais" — abre o bottom
+/// sheet completo, de onde sai o contato via WhatsApp (contato público — o
+/// backend nunca expõe o celular pessoal).
 class PublicTransportDriverCard extends StatelessWidget {
   const PublicTransportDriverCard({super.key, required this.driver});
 
@@ -227,23 +225,12 @@ class PublicTransportDriverCard extends StatelessWidget {
                   style: FilledButton.styleFrom(
                     minimumSize: const Size(88, 48),
                   ),
-                  onPressed: (driver.cellPhone ?? '').trim().isEmpty
-                      ? null
-                      : () async {
-                          final result = await WhatsAppLauncher.openChat(
-                            phone: driver.cellPhone,
-                            contactName: driver.name,
-                          );
-                          if (!context.mounted || result.success) return;
-                          showAppSnackBar(
-                            context,
-                            message:
-                                result.errorMessage ??
-                                'Falha ao abrir o WhatsApp.',
-                            type: AppFeedbackType.error,
-                          );
-                        },
-                  child: const Text('Solicitar'),
+                  // O card resume o motorista; o contato fica no detalhe.
+                  // Antes o botão disparava o WhatsApp direto e o responsável
+                  // solicitava sem ver van, escolas, bairros e turnos.
+                  onPressed: () =>
+                      showPublicTransportDriverDetail(context, driver: driver),
+                  child: const Text('Ver mais'),
                 ),
               ],
             ),

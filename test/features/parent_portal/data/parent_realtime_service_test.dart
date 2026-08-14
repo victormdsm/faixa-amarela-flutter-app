@@ -98,6 +98,64 @@ void main() {
       await sub.cancel();
     });
 
+    test('repassa route.status.updated e boarding.status.updated da rota assinada', () async {
+      service.watchRoute(routeId: 7, token: 'token-abc');
+      socket.simulateConnect();
+
+      final routeStatusExpectation = expectLater(
+        service.routeStatuses,
+        emits(
+          isA<ParentRouteStatusEvent>()
+              .having((e) => e.routeId, 'routeId', 7)
+              .having((e) => e.status, 'status', 'finished'),
+        ),
+      );
+      final boardingExpectation = expectLater(
+        service.boardingStatuses,
+        emits(
+          isA<ParentBoardingStatusEvent>()
+              .having((e) => e.routeId, 'routeId', 7)
+              .having((e) => e.childId, 'childId', 10)
+              .having((e) => e.status, 'status', 'boarded'),
+        ),
+      );
+
+      socket.simulateRouteStatus({'routeId': 7, 'status': 'finished'});
+      socket.simulateBoardingStatus({
+        'routeId': 7,
+        'childId': 10,
+        'status': 'boarded',
+      });
+
+      await routeStatusExpectation;
+      await boardingExpectation;
+    });
+
+    test('ignora status de outra rota', () async {
+      service.watchRoute(routeId: 7, token: 'token-abc');
+      socket.simulateConnect();
+
+      final routeStatuses = <ParentRouteStatusEvent>[];
+      final boardingStatuses = <ParentBoardingStatusEvent>[];
+      final subRoute = service.routeStatuses.listen(routeStatuses.add);
+      final subBoarding = service.boardingStatuses.listen(
+        boardingStatuses.add,
+      );
+
+      socket.simulateRouteStatus({'routeId': 99, 'status': 'finished'});
+      socket.simulateBoardingStatus({
+        'routeId': 99,
+        'childId': 10,
+        'status': 'boarded',
+      });
+      // Entrega do broadcast é assíncrona: drena a fila antes de afirmar.
+      await pumpEventQueue();
+      expect(routeStatuses, isEmpty);
+      expect(boardingStatuses, isEmpty);
+      await subRoute.cancel();
+      await subBoarding.cancel();
+    });
+
     test('troca de rota sai da room anterior e assina a nova', () {
       service.watchRoute(routeId: 7, token: 'token-abc');
       socket.simulateConnect();

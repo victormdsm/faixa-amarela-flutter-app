@@ -30,7 +30,7 @@ class AuthInterceptor extends Interceptor {
   final SecureTokenStorage _secureStorage;
   final void Function()? _onUnauthorized;
 
-  static final _refreshLock = Lock();
+  static final Lock refreshLock = Lock();
 
   @override
   Future<void> onRequest(
@@ -87,7 +87,7 @@ class AuthInterceptor extends Interceptor {
     }
 
     try {
-      final refreshed = await _refreshLock.synchronized(_doRefresh);
+      final refreshed = await refreshLock.synchronized(_doRefresh);
       if (!refreshed) {
         await _clearSession();
         handler.reject(err);
@@ -186,7 +186,9 @@ class Lock {
 
   Future<T> synchronized<T>(Future<T> Function() task) async {
     while (_pending != null) {
-      await _pending;
+      try {
+        await _pending;
+      } catch (_) {}
     }
 
     late final T result;

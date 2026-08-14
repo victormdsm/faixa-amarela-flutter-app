@@ -44,10 +44,6 @@ class ParentDashboardPage extends ConsumerWidget {
 
     final childCount = _Counter.fromPage(childrenAsync, (p) => p.items.length);
     final routeCount = _Counter.fromPage(routesAsync, (p) => p.items.length);
-    final boardingCount = _Counter.fromPage(
-      boardingsAsync,
-      (p) => p.items.length,
-    );
     final activeRouteCount = _Counter.fromPage(
       routesAsync,
       (p) => p.items.where(_isActiveRoute).length,
@@ -127,8 +123,10 @@ class ParentDashboardPage extends ConsumerWidget {
             const SizedBox(height: AppSpacing.lg),
             ParentRouteStatusCard(
               activeRoute: activeRoute,
+              // Aba do shell: `push` empilhava um segundo shell (com outra
+              // bottom nav) sobre o atual em vez de trocar de aba.
               onViewMap: activeRoute != null
-                  ? () => context.push(AppRoutes.parentRoutes)
+                  ? () => _goBranch(context, 2)
                   : null,
             ),
             const SizedBox(height: AppSpacing.lg),
@@ -148,10 +146,12 @@ class ParentDashboardPage extends ConsumerWidget {
             const SizedBox(height: AppSpacing.xl),
             const DashboardSectionTitle('Resumo'),
             const SizedBox(height: AppSpacing.md),
+            // A estatística de embarques saiu do resumo a pedido do produto:
+            // o histórico continua na aba "Embarques".
             DashboardMetricGrid(
               metrics: [
                 PortalHomeMetric(
-                  label: 'Alunos',
+                  label: 'Dependentes',
                   value: childCount.label,
                   icon: Icons.child_care_rounded,
                 ),
@@ -159,11 +159,6 @@ class ParentDashboardPage extends ConsumerWidget {
                   label: 'Rotas',
                   value: routeCount.label,
                   icon: Icons.route_rounded,
-                ),
-                PortalHomeMetric(
-                  label: 'Embarques',
-                  value: boardingCount.label,
-                  icon: Icons.fact_check_rounded,
                 ),
                 PortalHomeMetric(
                   label: 'Rota Ativa',
@@ -184,7 +179,7 @@ class ParentDashboardPage extends ConsumerWidget {
                 ),
                 PortalHomeAction(
                   key: E2EKeys.parentChildrenAction,
-                  label: 'Alunos',
+                  label: 'Dependentes',
                   icon: Icons.child_care_rounded,
                   onTap: () => _goBranch(context, 1),
                 ),

@@ -39,7 +39,19 @@ class _RouteMapViewState extends State<RouteMapView> {
   @override
   void didUpdateWidget(covariant RouteMapView old) {
     super.didUpdateWidget(old);
-    if (_ready && !_hasError) {
+    if (_hasError) {
+      // O boundary travava o mapa para sempre em qualquer exceção (ex.: o
+      // controller nativo respondendo durante o encerramento da rota). Com
+      // novos dados chegando, remonta o mapa em vez de ficar preso no
+      // placeholder: _ready=false segura o _syncMap até o estilo recarregar.
+      setState(() {
+        _hasError = false;
+        _error = null;
+        _ready = false;
+      });
+      return;
+    }
+    if (_ready) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _syncMap();
       });
@@ -93,8 +105,15 @@ class _RouteMapViewState extends State<RouteMapView> {
       final current = (t.lastLatitude != null && t.lastLongitude != null)
           ? LatLng(t.lastLatitude!, t.lastLongitude!)
           : null;
-      final poly = t.routePolyline.map((p) => LatLng(p.lat, p.lng)).toList();
-      final stops = t.routeRemainingStops;
+      // Linha e paradas só existem com rota ativa: após o encerramento o
+      // estado é limpo, e qualquer resíduo de uma requisição em voo não
+      // pode virar o traçado reto azul (aprox) no mapa.
+      final poly = t.routeActive
+          ? t.routePolyline.map((p) => LatLng(p.lat, p.lng)).toList()
+          : const <LatLng>[];
+      final stops = t.routeActive
+          ? t.routeRemainingStops
+          : const <DriverTrackingStopPoint>[];
       final fallback = [?current, ...stops.map((s) => LatLng(s.lat, s.lng))];
       final display = poly.length >= 2 ? poly : fallback;
       final usingApprox = poly.length < 2 && fallback.length >= 2;

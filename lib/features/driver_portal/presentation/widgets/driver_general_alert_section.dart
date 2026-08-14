@@ -7,7 +7,7 @@ import '../../../../core/presentation/widgets/app_feedback.dart';
 import '../../../tracking/presentation/state/driver_tracking_state.dart';
 import '../providers/driver_portal_providers.dart';
 
-/// Seção de alertas gerais para todos os responsáveis dos alunos na rota.
+/// Seção de alertas gerais para todos os responsáveis dos dependentes na rota.
 class DriverGeneralAlertSection extends ConsumerStatefulWidget {
   const DriverGeneralAlertSection({super.key, required this.tracking});
 
@@ -113,7 +113,7 @@ class _DriverGeneralAlertSectionState
       builder: (ctx) => AlertDialog(
         title: Text('Enviar alerta: $label?'),
         content: Text(
-          'Todos os responsáveis dos alunos na rota receberão:\n\n"$message"',
+          'Todos os responsáveis dos dependentes na rota receberão:\n\n"$message"',
         ),
         actions: [
           TextButton(

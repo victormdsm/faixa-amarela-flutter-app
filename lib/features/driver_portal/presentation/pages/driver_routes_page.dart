@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +9,7 @@ import '../../../../core/error/app_error_reporter.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/presentation/widgets/app_feedback.dart';
 import '../../../../core/presentation/widgets/app_shared_widgets.dart';
+import '../../../../domain/models/route_manifest.dart';
 import '../../../../domain/repositories/routes_repository.dart';
 import '../../../tracking/presentation/providers/tracking_providers.dart';
 import '../../../tracking/presentation/state/driver_tracking_state.dart';
@@ -30,9 +33,16 @@ class DriverRoutesPage extends ConsumerStatefulWidget {
 class _DriverRoutesPageState extends ConsumerState<DriverRoutesPage> {
   bool _isFinishing = false;
 
+  /// Retomada automática do rastreamento (ver [_syncTrackingWithBackend]).
+  bool _isResuming = false;
+  int? _resumeAttemptedRouteId;
+
   @override
   Widget build(BuildContext context) {
     final routesAsync = ref.watch(driverRoutesProvider);
+    // Fonte de verdade da rota em andamento: o backend. O estado de tracking
+    // vive só em memória e some quando o app é fechado.
+    final activeRouteAsync = ref.watch(driverRouteControllerProvider);
 
     DriverTrackingState tracking;
     try {
@@ -40,6 +50,8 @@ class _DriverRoutesPageState extends ConsumerState<DriverRoutesPage> {
     } catch (_) {
       tracking = const DriverTrackingState();
     }
+
+    _syncTrackingWithBackend(activeRouteAsync, tracking);
 
     final routesLoading = routesAsync.isLoading && !routesAsync.hasValue;
     final routesError = routesAsync.hasValue ? null : routesAsync.error;
@@ -77,6 +89,14 @@ class _DriverRoutesPageState extends ConsumerState<DriverRoutesPage> {
                             ? null
                             : () => _finishRoute(tracking),
                       ),
+                      // ── Retomando a rota ativa após reabrir o app ──
+                      if (_isResuming) ...[
+                        const SizedBox(height: AppSpacing.sm),
+                        const _RoutesStatusBanner(
+                          isLoading: true,
+                          loadingMessage: 'Retomando a rota em andamento...',
+                        ),
+                      ],
                       // ── Loading/erro das rotas no nível do mapa ──
                       if (routesLoading || routesError != null) ...[
                         const SizedBox(height: AppSpacing.sm),
@@ -116,6 +136,70 @@ class _DriverRoutesPageState extends ConsumerState<DriverRoutesPage> {
             : null,
       ),
     );
+  }
+
+  /// Retoma o rastreamento quando o backend ainda tem uma rota em andamento
+  /// e o estado local não.
+  ///
+  /// O estado do tracking vive só em memória: fechar o app zerava
+  /// `routeActive` enquanto a rota seguia ativa no backend. A tela voltava
+  /// mostrando "Rotas salvas" e o botão "Iniciar" falhava (já existe rota
+  /// ativa) — sem nenhuma forma de recuperar a visualização. Aqui o backend
+  /// (`/driver/routes/active`) é a fonte de verdade e religa o rastreamento.
+  ///
+  /// O caminho inverso (tracking ligado, backend sem rota) NÃO é tratado
+  /// aqui de propósito: logo após iniciar uma rota este provider ainda pode
+  /// responder o valor antigo (null) e derrubaríamos o rastreamento recém
+  /// iniciado. Encerrar a rota já desliga o tracking em [_finishRoute].
+  void _syncTrackingWithBackend(
+    AsyncValue<RouteManifest?> activeRouteAsync,
+    DriverTrackingState tracking,
+  ) {
+    if (_isResuming) return;
+    final activeRoute = activeRouteAsync.asData?.value;
+    if (activeRoute == null) {
+      _resumeAttemptedRouteId = null;
+      return;
+    }
+
+    if (activeRoute.status == RouteStatus.finished) return;
+    if (tracking.routeActive && tracking.routeId == activeRoute.id) {
+      _resumeAttemptedRouteId = null;
+      return;
+    }
+    // Uma tentativa por rota: sem permissão de localização a retomada falha
+    // e um retry em loop pediria permissão a cada rebuild.
+    if (_resumeAttemptedRouteId == activeRoute.id) return;
+
+    _resumeAttemptedRouteId = activeRoute.id;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_resumeTracking(activeRoute));
+    });
+  }
+
+  Future<void> _resumeTracking(RouteManifest activeRoute) async {
+    if (_isResuming) return;
+    setState(() => _isResuming = true);
+    try {
+      final resumed = await resumeTrackingFromManifest(ref, activeRoute);
+      if (!mounted || resumed) return;
+      showAppSnackBar(
+        context,
+        message:
+            'Há uma rota em andamento, mas não foi possível retomar o '
+            'rastreamento. Verifique as permissões de localização.',
+        type: AppFeedbackType.warning,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: AppErrorReporter.messageFor(e),
+        type: AppFeedbackType.error,
+      );
+    } finally {
+      if (mounted) setState(() => _isResuming = false);
+    }
   }
 
   Future<void> _finishRoute(DriverTrackingState tracking) async {
@@ -165,11 +249,13 @@ class _RoutesStatusBanner extends StatelessWidget {
   const _RoutesStatusBanner({
     required this.isLoading,
     this.message,
+    this.loadingMessage,
     this.onRetry,
   });
 
   final bool isLoading;
   final String? message;
+  final String? loadingMessage;
   final VoidCallback? onRetry;
 
   @override
@@ -211,7 +297,7 @@ class _RoutesStatusBanner extends StatelessWidget {
           Expanded(
             child: Text(
               isLoading
-                  ? 'Carregando rotas...'
+                  ? (loadingMessage ?? 'Carregando rotas...')
                   : (message ?? 'Não foi possível carregar as rotas.'),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -366,7 +452,7 @@ class _AdhocPlannerContentState extends State<AdhocPlannerContent> {
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'A rota será criada com base nos alunos ativos vinculados ao seu veículo.',
+            'A rota será criada com base nos dependentes ativos vinculados ao seu veículo.',
             style: Theme.of(
               context,
             ).textTheme.bodySmall?.copyWith(color: AppColors.slate),
@@ -438,8 +524,8 @@ class _AdhocPlannerContentState extends State<AdhocPlannerContent> {
                 if (children.isEmpty) {
                   return FaixaEmptyState(
                     message: _period == null
-                        ? 'Nenhum aluno ativo vinculado no momento.'
-                        : 'Nenhum aluno ativo neste período.',
+                        ? 'Nenhum dependente ativo vinculado no momento.'
+                        : 'Nenhum dependente ativo neste período.',
                     icon: Icons.child_care_rounded,
                     subtitle: _period == null
                         ? 'Vincule crianças ao seu veículo para iniciar uma rota.'
@@ -450,7 +536,7 @@ class _AdhocPlannerContentState extends State<AdhocPlannerContent> {
                   children: [
                     Text(
                       '${_selectedChildIds!.length} de ${children.length} '
-                      'alunos na rota',
+                      'dependentes na rota',
                       style: Theme.of(
                         context,
                       ).textTheme.bodySmall?.copyWith(color: AppColors.slate),

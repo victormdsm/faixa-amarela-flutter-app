@@ -8,6 +8,7 @@ import '../../../../app/theme/app_theme.dart';
 import '../../../../core/error/app_error_reporter.dart';
 import '../../../../core/presentation/widgets/app_shared_widgets.dart';
 import '../../../../core/presentation/widgets/faixa_app_bar.dart';
+import '../../../../core/presentation/widgets/safe_bottom_inset.dart';
 import '../../../../domain/models/route_manifest.dart';
 import '../providers/driver_portal_providers.dart';
 import '../widgets/bulk_disembark_dialog.dart';
@@ -106,8 +107,13 @@ class _RouteBody extends ConsumerWidget {
                   icon: Icons.route_rounded,
                 )
               : ListView.builder(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.lg,
+                  // Tela empilhada (sem bottom nav): o último card ficava
+                  // embaixo da barra de navegação do sistema.
+                  padding: EdgeInsets.fromLTRB(
+                    AppSpacing.lg,
+                    0,
+                    AppSpacing.lg,
+                    safeBottomInset(context),
                   ),
                   itemCount: boardingStops.length,
                   itemBuilder: (context, index) {

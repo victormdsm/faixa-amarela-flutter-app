@@ -13,7 +13,7 @@ import '../providers/driver_portal_providers.dart';
 import 'driver_general_alert_section.dart';
 import 'route_passenger_tile.dart';
 
-/// Lista de passageiros/alunos da rota ativa.
+/// Lista de passageiros/dependentes da rota ativa.
 ///
 /// Exibe os cards de embarque/desembarque, notificações e alerta geral.
 class RoutePassengersList extends ConsumerStatefulWidget {
@@ -46,7 +46,7 @@ class _RoutePassengersListState extends ConsumerState<RoutePassengersList> {
         padding: const EdgeInsets.all(AppSpacing.lg),
         children: const [
           FaixaEmptyState(
-            message: 'Nenhum aluno na rota atual.',
+            message: 'Nenhum dependente na rota atual.',
             icon: Icons.groups_2_outlined,
           ),
         ],
@@ -101,7 +101,7 @@ class _RoutePassengersListState extends ConsumerState<RoutePassengersList> {
       apiCall: (repo, routeId) => repo.markBoarding(routeId, childId),
       onLocal: (ctrl) => ctrl.markClientBoardedLocal(childId),
       onRollback: (ctrl) => ctrl.updateClientStopStatusLocal(childId, 'pending'),
-      msg: 'Aluno embarcou.',
+      msg: 'Dependente embarcou.',
     );
   }
 
@@ -112,7 +112,7 @@ class _RoutePassengersListState extends ConsumerState<RoutePassengersList> {
       onLocal: (ctrl) => ctrl.markClientDisembarkedLocal(childId),
       onRollback: (ctrl) =>
           ctrl.updateClientStopStatusLocal(childId, 'picked_up'),
-      msg: 'Aluno desembarcou.',
+      msg: 'Dependente desembarcou.',
     );
 
     final tracking = ref.read(driverTrackingControllerProvider);
@@ -139,7 +139,7 @@ class _RoutePassengersListState extends ConsumerState<RoutePassengersList> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Remover aluno'),
+        title: const Text('Remover dependente'),
         content: Text('Remover $name da rota? A rota será recalculada.'),
         actions: [
           TextButton(
@@ -334,5 +334,5 @@ bool _isDropoffType(String? type) {
 
 String _formatStudentName(String? name) {
   final trimmed = name?.trim() ?? '';
-  return trimmed.isEmpty ? 'Aluno' : trimmed;
+  return trimmed.isEmpty ? 'Dependente' : trimmed;
 }

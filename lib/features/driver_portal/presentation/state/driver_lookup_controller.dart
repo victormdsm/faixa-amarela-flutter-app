@@ -56,8 +56,8 @@ class DriverLookupController extends Notifier<AsyncValue<ChildLookupResult?>> {
     });
   }
 
-  Future<void> requestEnrollment(int childId) async {
-    await _repo.requestEnrollment(childId);
+  Future<void> requestEnrollment(String childUuid) async {
+    await _repo.requestEnrollment(childUuid);
   }
 
   void clear() {

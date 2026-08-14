@@ -26,7 +26,7 @@ class ParentShellPage extends ConsumerWidget {
           const FaixaNavItem(
             icon: Icons.child_care_rounded,
             activeIcon: Icons.child_care_rounded,
-            label: 'Filhos',
+            label: 'Dependentes',
           ),
           const FaixaNavItem(
             icon: Icons.route_rounded,

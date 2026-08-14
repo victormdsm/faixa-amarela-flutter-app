@@ -255,13 +255,16 @@ class _CitySelectSheetState extends State<_CitySelectSheet> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final filtered = _filtered;
+    // Ver faixa_searchable_single_select.dart: sem o inset do teclado o
+    // conteúdo do sheet fica escondido atrás dele ao digitar.
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
+      padding: EdgeInsets.fromLTRB(
         AppSpacing.lg,
         AppSpacing.sm,
         AppSpacing.lg,
-        AppSpacing.lg,
+        AppSpacing.lg + keyboardInset,
       ),
       child: Column(
         children: [

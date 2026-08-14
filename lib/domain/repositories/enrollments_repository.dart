@@ -17,7 +17,7 @@ abstract interface class EnrollmentsRepository {
   /// fluxo (LGPD): o backend responde 400 para documentos.
   Future<ChildLookupResult> lookupChildByCode(String code);
 
-  Future<void> requestEnrollment(int childId);
+  Future<void> requestEnrollment(String childUuid);
 
   Future<List<Enrollment>> getMyEnrollments();
 }

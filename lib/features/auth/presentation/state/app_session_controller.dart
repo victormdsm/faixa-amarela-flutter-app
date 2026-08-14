@@ -8,6 +8,7 @@ import '../../../driver_portal/presentation/providers/driver_portal_providers.da
 import '../../../parent_portal/presentation/providers/parent_portal_providers.dart';
 import '../../data/repositories/nestjs_auth_repository.dart';
 import '../../data/session_storage.dart';
+import '../../../tracking/data/driver_tracking_runtime.dart';
 import '../../domain/entities/auth_session.dart';
 import '../../domain/entities/user_role.dart';
 import '../providers/auth_providers.dart';
@@ -89,6 +90,9 @@ class AppSessionController extends Notifier<AppSessionState> {
     state = const AppSessionState(session: null, isLoading: false);
     await ref.read(_sessionStorageProvider).clear();
     await DriverProfileStorage().clear();
+    // Limpa o buffer de telemetria independentemente do estado da rota;
+    // evita que pontos de GPS fiquem congelados no disco entre contas.
+    await clearDriverTrackingTelemetryBox();
     _invalidateUserDataProviders();
   }
 
@@ -102,6 +106,9 @@ class AppSessionController extends Notifier<AppSessionState> {
     state = const AppSessionState(session: null, isLoading: false);
     await storage.clear();
     await DriverProfileStorage().clear();
+    // Limpa o buffer de telemetria independentemente do estado da rota;
+    // evita que pontos de GPS fiquem congelados no disco entre contas.
+    await clearDriverTrackingTelemetryBox();
     _invalidateUserDataProviders();
 
     try {

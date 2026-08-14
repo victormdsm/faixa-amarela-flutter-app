@@ -169,7 +169,8 @@ class _DriverLookupChildPageState extends ConsumerState<DriverLookupChildPage> {
         return _ChildResultCard(
           result: result,
           onRequestEnrollment: () async {
-            if (result.childId == null) return;
+            final childUuid = result.childUuid;
+            if (childUuid == null) return;
             if (result.hasActiveEnrollmentWithOtherDriver) {
               final confirmed = await _confirmMultiDriverWarning(result);
               if (!confirmed || !mounted) return;
@@ -177,7 +178,7 @@ class _DriverLookupChildPageState extends ConsumerState<DriverLookupChildPage> {
             try {
               await ref
                   .read(driverLookupControllerProvider.notifier)
-                  .requestEnrollment(result.childId!);
+                  .requestEnrollment(childUuid);
               if (!mounted) return;
               showAppSnackBar(
                 context,

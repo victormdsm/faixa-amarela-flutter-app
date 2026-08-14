@@ -52,7 +52,7 @@ class _RouteExecutionStopCardState
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        stop.childName.isNotEmpty ? stop.childName : 'Aluno',
+                        stop.childName.isNotEmpty ? stop.childName : 'Dependente',
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.w700,
                           color: AppColors.ink,
@@ -166,10 +166,10 @@ class _RouteExecutionStopCardState
       builder: (dialogContext) => AlertDialog(
         backgroundColor: AppColors.surface,
         surfaceTintColor: AppColors.surface,
-        title: const Text('Remover aluno'),
+        title: const Text('Remover dependente'),
         content: Text(
           'Remover ${stop.childName} desta rota? '
-          'A remoção é irreversível: o aluno não poderá ser readicionado '
+          'A remoção é irreversível: o dependente não poderá ser readicionado '
           'nesta rota hoje.',
           style: Theme.of(context).textTheme.bodyMedium,
         ),

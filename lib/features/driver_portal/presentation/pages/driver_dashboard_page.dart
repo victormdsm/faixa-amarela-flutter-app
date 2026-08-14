@@ -121,16 +121,19 @@ class DriverDashboardPage extends ConsumerWidget {
                   DashboardActionGrid(
                     crossAxisCount: 2,
                     actions: [
+                      // Ambas são abas do shell: trocar de aba (goBranch) em
+                      // vez de `go`/`push`, que recriavam o shell e deixavam
+                      // a bottom nav fora de sincronia com a tela exibida.
                       PortalHomeAction(
                         key: E2EKeys.driverLookupButton,
-                        label: 'Buscar criança',
+                        label: 'Buscar dependente',
                         icon: Icons.person_search_rounded,
-                        onTap: () => context.go(AppRoutes.driverClients),
+                        onTap: () => _goBranch(context, 1),
                       ),
                       PortalHomeAction(
                         label: 'Matrículas',
                         icon: Icons.how_to_reg_rounded,
-                        onTap: () => context.push(AppRoutes.driverEnrollments),
+                        onTap: () => _goBranch(context, 3),
                       ),
                     ],
                   ),

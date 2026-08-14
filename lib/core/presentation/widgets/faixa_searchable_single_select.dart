@@ -169,13 +169,17 @@ class _SingleSelectSheetState extends State<_SingleSelectSheet> {
     final theme = Theme.of(context);
     final filtered = _filtered;
     final hasSelection = widget.selectedValue != null;
+    // O bottom sheet fica ancorado na base da tela e não reage ao teclado
+    // sozinho: sem este inset o card inteiro (campo de busca, lista e botões)
+    // some atrás do teclado assim que o usuário começa a digitar.
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
+      padding: EdgeInsets.fromLTRB(
         AppSpacing.lg,
         AppSpacing.sm,
         AppSpacing.lg,
-        AppSpacing.lg,
+        AppSpacing.lg + keyboardInset,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,

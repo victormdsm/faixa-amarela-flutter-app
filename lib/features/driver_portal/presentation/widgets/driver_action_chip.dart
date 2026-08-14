@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_theme.dart';
 
-/// Chip de ação compacto usado nos cards de alunos da rota ativa.
+/// Chip de ação compacto usado nos cards de dependentes da rota ativa.
 class DriverActionChip extends StatelessWidget {
   const DriverActionChip({
     super.key,

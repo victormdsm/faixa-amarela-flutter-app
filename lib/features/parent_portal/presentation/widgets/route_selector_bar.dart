@@ -2,16 +2,47 @@ import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_theme.dart';
 
+/// Uma rota ativa disponível para acompanhamento.
+class RouteSelectorEntry {
+  const RouteSelectorEntry({
+    required this.driverName,
+    required this.dependentNames,
+  });
+
+  final String driverName;
+
+  /// Dependentes do responsável que estão no manifesto desta rota. É o que
+  /// diferencia duas rotas simultâneas para quem tem mais de um dependente.
+  final List<String> dependentNames;
+
+  /// Rótulo curto do chip: os dependentes quando conhecidos, senão o
+  /// motorista.
+  String get label {
+    if (dependentNames.isEmpty) return driverName;
+    return dependentNames.map(_firstName).join(', ');
+  }
+
+  static String _firstName(String name) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return trimmed;
+    return trimmed.split(RegExp(r'\s+')).first;
+  }
+}
+
 /// Barra de seleção de qual rota ativa o responsável deseja acompanhar.
+///
+/// Exibida apenas quando o backend (`GET /parent/routes`) devolve mais de uma
+/// rota ativa — o endpoint já retorna todas as rotas em andamento dos
+/// motoristas vinculados aos dependentes, uma por motorista.
 class RouteSelectorBar extends StatelessWidget {
   const RouteSelectorBar({
     super.key,
-    required this.routes,
+    required this.entries,
     required this.selectedIndex,
     required this.onSelect,
   });
 
-  final List<Map<String, dynamic>> routes;
+  final List<RouteSelectorEntry> entries;
   final int selectedIndex;
   final ValueChanged<int> onSelect;
 
@@ -39,7 +70,7 @@ class RouteSelectorBar extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            'Escolha qual rota acompanhar',
+            '${entries.length} rotas ativas — escolha qual acompanhar',
             style: theme.textTheme.labelSmall?.copyWith(
               fontWeight: FontWeight.w700,
               color: AppColors.slate,
@@ -50,51 +81,69 @@ class RouteSelectorBar extends StatelessWidget {
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
-              children: List.generate(routes.length, (i) {
-                final r = routes[i];
-                final driverName =
-                    ((r['driver'] as Map?)?['name'] ?? 'Motorista').toString();
+              children: List.generate(entries.length, (i) {
+                final entry = entries[i];
                 final selected = i == selectedIndex;
                 return Padding(
                   padding: EdgeInsets.only(
-                    right: i < routes.length - 1 ? AppSpacing.sm : 0,
+                    right: i < entries.length - 1 ? AppSpacing.sm : 0,
                   ),
-                  child: GestureDetector(
-                    onTap: () => onSelect(i),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.md,
-                        vertical: AppSpacing.sm - 1,
-                      ),
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? AppColors.yellow
-                            : AppColors.surfaceSoft,
-                        borderRadius: BorderRadius.circular(AppRadius.full),
-                        border: Border.all(
-                          color: selected
-                              ? AppColors.ink.withValues(alpha: 0.2)
-                              : Colors.transparent,
+                  child: Semantics(
+                    button: true,
+                    selected: selected,
+                    label:
+                        '${entry.label} — motorista ${entry.driverName}',
+                    child: GestureDetector(
+                      onTap: () => onSelect(i),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        constraints: const BoxConstraints(minHeight: 44),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.md,
+                          vertical: AppSpacing.sm - 1,
                         ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.directions_bus_rounded,
-                            size: 14,
-                            color: AppColors.ink,
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? AppColors.yellow
+                              : AppColors.surfaceSoft,
+                          borderRadius: BorderRadius.circular(AppRadius.full),
+                          border: Border.all(
+                            color: selected
+                                ? AppColors.ink.withValues(alpha: 0.2)
+                                : Colors.transparent,
                           ),
-                          const SizedBox(width: 5),
-                          Text(
-                            driverName,
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              fontWeight: FontWeight.w700,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.directions_bus_rounded,
+                              size: 14,
                               color: AppColors.ink,
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 5),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  entry.label,
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.ink,
+                                  ),
+                                ),
+                                Text(
+                                  entry.driverName,
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    fontSize: 10,
+                                    color: AppColors.slate,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),

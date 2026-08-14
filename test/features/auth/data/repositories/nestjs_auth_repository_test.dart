@@ -196,7 +196,11 @@ void main() {
       when(
         () => dio.post<Map<String, dynamic>>(
           '/auth/reset-password',
-          data: {'token': 'tok', 'newPassword': 'new_secret'},
+          data: {
+            'email': 'user@email.com',
+            'token': 'tok',
+            'new_password': 'new_secret',
+          },
         ),
       ).thenAnswer(
         (_) async => Response(
@@ -207,6 +211,7 @@ void main() {
       );
 
       await repository.resetPassword(
+        email: 'user@email.com',
         token: 'tok',
         password: 'new_secret',
         passwordConfirmation: 'new_secret',
@@ -215,7 +220,11 @@ void main() {
       verify(
         () => dio.post<Map<String, dynamic>>(
           '/auth/reset-password',
-          data: {'token': 'tok', 'newPassword': 'new_secret'},
+          data: {
+            'email': 'user@email.com',
+            'token': 'tok',
+            'new_password': 'new_secret',
+          },
         ),
       ).called(1);
     });

@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../../../../core/network/api_exception.dart';
+import '../../../../core/network/auth_interceptor.dart';
 import '../../../../core/storage/secure_token_storage.dart';
 import '../../domain/entities/auth_session.dart';
 import '../../domain/entities/user_role.dart';
@@ -51,7 +52,26 @@ class NestjsAuthRepository implements AuthRepository {
     }
   }
 
-  Future<AuthSession> refreshSession(String refreshToken) async {
+  Future<AuthSession> refreshSession(String refreshToken) {
+    return AuthInterceptor.refreshLock.synchronized(
+      () => _performRefresh(refreshToken),
+    );
+  }
+
+  @override
+  Future<AuthSession?> refreshCurrentSession() {
+    return AuthInterceptor.refreshLock.synchronized<AuthSession?>(() async {
+      final refreshToken = await _secureStorage.readRefreshToken();
+      if (refreshToken == null || refreshToken.isEmpty) return null;
+      try {
+        return await _performRefresh(refreshToken);
+      } catch (_) {
+        return null;
+      }
+    });
+  }
+
+  Future<AuthSession> _performRefresh(String refreshToken) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
         '/auth/refresh',
@@ -181,6 +201,7 @@ class NestjsAuthRepository implements AuthRepository {
 
   @override
   Future<void> resetPassword({
+    required String email,
     required String token,
     required String password,
     required String passwordConfirmation,
@@ -188,7 +209,11 @@ class NestjsAuthRepository implements AuthRepository {
     try {
       await _dio.post<Map<String, dynamic>>(
         '/auth/reset-password',
-        data: {'token': token, 'newPassword': password},
+        data: {
+          'email': email.trim(),
+          'token': token,
+          'new_password': password,
+        },
       );
     } on ApiException {
       rethrow;

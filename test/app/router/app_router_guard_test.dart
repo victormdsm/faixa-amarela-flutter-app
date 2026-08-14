@@ -325,5 +325,70 @@ void main() {
         );
       }
     });
+
+    group('busca pública de transporte', () {
+      // O CTA "Encontrar transporte escolar" da home do responsável abria
+      // /search-transport e o guard devolvia /pais na mesma hora: o botão
+      // parecia não fazer nada.
+      test('responsável logado consegue abrir a busca', () {
+        expect(
+          AppRouterGuard.redirect(
+            session: _session(role: 'parent'),
+            isLoading: false,
+            loginRole: null,
+            location: AppRoutes.searchTransport,
+          ),
+          isNull,
+        );
+      });
+
+      test('motorista logado também consegue abrir a busca', () {
+        expect(
+          AppRouterGuard.redirect(
+            session: _session(role: 'driver'),
+            isLoading: false,
+            loginRole: null,
+            location: AppRoutes.searchTransport,
+          ),
+          isNull,
+        );
+      });
+
+      test('anônimo continua com acesso', () {
+        expect(
+          AppRouterGuard.redirect(
+            session: null,
+            isLoading: false,
+            loginRole: null,
+            location: AppRoutes.searchTransport,
+          ),
+          isNull,
+        );
+      });
+
+      test('conta não ativada continua presa na ativação', () {
+        expect(
+          AppRouterGuard.redirect(
+            session: _session(role: 'parent', isActivated: false),
+            isLoading: false,
+            loginRole: null,
+            location: AppRoutes.searchTransport,
+          ),
+          AppRoutes.activation,
+        );
+      });
+
+      test('login segue redirecionando para o portal quando há sessão', () {
+        expect(
+          AppRouterGuard.redirect(
+            session: _session(role: 'parent'),
+            isLoading: false,
+            loginRole: null,
+            location: AppRoutes.login,
+          ),
+          AppRoutes.parentHome,
+        );
+      });
+    });
   });
 }

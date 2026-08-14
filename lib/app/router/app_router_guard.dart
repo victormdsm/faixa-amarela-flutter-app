@@ -12,13 +12,20 @@ abstract final class AppRouterGuard {
     // Proteção contra location vazia durante inicialização do GoRouter.
     final loc = location.isEmpty ? AppRoutes.login : location;
 
+    // Busca pública de transporte: acessível sem login E também com a sessão
+    // aberta (o responsável abre pelo CTA "Encontrar transporte escolar" da
+    // home). Fica fora de [isPublicRoute] porque rotas públicas são
+    // *redirecionadas de volta* ao portal quando há sessão — era isso que
+    // fazia o botão da home do responsável não sair do lugar.
+    final isOpenRoute = loc == AppRoutes.searchTransport;
+
     final isPublicRoute =
+        isOpenRoute ||
         loc == AppRoutes.login ||
         loc == AppRoutes.forgotPassword ||
         loc == AppRoutes.resetPassword ||
         loc == AppRoutes.parentSignUp ||
         loc == AppRoutes.finalizeRegistration ||
-        loc == AppRoutes.searchTransport ||
         loc == AppRoutes.activation;
 
     if (isLoading) return null;
@@ -57,8 +64,9 @@ abstract final class AppRouterGuard {
     // Impede responsável (neste contexto de login) de acessar portal de motorista.
     if (isParentSession && isDriverRoute) return AppRoutes.parentHome;
 
-    // Redireciona de rotas públicas para o portal correto.
-    if (isPublicRoute) {
+    // Redireciona de rotas públicas para o portal correto — exceto as rotas
+    // abertas, que continuam navegáveis com a sessão ativa.
+    if (isPublicRoute && !isOpenRoute) {
       if (isDriverSession) return AppRoutes.driverHome;
       if (isParentSession) return AppRoutes.parentHome;
     }

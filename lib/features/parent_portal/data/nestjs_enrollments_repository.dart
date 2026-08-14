@@ -106,7 +106,7 @@ class NestjsEnrollmentsRepository implements EnrollmentsRepository {
   }
 
   @override
-  Future<void> requestEnrollment(int childId) async {
+  Future<void> requestEnrollment(String childUuid) async {
     throw UnsupportedError('requestEnrollment is a driver-only operation.');
   }
 

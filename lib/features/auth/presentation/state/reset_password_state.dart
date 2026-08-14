@@ -7,6 +7,7 @@ abstract class ResetPasswordState with _$ResetPasswordState {
   const ResetPasswordState._();
 
   const factory ResetPasswordState({
+    required String email,
     required String token,
     required String password,
     required String passwordConfirmation,
@@ -18,6 +19,7 @@ abstract class ResetPasswordState with _$ResetPasswordState {
   }) = _ResetPasswordState;
 
   factory ResetPasswordState.initial() => const ResetPasswordState(
+    email: '',
     token: '',
     password: '',
     passwordConfirmation: '',
@@ -27,6 +29,7 @@ abstract class ResetPasswordState with _$ResetPasswordState {
   );
 
   bool get canSubmit =>
+      email.trim().isNotEmpty &&
       token.trim().isNotEmpty &&
       password.length >= 6 &&
       password == passwordConfirmation &&

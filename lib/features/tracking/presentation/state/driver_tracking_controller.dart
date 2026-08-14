@@ -4,7 +4,7 @@ import 'dart:math' as math;
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart'
-    show debugPrint, defaultTargetPlatform, kIsWeb;
+    show debugPrint, defaultTargetPlatform, kIsWeb, visibleForTesting;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
@@ -14,6 +14,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/backend_config.dart';
 import '../../../../core/network/network_providers.dart';
 import '../../../auth/domain/entities/auth_session.dart';
+import '../../../auth/domain/entities/user_role.dart';
+import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../auth/presentation/state/app_session_controller.dart';
 import '../../data/driver_tracking_runtime.dart';
 import 'driver_tracking_state.dart';
@@ -32,9 +34,14 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
       _bufferCountSubscription?.cancel();
       _flushSuccessSubscription?.cancel();
       _errorSubscription?.cancel();
+      _authExpiredSubscription?.cancel();
+      _proactiveRefreshTimer?.cancel();
     });
     return const DriverTrackingState();
   }
+
+  static const _proactiveRefreshMargin = Duration(minutes: 5);
+  static const _minProactiveRefreshDelay = Duration(seconds: 5);
 
   late Dio _dio;
   final FlutterBackgroundService _backgroundService =
@@ -47,8 +54,19 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
   StreamSubscription<Map<String, dynamic>?>? _bufferCountSubscription;
   StreamSubscription<Map<String, dynamic>?>? _flushSuccessSubscription;
   StreamSubscription<Map<String, dynamic>?>? _errorSubscription;
+  StreamSubscription<Map<String, dynamic>?>? _authExpiredSubscription;
+
+  Timer? _proactiveRefreshTimer;
+  bool _isRefreshingSession = false;
 
   String? _authHeader;
+
+  @visibleForTesting
+  String? get authHeader => _authHeader;
+
+  @visibleForTesting
+  bool get proactiveRefreshScheduled => _proactiveRefreshTimer?.isActive == true;
+
   bool _initialized = false;
   bool _serviceConfigured = false;
   bool _isGeofenceRequestInFlight = false;
@@ -94,8 +112,62 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
       } catch (_) {}
     }
 
-    if (session == null && state.routeActive) {
-      unawaited(stopRouteTracking(silent: true));
+    if (session == null) {
+      _cancelProactiveRefresh();
+      if (state.routeActive) {
+        unawaited(stopRouteTracking(silent: true));
+      }
+      return;
+    }
+
+    _scheduleProactiveRefresh(session);
+  }
+
+  void _cancelProactiveRefresh() {
+    _proactiveRefreshTimer?.cancel();
+    _proactiveRefreshTimer = null;
+  }
+
+  void _scheduleProactiveRefresh(AuthSession? session) {
+    _cancelProactiveRefresh();
+    if (session == null || !state.routeActive) return;
+
+    final rawExpiresAt = session.expiresAt;
+    if (rawExpiresAt == null || rawExpiresAt.isEmpty) return;
+    final expiry = DateTime.tryParse(rawExpiresAt);
+    if (expiry == null) return;
+
+    var delay = expiry.difference(DateTime.now()) - _proactiveRefreshMargin;
+    if (delay < _minProactiveRefreshDelay) {
+      delay = _minProactiveRefreshDelay;
+    }
+
+    _proactiveRefreshTimer = Timer(delay, () {
+      unawaited(refreshSessionNow());
+    });
+  }
+
+  Future<void> refreshSessionNow() async {
+    if (_isRefreshingSession) return;
+    if (!state.routeActive) return;
+
+    _isRefreshingSession = true;
+    try {
+      final refreshed = await ref
+          .read(authRepositoryProvider)
+          .refreshCurrentSession();
+      if (refreshed == null) return;
+      if (!ref.mounted) return;
+
+      final loginRole =
+          ref.read(appSessionControllerProvider).loginRole ?? UserRole.driver;
+      ref
+          .read(appSessionControllerProvider.notifier)
+          .setSession(refreshed, loginRole: loginRole);
+      syncSession(refreshed);
+    } catch (_) {
+    } finally {
+      _isRefreshingSession = false;
     }
   }
 
@@ -146,6 +218,7 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
     _deviationDistanceThresholdMeters = math.max(10, deviationDistanceMeters);
     _deviationSustainSeconds = math.max(1, deviationSustainSeconds);
     _deviationDebounceSeconds = math.max(1, deviationDebounceSeconds);
+    _scheduleProactiveRefresh(session);
 
     if (_supportsBackgroundService) {
       try {
@@ -183,6 +256,7 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
 
   Future<void> stopRouteTracking({bool silent = false}) async {
     await _stopForegroundStream();
+    _cancelProactiveRefresh();
 
     if (_supportsBackgroundService) {
       try {
@@ -206,6 +280,7 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
       clearRoute: true,
       clearGeofence: true,
       clearRoutePreview: true,
+      clearPosition: true,
       clearError: silent,
       clearWarning: false,
       offRoute: false,
@@ -219,6 +294,10 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
     double? distanceMeters,
     int? durationSeconds,
   }) {
+    // Preview só faz sentido com rota ativa: se o encerramento aconteceu no
+    // meio do start/retomada, popular paradas aqui deixaria lixo no mapa.
+    if (!state.routeActive) return;
+
     final parsedStops = _parseStops(
       remainingStops ?? const <Map<String, dynamic>>[],
     );
@@ -393,6 +472,7 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
     _bufferCountSubscription?.cancel();
     _flushSuccessSubscription?.cancel();
     _errorSubscription?.cancel();
+    _authExpiredSubscription?.cancel();
 
     _bufferCountSubscription = _backgroundService
         .on(trackingEventBufferCount)
@@ -420,6 +500,12 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
       if (message == null || message.isEmpty) return;
       state = state.copyWith(error: message);
     });
+
+    _authExpiredSubscription = _backgroundService
+        .on(trackingEventAuthExpired)
+        .listen((_) {
+          unawaited(refreshSessionNow());
+        });
   }
 
   Future<void> _switchToForegroundMode() async {
@@ -609,6 +695,10 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
         ),
       );
 
+      // A rota pode ter sido encerrada com a requisição em voo — sem este
+      // re-check o retorno tardio repovoava o geofence depois do stop.
+      if (!state.routeActive) return;
+
       final data = response.data ?? const <String, dynamic>{};
       final matches = (data['matches'] as List?) ?? const <dynamic>[];
       final nearest = matches.isNotEmpty && matches.first is Map
@@ -680,6 +770,11 @@ class DriverTrackingController extends Notifier<DriverTrackingState>
           headers: <String, dynamic>{'Authorization': _authHeader},
         ),
       );
+
+      // A rota pode ter sido encerrada com o recálculo em voo — sem este
+      // re-check o retorno tardio repovoava polyline/paradas depois do stop
+      // e o mapa desenhava um traçado reto fantasma.
+      if (!state.routeActive) return;
 
       final data = response.data ?? const <String, dynamic>{};
       final distance = (data['distanceMeters'] as num?)?.toDouble();

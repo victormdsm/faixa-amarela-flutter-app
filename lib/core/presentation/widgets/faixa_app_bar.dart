@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 /// AppBar padronizado do app Faixa Amarela.
 ///
@@ -51,13 +52,38 @@ class FaixaAppBar extends StatelessWidget implements PreferredSizeWidget {
           ? Builder(
               builder: (context) => IconButton(
                 tooltip: 'Voltar',
-                onPressed: onBack ?? () => Navigator.of(context).maybePop(),
+                onPressed: onBack ?? () => _handleBack(context),
                 icon: const Icon(Icons.arrow_back_rounded),
               ),
             )
           : null,
       actions: actions,
     );
+  }
+
+  /// Voltar resiliente.
+  ///
+  /// A raiz de cada aba do [StatefulShellRoute] não tem página abaixo na
+  /// pilha — `maybePop()` retornava `false` e o botão simplesmente não fazia
+  /// nada (APP: "botão de voltar não executa nenhuma ação"). Nessas telas o
+  /// voltar leva para a primeira aba do portal (Início); só quando existe
+  /// algo empilhado é que ele desempilha de fato.
+  static void _handleBack(BuildContext context) {
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) {
+      navigator.pop();
+      return;
+    }
+
+    final shell = StatefulNavigationShell.maybeOf(context);
+    if (shell != null) {
+      if (shell.currentIndex != 0) shell.goBranch(0);
+      return;
+    }
+
+    // Fora de um shell (telas públicas): volta pela rota do GoRouter.
+    final router = GoRouter.of(context);
+    if (router.canPop()) router.pop();
   }
 
   final Widget? title;

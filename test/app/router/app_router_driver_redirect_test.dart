@@ -38,6 +38,9 @@ class _FakeAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<AuthSession?> refreshCurrentSession() async => null;
+
+  @override
   Future<void> activateAccount({
     required String emailOrCpf,
     required String code,
@@ -51,6 +54,7 @@ class _FakeAuthRepository implements AuthRepository {
 
   @override
   Future<void> resetPassword({
+    required String email,
     required String token,
     required String password,
     required String passwordConfirmation,

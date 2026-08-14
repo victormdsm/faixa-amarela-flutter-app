@@ -85,12 +85,12 @@ class FakeEnrollmentsRepository implements DriverEnrollmentsRepository {
   }
 
   @override
-  Future<void> requestEnrollment(int childId) async {
+  Future<void> requestEnrollment(String childUuid) async {
     _enrollments.add(
       Enrollment(
         id: _enrollments.length + 1,
-        childId: childId,
-        childName: 'Criança $childId',
+        childId: _enrollments.length + 1,
+        childName: 'Criança $childUuid',
         driverId: 1,
         driverName: 'Motorista',
         vanPlate: 'ABC1234',

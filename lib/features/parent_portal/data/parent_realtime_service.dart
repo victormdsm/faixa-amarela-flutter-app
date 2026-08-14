@@ -25,6 +25,25 @@ class ParentVanLocation {
   final double? heading;
 }
 
+/// Mudança de status da rota recebida via socket no evento
+/// `route.status.updated` (payload: routeId, manifestId, userId, status).
+class ParentRouteStatusEvent {
+  const ParentRouteStatusEvent({this.routeId, this.status});
+
+  final int? routeId;
+  final String? status;
+}
+
+/// Mudança de embarque recebida via socket no evento
+/// `boarding.status.updated` (payload: routeId, manifestId, childId, status).
+class ParentBoardingStatusEvent {
+  const ParentBoardingStatusEvent({this.routeId, this.childId, this.status});
+
+  final int? routeId;
+  final int? childId;
+  final String? status;
+}
+
 /// Abstração mínima sobre o socket para permitir um fake em testes (o
 /// `Socket` concreto do socket_io_client não é injetável sem abrir conexão).
 abstract interface class ParentRealtimeSocket {
@@ -105,6 +124,10 @@ typedef ParentRealtimeSocketFactory =
 /// assina a room da rota (`subscribe.route`) e repassa as posições da van
 /// (`telemetry.location.updated`) assim que chegam — sem polling HTTP.
 ///
+/// Também repassa `route.status.updated` e `boarding.status.updated`: sem
+/// esses eventos a tela só descobria início/fim de rota e embarques no
+/// polling de fallback (que fica em standby com o socket vivo).
+///
 /// O socket_io_client faz reconexão automática; a cada `connect` (primeira
 /// ou reconexão) a assinatura da rota é refeita. A UI trata
 /// [ParentRealtimeStatus.connected] como "ao vivo"; nos demais estados o
@@ -118,6 +141,8 @@ class ParentRealtimeService {
        _socketFactory = socketFactory ?? _defaultSocketFactory;
 
   static const eventLocationUpdated = 'telemetry.location.updated';
+  static const eventRouteStatusUpdated = 'route.status.updated';
+  static const eventBoardingStatusUpdated = 'boarding.status.updated';
   static const _eventSubscribeRoute = 'subscribe.route';
   static const _eventUnsubscribeRoute = 'unsubscribe.route';
 
@@ -131,9 +156,17 @@ class ParentRealtimeService {
 
   final _statusController = StreamController<ParentRealtimeStatus>.broadcast();
   final _locationController = StreamController<ParentVanLocation>.broadcast();
+  final _routeStatusController =
+      StreamController<ParentRouteStatusEvent>.broadcast();
+  final _boardingStatusController =
+      StreamController<ParentBoardingStatusEvent>.broadcast();
 
   Stream<ParentRealtimeStatus> get statusChanges => _statusController.stream;
   Stream<ParentVanLocation> get locations => _locationController.stream;
+  Stream<ParentRouteStatusEvent> get routeStatuses =>
+      _routeStatusController.stream;
+  Stream<ParentBoardingStatusEvent> get boardingStatuses =>
+      _boardingStatusController.stream;
   ParentRealtimeStatus get status => _status;
   int? get watchedRouteId => _routeId;
 
@@ -200,6 +233,8 @@ class ParentRealtimeService {
     unwatch();
     unawaited(_statusController.close());
     unawaited(_locationController.close());
+    unawaited(_routeStatusController.close());
+    unawaited(_boardingStatusController.close());
   }
 
   void _bindSocket(ParentRealtimeSocket socket) {
@@ -217,6 +252,8 @@ class ParentRealtimeService {
       _setStatus(ParentRealtimeStatus.disconnected);
     });
     socket.on(eventLocationUpdated, _handleLocationUpdated);
+    socket.on(eventRouteStatusUpdated, _handleRouteStatusUpdated);
+    socket.on(eventBoardingStatusUpdated, _handleBoardingStatusUpdated);
   }
 
   void _subscribeWatchedRoute() {
@@ -262,11 +299,46 @@ class ParentRealtimeService {
     );
   }
 
+  void _handleRouteStatusUpdated(dynamic payload) {
+    if (payload is! Map) return;
+    final map = Map<String, dynamic>.from(payload);
+
+    final routeId = (map['routeId'] as num?)?.toInt();
+    final watched = _routeId;
+    if (watched != null && routeId != null && routeId != watched) return;
+
+    _routeStatusController.add(
+      ParentRouteStatusEvent(
+        routeId: routeId,
+        status: map['status']?.toString(),
+      ),
+    );
+  }
+
+  void _handleBoardingStatusUpdated(dynamic payload) {
+    if (payload is! Map) return;
+    final map = Map<String, dynamic>.from(payload);
+
+    final routeId = (map['routeId'] as num?)?.toInt();
+    final watched = _routeId;
+    if (watched != null && routeId != null && routeId != watched) return;
+
+    _boardingStatusController.add(
+      ParentBoardingStatusEvent(
+        routeId: routeId,
+        childId: (map['childId'] as num?)?.toInt(),
+        status: map['status']?.toString(),
+      ),
+    );
+  }
+
   void _teardownSocket() {
     final socket = _socket;
     _socket = null;
     if (socket != null) {
       socket.off(eventLocationUpdated);
+      socket.off(eventRouteStatusUpdated);
+      socket.off(eventBoardingStatusUpdated);
       socket.dispose();
     }
   }

@@ -7,7 +7,7 @@ extension UserRoleX on UserRole {
   };
 
   String get subtitle => switch (this) {
-    UserRole.parent => 'Acompanhar filhos, enderecos e localizacao da van',
+    UserRole.parent => 'Acompanhar dependentes, enderecos e localizacao da van',
     UserRole.driver => 'Gerenciar clientes, rotas e mensagens via WhatsApp',
   };
 }

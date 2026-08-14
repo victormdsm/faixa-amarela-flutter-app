@@ -5,7 +5,7 @@ import '../../../../app/theme/app_theme.dart';
 import 'driver_action_chip.dart';
 import 'route_passengers_list.dart';
 
-/// Tile expansível com as informações e ações de um aluno na rota ativa.
+/// Tile expansível com as informações e ações de um dependente na rota ativa.
 class RoutePassengerTile extends StatefulWidget {
   const RoutePassengerTile({
     super.key,

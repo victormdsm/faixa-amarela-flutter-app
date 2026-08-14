@@ -38,12 +38,15 @@ class _DriverAddClientPageState extends ConsumerState<DriverAddClientPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final result = _lookupResult;
-    final canLink = result != null && result.found && result.childId != null;
+    final canLink = result != null && result.found && result.childUuid != null;
 
     return Scaffold(
       backgroundColor: AppColors.surfaceSoft,
       appBar: FaixaAppBar.screen(title: 'Vincular crianca'),
       body: SafeArea(
+        // Piso mínimo: MIUI reporta inset bottom 0 e ainda sobrepõe a barra
+        // de navegação sobre o último botão da lista.
+        minimum: const EdgeInsets.only(bottom: AppSpacing.md),
         child: ListView(
           padding: const EdgeInsets.all(AppSpacing.lg),
           children: [
@@ -263,8 +266,8 @@ class _DriverAddClientPageState extends ConsumerState<DriverAddClientPage> {
 
   Future<void> _link() async {
     final result = _lookupResult;
-    final childId = result?.childId;
-    if (childId == null) return;
+    final childUuid = result?.childUuid;
+    if (childUuid == null) return;
 
     // F4 multi-vínculo: exige confirmação explícita antes de solicitar o
     // vínculo quando a criança já tem matrícula ativa com outro motorista.
@@ -326,7 +329,7 @@ class _DriverAddClientPageState extends ConsumerState<DriverAddClientPage> {
     try {
       await ref
           .read(driverEnrollmentsRepositoryProvider)
-          .requestEnrollment(childId);
+          .requestEnrollment(childUuid);
       ref.invalidate(driverEnrollmentsControllerProvider);
       if (!mounted) return;
       Navigator.of(context).pop(true);

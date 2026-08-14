@@ -6,6 +6,7 @@ import '../../../../app/router/app_router.dart';
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/presentation/widgets/app_feedback.dart';
 import '../../../../core/presentation/widgets/app_shared_widgets.dart';
+import '../state/forgot_password_controller.dart';
 import '../state/reset_password_controller.dart';
 import '../widgets/auth_shell.dart';
 
@@ -25,9 +26,18 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       try {
+        final resetController = ref.read(
+          resetPasswordControllerProvider.notifier,
+        );
         final token = GoRouterState.of(context).uri.queryParameters['token'];
         if (token != null && token.isNotEmpty) {
-          ref.read(resetPasswordControllerProvider.notifier).setToken(token);
+          resetController.setToken(token);
+        }
+        if (ref.read(resetPasswordControllerProvider).email.trim().isEmpty) {
+          final forgotEmail = ref.read(forgotPasswordControllerProvider).email;
+          if (forgotEmail.trim().isNotEmpty) {
+            resetController.setEmail(forgotEmail);
+          }
         }
       } catch (_) {
         // Running outside a GoRouter context (e.g. unit tests) — ignore.
@@ -54,6 +64,16 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          _AuthTextField(
+            controller: TextEditingController(text: state.email)
+              ..selection = TextSelection.collapsed(offset: state.email.length),
+            enabled: !state.isLoading,
+            textInputAction: TextInputAction.next,
+            onChanged: controller.setEmail,
+            labelText: 'E-mail cadastrado',
+            prefixIcon: Icons.mail_outline_rounded,
+          ),
+          const SizedBox(height: AppSpacing.md),
           _AuthTextField(
             controller: TextEditingController(text: state.token)
               ..selection = TextSelection.collapsed(offset: state.token.length),
