@@ -11,15 +11,24 @@ import 'ad_link_launcher.dart';
 /// "Publicidade"). Exibe o primeiro anúncio `card` do placement; não
 /// renderiza nada quando não há anúncios ou quando a busca falha.
 class AdCardWidget extends ConsumerWidget {
-  const AdCardWidget({super.key, required this.placement, required this.role});
+  const AdCardWidget({
+    super.key,
+    required this.placement,
+    required this.role,
+    this.cityId,
+  });
 
   final String placement;
   final AdRole role;
 
+  /// Cidade da superfície; `null` = o backend só serve anúncios sem
+  /// segmentação geográfica.
+  final int? cityId;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final adsAsync = ref.watch(
-      adsProvider((placement: placement, role: role)),
+      adsProvider((placement: placement, role: role, cityId: cityId)),
     );
 
     final ad = adsAsync.when(
@@ -40,6 +49,7 @@ class AdCardWidget extends ConsumerWidget {
             placement: placement,
             surface: AdFormat.card.wireValue,
             role: role,
+            cityId: cityId,
           );
     });
 
@@ -52,6 +62,7 @@ class AdCardWidget extends ConsumerWidget {
             placement: placement,
             surface: AdFormat.card.wireValue,
             role: role,
+            cityId: cityId,
           );
       await openAdLink(ad.linkUrl!);
     }

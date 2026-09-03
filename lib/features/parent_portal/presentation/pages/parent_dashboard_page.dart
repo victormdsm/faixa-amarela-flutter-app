@@ -16,10 +16,6 @@ import '../../../../core/presentation/widgets/e2e_keys.dart';
 import '../../../../core/presentation/widgets/faixa_app_bar.dart';
 import '../../../../core/presentation/widgets/find_transport_button.dart';
 import '../../../auth/presentation/state/app_session_controller.dart';
-import '../../../ads/domain/ad.dart';
-import '../../../ads/presentation/providers/ads_providers.dart';
-import '../../../ads/presentation/widgets/ad_banner_widget.dart';
-import '../../../ads/presentation/widgets/ad_card_widget.dart';
 import '../../../../domain/models/child.dart';
 import '../providers/parent_portal_providers.dart';
 import '../widgets/parent_children_strip.dart';
@@ -39,7 +35,6 @@ class ParentDashboardPage extends ConsumerWidget {
       ref.invalidate(parentChildrenProvider);
       ref.invalidate(parentRoutesProvider);
       ref.invalidate(parentBoardingsProvider);
-      ref.invalidate(adsProvider);
     }
 
     final childCount = _Counter.fromPage(childrenAsync, (p) => p.items.length);
@@ -194,17 +189,6 @@ class ParentDashboardPage extends ConsumerWidget {
             _MoreActionsPanel(
               onEnrollments: () => context.push(AppRoutes.parentEnrollments),
               onProfile: () => context.push(AppRoutes.parentProfile),
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            const AdCardWidget(
-              placement: AdPlacements.parentDashboardCard,
-              role: AdRole.parent,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            const AdBannerWidget(
-              placement: AdPlacements.parentDashboardBanner,
-              role: AdRole.parent,
-              height: 104,
             ),
             const SizedBox(height: AppSpacing.xxl),
           ],

@@ -71,14 +71,14 @@ void main() {
       verify(() => dio.get<dynamic>('/catalogs/schools')).called(1);
 
       // Garante que a versão atual do schema foi gravada.
-      expect(box.get('schema_version'), 2);
+      expect(box.get('schema_version'), 3);
     });
 
     test('mantém cache válido quando schema_version está atual', () async {
       dio = MockDio();
       final box = Hive.box<dynamic>('catalog_cache');
 
-      await box.put('schema_version', 2);
+      await box.put('schema_version', 3);
       await box.put('schools_at', DateTime.now().millisecondsSinceEpoch);
       await box.put('schools_data', [
         <String, dynamic>{

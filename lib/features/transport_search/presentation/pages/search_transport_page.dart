@@ -5,6 +5,7 @@ import '../../../../app/theme/app_theme.dart';
 import '../../../../core/presentation/widgets/faixa_app_bar.dart';
 import '../../../../core/presentation/widgets/safe_bottom_inset.dart';
 import '../../../ads/domain/ad.dart';
+import '../../../ads/presentation/providers/ad_audience_provider.dart';
 import '../../../ads/presentation/widgets/ad_banner_widget.dart';
 import '../providers/transport_search_providers.dart';
 import '../state/transport_search_controller.dart';
@@ -26,6 +27,10 @@ class SearchTransportPage extends ConsumerWidget {
     final neighborhoods = ref.watch(availableNeighborhoodsProvider);
     final driversAsync = ref.watch(transportDriversProvider);
     final drivers = ref.watch(filteredTransportDriversProvider);
+    // Única superfície com anúncio no app: vale para visitante e para sessão
+    // aberta, e o papel/cidade da vez definem a segmentação.
+    final adRole = ref.watch(adAudienceRoleProvider);
+    final adCityId = ref.watch(searchAdCityIdProvider);
 
     final hasAnyFilter =
         filters.school != null ||
@@ -69,9 +74,10 @@ class SearchTransportPage extends ConsumerWidget {
                     onPeriodChanged: controller.setPeriod,
                   ),
                   const SizedBox(height: AppSpacing.md),
-                  const AdBannerWidget(
+                  AdBannerWidget(
                     placement: AdPlacements.searchInlineBanner,
-                    role: AdRole.public,
+                    role: adRole,
+                    cityId: adCityId,
                     height: 104,
                   ),
                 ],

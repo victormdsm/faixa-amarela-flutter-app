@@ -44,6 +44,35 @@ final _selectedDistrictIdProvider = Provider<int?>((ref) {
   return null;
 });
 
+/// Cidade da busca, para segmentar o anúncio do slot da busca.
+///
+/// Sai da escola escolhida e, na falta dela, do bairro. Enquanto nenhum dos
+/// dois estiver selecionado o valor é `null` e o backend serve apenas
+/// anúncios sem segmentação geográfica.
+final searchAdCityIdProvider = Provider<int?>((ref) {
+  final filters = ref.watch(transportSearchControllerProvider);
+
+  if (filters.school != null) {
+    final schools = ref.watch(schoolsCatalogProvider).value ?? const [];
+    for (final option in schools) {
+      if (option.name == filters.school && option.cityId != null) {
+        return option.cityId;
+      }
+    }
+  }
+
+  if (filters.neighborhood != null) {
+    final districts = ref.watch(districtsCatalogProvider).value ?? const [];
+    for (final option in districts) {
+      if (option.name == filters.neighborhood && option.cityId != null) {
+        return option.cityId;
+      }
+    }
+  }
+
+  return null;
+});
+
 final _selectedShiftIdProvider = Provider<int?>((ref) {
   final period = ref.watch(transportSearchControllerProvider).period;
   if (period == null) return null;

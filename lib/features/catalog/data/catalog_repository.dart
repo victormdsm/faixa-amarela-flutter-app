@@ -41,7 +41,7 @@ class CatalogRepository {
 
   static const _boxName = 'catalog_cache';
   static const _ttlMs = 24 * 60 * 60 * 1000; // 24 hours
-  static const _cacheSchemaVersion = 2;
+  static const _cacheSchemaVersion = 3;
   static const _schemaVersionKey = 'schema_version';
 
   static Future<void> openCacheBox() => Hive.openBox<dynamic>(_boxName);
@@ -117,6 +117,9 @@ class CatalogRepository {
               (e) => <String, dynamic>{
                 'id': e.id,
                 'name': e.name,
+                // Cidade de escolas/bairros: alimenta a segmentação
+                // geográfica dos anúncios na busca de transporte.
+                'cityId': e.cityId,
                 // Sempre grava shifts (mesmo vazio) para escolas: caches
                 // antigos sem a chave causavam "nenhum turno cadastrado".
                 'shifts': e.shifts

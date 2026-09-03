@@ -14,9 +14,6 @@ import '../../../../core/presentation/widgets/dashboard/dashboard_section_title.
 import '../../../../core/presentation/widgets/e2e_keys.dart';
 import '../../../../core/presentation/widgets/faixa_app_bar.dart';
 import '../../../../domain/models/route_manifest.dart';
-import '../../../ads/domain/ad.dart';
-import '../../../ads/presentation/providers/ads_providers.dart';
-import '../../../ads/presentation/widgets/ad_card_widget.dart';
 import '../providers/driver_portal_providers.dart';
 import '../widgets/driver_active_route_card.dart';
 import '../widgets/driver_profile_card.dart';
@@ -30,7 +27,6 @@ class DriverDashboardPage extends ConsumerWidget {
     final dashboardAsync = ref.watch(driverDashboardControllerProvider);
 
     Future<void> refresh() async {
-      ref.invalidate(adsProvider);
       await ref.read(driverDashboardControllerProvider.notifier).refresh();
     }
 
@@ -144,11 +140,6 @@ class DriverDashboardPage extends ConsumerWidget {
                       icon: const Icon(Icons.notifications_rounded, size: 18),
                       label: const Text('Avisos'),
                     ),
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
-                  const AdCardWidget(
-                    placement: AdPlacements.driverDashboardCard,
-                    role: AdRole.driver,
                   ),
                   const SizedBox(height: AppSpacing.xxl),
                 ],

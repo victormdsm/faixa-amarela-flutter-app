@@ -70,7 +70,7 @@ void main() {
       );
 
       final ads = await repository.fetchAds(
-        placement: AdPlacements.parentDashboardBanner,
+        placement: AdPlacements.searchInlineBanner,
         role: AdRole.parent,
         deviceId: 'device-1',
       );
@@ -79,7 +79,8 @@ void main() {
       expect(ads.single.name, 'Campanha');
     });
 
-    test('sends placement, role and device_id as query parameters', () async {
+    test('sends placement, role, device_id and city_id as query parameters',
+        () async {
       when(
         () => dio.get<dynamic>(
           '/publicities',
@@ -88,8 +89,37 @@ void main() {
       ).thenAnswer((_) async => _jsonResponse(const [], '/publicities'));
 
       await repository.fetchAds(
-        placement: AdPlacements.driverDashboardCard,
+        placement: AdPlacements.searchInlineBanner,
         role: AdRole.driver,
+        deviceId: 'device-9',
+        cityId: 42,
+      );
+
+      final captured = verify(
+        () => dio.get<dynamic>(
+          '/publicities',
+          queryParameters: captureAny(named: 'queryParameters'),
+        ),
+      ).captured;
+
+      final params = captured.single as Map<String, dynamic>;
+      expect(params['placement'], AdPlacements.searchInlineBanner);
+      expect(params['role'], 'driver');
+      expect(params['device_id'], 'device-9');
+      expect(params['city_id'], 42);
+    });
+
+    test('omits city_id when the surface has no city', () async {
+      when(
+        () => dio.get<dynamic>(
+          '/publicities',
+          queryParameters: any(named: 'queryParameters'),
+        ),
+      ).thenAnswer((_) async => _jsonResponse(const [], '/publicities'));
+
+      await repository.fetchAds(
+        placement: AdPlacements.searchInlineBanner,
+        role: AdRole.public,
         deviceId: 'device-9',
       );
 
@@ -101,9 +131,7 @@ void main() {
       ).captured;
 
       final params = captured.single as Map<String, dynamic>;
-      expect(params['placement'], AdPlacements.driverDashboardCard);
-      expect(params['role'], 'driver');
-      expect(params['device_id'], 'device-9');
+      expect(params.containsKey('city_id'), isFalse);
     });
 
     test('drops items without image or with invalid id', () async {
@@ -215,7 +243,7 @@ void main() {
       );
       await repository.trackImpression(
         7,
-        placement: AdPlacements.parentDashboardBanner,
+        placement: 'outro-slot',
         deviceId: 'device-1',
       );
 
@@ -244,7 +272,7 @@ void main() {
   });
 
   group('trackClick', () {
-    test('posts to the click endpoint with placement/surface/deviceId',
+    test('posts to the click endpoint with placement/surface/deviceId/cityId',
         () async {
       when(
         () => dio.post<dynamic>('/publicities/7/click', data: any(named: 'data')),
@@ -252,9 +280,10 @@ void main() {
 
       await repository.trackClick(
         7,
-        placement: AdPlacements.parentDashboardCard,
+        placement: AdPlacements.searchInlineBanner,
         surface: 'card',
         deviceId: 'device-2',
+        cityId: 42,
       );
 
       final captured = verify(
@@ -267,9 +296,10 @@ void main() {
       expect(
         captured.single,
         equals(const <String, dynamic>{
-          'placement': 'parent-dashboard-card',
+          'placement': 'search-inline-banner',
           'surface': 'card',
           'deviceId': 'device-2',
+          'cityId': 42,
         }),
       );
     });

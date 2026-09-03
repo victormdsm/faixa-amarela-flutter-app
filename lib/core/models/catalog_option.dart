@@ -1,10 +1,18 @@
 class CatalogOption {
-  const CatalogOption({required this.id, required this.name, this.shifts = const []});
+  const CatalogOption({
+    required this.id,
+    required this.name,
+    this.shifts = const [],
+    this.cityId,
+  });
 
   final int id;
   final String name;
   /// Turnos da escola (preenchido apenas para o tipo "schools" pelo backend).
   final List<CatalogOption> shifts;
+
+  /// Cidade do item (escolas e bairros expõem `cityId`; demais catálogos não).
+  final int? cityId;
 
   factory CatalogOption.fromJson(Map<String, dynamic> json) {
     final rawId = json['id'];
@@ -26,10 +34,18 @@ class CatalogOption {
             .toList(growable: false)
         : const <CatalogOption>[];
 
+    final rawCityId = json['cityId'] ?? json['city_id'];
+    final int? cityId = switch (rawCityId) {
+      final num n => n.toInt(),
+      final String s => int.tryParse(s),
+      _ => null,
+    };
+
     return CatalogOption(
       id: id,
       name: (json['name'] ?? '').toString(),
       shifts: shifts,
+      cityId: cityId != null && cityId > 0 ? cityId : null,
     );
   }
 }

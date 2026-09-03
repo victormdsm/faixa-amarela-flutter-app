@@ -28,11 +28,13 @@ enum AdRole {
 }
 
 /// Placements (slots) de anúncio acordados com o backend.
+///
+/// Hoje a busca de transporte é a única superfície que exibe anúncio — para
+/// visitante e para usuário logado. Os slots dos dashboards continuam no
+/// banco, porém desligados (`ad_placements.is_active = false`), e o feed não
+/// os serve.
 abstract final class AdPlacements {
   static const searchInlineBanner = 'search-inline-banner';
-  static const parentDashboardBanner = 'parent-dashboard-banner';
-  static const parentDashboardCard = 'parent-dashboard-card';
-  static const driverDashboardCard = 'driver-dashboard-card';
 }
 
 /// Anúncio retornado por `GET /publicities`.

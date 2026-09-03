@@ -19,11 +19,17 @@ class AdBannerWidget extends ConsumerStatefulWidget {
     super.key,
     required this.placement,
     required this.role,
+    this.cityId,
     this.height = 110,
   });
 
   final String placement;
   final AdRole role;
+
+  /// Cidade da superfície; `null` = o backend só serve anúncios sem
+  /// segmentação geográfica.
+  final int? cityId;
+
   final double height;
 
   @override
@@ -38,7 +44,11 @@ class _AdBannerWidgetState extends ConsumerState<AdBannerWidget>
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
 
-  AdQuery get _query => (placement: widget.placement, role: widget.role);
+  AdQuery get _query => (
+    placement: widget.placement,
+    role: widget.role,
+    cityId: widget.cityId,
+  );
 
   @override
   void initState() {
@@ -94,6 +104,7 @@ class _AdBannerWidgetState extends ConsumerState<AdBannerWidget>
           placement: widget.placement,
           surface: AdFormat.banner.wireValue,
           role: widget.role,
+          cityId: widget.cityId,
         );
   }
 
@@ -105,6 +116,7 @@ class _AdBannerWidgetState extends ConsumerState<AdBannerWidget>
           placement: widget.placement,
           surface: AdFormat.banner.wireValue,
           role: widget.role,
+          cityId: widget.cityId,
         );
     await openAdLink(ad.linkUrl!);
   }

@@ -24,13 +24,16 @@ class AdsRepository {
   /// Dedup de impressões da sessão: `<placement>:<adId>`.
   final Set<String> _impressionsSent = <String>{};
 
+  /// Busca os anúncios do [placement].
+  ///
+  /// [cityId] vem da superfície (na busca, da escola/bairro escolhido). Sem
+  /// cidade o backend só devolve anúncios sem segmentação geográfica — um
+  /// anúncio comprado para uma cidade não vaza para o resto do país.
   Future<List<Ad>> fetchAds({
     required String placement,
     required AdRole role,
     String? deviceId,
-    // TODO(APP-12): o app ainda não tem fonte de cidade no perfil/seleção do
-    // usuário — quando existir, propagar até aqui para segmentar os anúncios.
-    String? cityId,
+    int? cityId,
   }) async {
     try {
       final response = await _dio.get<dynamic>(
@@ -39,7 +42,7 @@ class AdsRepository {
           'placement': placement,
           'role': role.wireValue,
           'device_id': deviceId ?? await _deviceIdStorage.getOrCreate(),
-          'cityId': ?cityId,
+          'city_id': ?cityId,
         },
       );
       return _parseAds(response.data);
@@ -56,6 +59,7 @@ class AdsRepository {
     String? surface,
     AdRole? role,
     String? deviceId,
+    int? cityId,
   }) async {
     final key = '${placement ?? ''}:$adId';
     if (!_impressionsSent.add(key)) return;
@@ -66,6 +70,7 @@ class AdsRepository {
       surface: surface,
       role: role,
       deviceId: deviceId,
+      cityId: cityId,
     );
   }
 
@@ -75,6 +80,7 @@ class AdsRepository {
     String? surface,
     AdRole? role,
     String? deviceId,
+    int? cityId,
   }) async {
     await _track(
       adId,
@@ -83,6 +89,7 @@ class AdsRepository {
       surface: surface,
       role: role,
       deviceId: deviceId,
+      cityId: cityId,
     );
   }
 
@@ -93,6 +100,7 @@ class AdsRepository {
     String? surface,
     AdRole? role,
     String? deviceId,
+    int? cityId,
   }) async {
     try {
       await _dio.post<dynamic>(
@@ -103,6 +111,7 @@ class AdsRepository {
           // APP-25: o backend grava audience_role a partir deste campo.
           'role': ?role?.wireValue,
           'deviceId': deviceId ?? await _deviceIdStorage.getOrCreate(),
+          'cityId': ?cityId,
         },
       );
     } catch (e) {
