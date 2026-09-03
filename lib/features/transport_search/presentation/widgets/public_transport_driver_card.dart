@@ -6,10 +6,10 @@ import '../../domain/entities/public_transport_driver.dart';
 import 'public_transport_driver_detail_sheet.dart';
 
 /// Card de um motorista de transporte escolar publico encontrado na busca.
-/// Exibe resumo do veículo, contato público, CNH, sobre (information),
-/// escolas e bairros. Toque no card — ou no botão "Ver mais" — abre o bottom
-/// sheet completo, de onde sai o contato via WhatsApp (contato público — o
-/// backend nunca expõe o celular pessoal).
+/// Exibe resumo do veículo, contato público, sobre (information) e bairros.
+/// Toque no card — ou no botão "Ver mais" — abre o bottom sheet completo, de
+/// onde sai o contato via WhatsApp (contato público — o backend nunca expõe o
+/// celular pessoal).
 class PublicTransportDriverCard extends StatelessWidget {
   const PublicTransportDriverCard({super.key, required this.driver});
 
@@ -112,52 +112,6 @@ class PublicTransportDriverCard extends StatelessWidget {
                       ],
                     ),
                   ],
-                  if ((driver.cnh ?? '').isNotEmpty) ...[
-                    const SizedBox(height: AppSpacing.xs),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.badge_outlined,
-                          size: 13,
-                          color: AppColors.muted,
-                        ),
-                        const SizedBox(width: AppSpacing.xs),
-                        Expanded(
-                          child: Text(
-                            'CNH ${driver.cnh}',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: AppColors.slate,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                  if (driver.schools.isNotEmpty) ...[
-                    const SizedBox(height: AppSpacing.xs),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.school_outlined,
-                          size: 13,
-                          color: AppColors.muted,
-                        ),
-                        const SizedBox(width: AppSpacing.xs),
-                        Expanded(
-                          child: Text(
-                            driver.schools.take(2).join(' · '),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: AppColors.slate,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
                   if (driver.districts.isNotEmpty) ...[
                     const SizedBox(height: AppSpacing.xs),
                     Row(
@@ -227,7 +181,7 @@ class PublicTransportDriverCard extends StatelessWidget {
                   ),
                   // O card resume o motorista; o contato fica no detalhe.
                   // Antes o botão disparava o WhatsApp direto e o responsável
-                  // solicitava sem ver van, escolas, bairros e turnos.
+                  // solicitava sem ver a van e os bairros atendidos.
                   onPressed: () =>
                       showPublicTransportDriverDetail(context, driver: driver),
                   child: const Text('Ver mais'),

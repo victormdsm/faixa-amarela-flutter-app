@@ -12,9 +12,7 @@ void main() {
     information: 'Van amarela, porta lateral',
     avatarUrl: null,
     vehicleImageUrl: null,
-    schools: ['Escola Municipal A', 'Escola Municipal B'],
     districts: ['Centro'],
-    shiftIds: [1],
   );
 
   Future<void> pumpCard(

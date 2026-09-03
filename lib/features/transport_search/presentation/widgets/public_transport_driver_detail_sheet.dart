@@ -27,9 +27,9 @@ Future<void> showPublicTransportDriverDetail(
 
 /// Bottom sheet de detalhe do motorista (busca pública, sem login).
 ///
-/// Exibe foto, nome, CNH, descrição, van, contato público (WhatsApp/ligação
-/// — sempre o telefone público da van, nunca o celular pessoal) e as
-/// escolas/bairros/turnos atendidos.
+/// Exibe foto, nome, descrição, van, contato público (WhatsApp/ligação —
+/// sempre o telefone público da van, nunca o celular pessoal) e os bairros
+/// atendidos.
 ///
 /// O conteúdo resolve via [transportDriverDetailProvider]: dados frescos da
 /// última busca entram sozinhos; enquanto carrega mostra um indicador (ou o
@@ -134,7 +134,6 @@ class _DriverDetailContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final cnh = (driver.cnh ?? '').trim();
     final about = driver.about;
     final vehicleDescription = (driver.vehicleDescription ?? '').trim();
     final vehiclePlate = (driver.vehiclePlate ?? '').trim();
@@ -183,27 +182,6 @@ class _DriverDetailContent extends StatelessWidget {
               color: AppColors.ink,
             ),
           ),
-          if (cnh.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.sm),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.badge_rounded,
-                  size: 16,
-                  color: AppColors.slate,
-                ),
-                const SizedBox(width: AppSpacing.xs),
-                Text(
-                  'CNH $cnh',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: AppColors.slate,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ],
 
           // ── Descrição (oculta quando vazia) ────────────────────────
           if (about != null) ...[
@@ -271,29 +249,13 @@ class _DriverDetailContent extends StatelessWidget {
             ),
           ],
 
-          // ── Cobertura: escolas, bairros e turnos ───────────────────
-          if (driver.schools.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.lg),
-            _DetailChipSection(
-              icon: Icons.school_outlined,
-              label: 'Escolas atendidas',
-              values: driver.schools,
-            ),
-          ],
+          // ── Cobertura: bairros atendidos ───────────────────────────
           if (driver.districts.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.md),
+            const SizedBox(height: AppSpacing.lg),
             _DetailChipSection(
               icon: Icons.location_on_outlined,
               label: 'Bairros atendidos',
               values: driver.districts,
-            ),
-          ],
-          if (driver.shifts.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.md),
-            _DetailChipSection(
-              icon: Icons.schedule_rounded,
-              label: 'Turnos atendidos',
-              values: driver.shifts,
             ),
           ],
 

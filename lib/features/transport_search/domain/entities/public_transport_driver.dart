@@ -6,15 +6,11 @@ class PublicTransportDriver {
     required this.information,
     required this.avatarUrl,
     required this.vehicleImageUrl,
-    required this.schools,
     required this.districts,
-    required this.shiftIds,
-    this.cnh,
     this.publicContactName,
     this.publicContactPhone,
     this.vehicleDescription,
     this.vehiclePlate,
-    this.shifts = const [],
   });
 
   final int id;
@@ -26,12 +22,7 @@ class PublicTransportDriver {
   final String? information;
   final String? avatarUrl;
   final String? vehicleImageUrl;
-  final List<String> schools;
   final List<String> districts;
-  final List<int> shiftIds;
-
-  /// CNH do motorista (contrato novo da busca pública).
-  final String? cnh;
 
   /// Nome/telefone de contato público da van (exibidos no detalhe).
   final String? publicContactName;
@@ -42,9 +33,6 @@ class PublicTransportDriver {
 
   /// Placa da van — opcional no contrato público; oculta quando ausente.
   final String? vehiclePlate;
-
-  /// Nomes dos turnos atendidos (para os chips do detalhe).
-  final List<String> shifts;
 
   /// Telefone público preferencial para contato (WhatsApp/ligação).
   String? get contactPhone {
@@ -69,15 +57,6 @@ class PublicTransportDriver {
           .toList(growable: false);
     }
 
-    List<int> ids(dynamic raw) {
-      if (raw is! List) return const [];
-      return raw
-          .whereType<num>()
-          .map((e) => e.toInt())
-          .toSet()
-          .toList(growable: false);
-    }
-
     int parseId(dynamic raw) {
       if (raw is num) return raw.toInt();
       if (raw is String) return int.tryParse(raw) ?? 0;
@@ -91,15 +70,11 @@ class PublicTransportDriver {
       information: json['information']?.toString(),
       avatarUrl: json['avatarUrl']?.toString(),
       vehicleImageUrl: json['vehicleImageUrl']?.toString(),
-      schools: names(json['schools']),
       districts: names(json['districts']),
-      shiftIds: ids(json['shiftIds']),
-      cnh: json['cnh']?.toString(),
       publicContactName: json['publicContactName']?.toString(),
       publicContactPhone: json['publicContactPhone']?.toString(),
       vehicleDescription: json['vehicleDescription']?.toString(),
       vehiclePlate: json['vehiclePlate']?.toString(),
-      shifts: names(json['shifts']),
     );
   }
 }
